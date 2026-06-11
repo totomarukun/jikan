@@ -160,6 +160,7 @@ export default async function CompareViewPage({
             allLabel="ラケット: 全部"
           />
           <select
+            key={filters.expOnly ? "both" : "all"}
             name="exp"
             defaultValue={filters.expOnly ? "both" : ""}
             className="h-10 rounded-lg border border-tt-gray30/60 bg-white px-2"
@@ -251,7 +252,9 @@ function FilterSelect({
   allLabel: string;
 }) {
   return (
+    // defaultValue はクライアント遷移では再評価されないため、key で再マウントさせる
     <select
+      key={current ?? "all"}
       name={name}
       defaultValue={current ?? ""}
       className="h-10 rounded-lg border border-tt-gray30/60 bg-white px-2"
