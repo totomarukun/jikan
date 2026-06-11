@@ -46,11 +46,8 @@ export default function RootLayout({
               <Link href="/battles" className="transition hover:text-tt-green">
                 人気の対決
               </Link>
-              <Link
-                href="/compare/select"
-                className="transition hover:text-tt-green"
-              >
-                対決を作る
+              <Link href="/switch" className="transition hover:text-tt-green">
+                乗り換え検討
               </Link>
               <Link href="/me" className="transition hover:text-tt-green">
                 マイページ
@@ -67,12 +64,18 @@ export default function RootLayout({
             <p className="mt-1 text-xs text-tt-gray70">
               データで、用具選びの後悔を減らす。
             </p>
-            <nav className="mt-4 flex gap-4 text-xs text-tt-gray70">
+            <nav className="mt-4 flex flex-wrap gap-4 text-xs text-tt-gray70">
               <Link href="/play" className="hover:text-tt-green">
                 AB比較に答える
               </Link>
               <Link href="/battles" className="hover:text-tt-green">
                 人気の対決
+              </Link>
+              <Link href="/switch" className="hover:text-tt-green">
+                乗り換え検討
+              </Link>
+              <Link href="/compare/select" className="hover:text-tt-green">
+                対決を作る
               </Link>
               <Link href="/terms" className="hover:text-tt-green">
                 利用規約

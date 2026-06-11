@@ -168,6 +168,7 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
             side="A"
             picked={phase.kind !== "choose" && phase.winner === "A"}
             dimmed={phase.kind !== "choose" && phase.winner === "B"}
+            isCurrent={question.optionAIsCurrent}
           />
           <span className="absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-tt-charcoal font-mono text-xs font-bold text-white shadow-lg">
             VS
@@ -240,6 +241,8 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
           phase={phase}
           nameA={question.optionA.name}
           nameB={question.optionB.name}
+          aId={question.optionA.id}
+          bId={question.optionB.id}
           busy={busy}
           onNext={() => advance(phase.reachedMilestone)}
         />
@@ -256,12 +259,16 @@ function RevealPanel({
   phase,
   nameA,
   nameB,
+  aId,
+  bId,
   busy,
   onNext,
 }: {
   phase: Extract<Phase, { kind: "reveal" }>;
   nameA: string;
   nameB: string;
+  aId: string;
+  bId: string;
   busy: boolean;
   onNext: () => void;
 }) {
@@ -317,6 +324,14 @@ function RevealPanel({
             ? `${reachedMilestone}問達成！ 報酬を見る`
             : "次の質問へ"}
       </button>
+      <a
+        href={`/compare/${aId}/vs/${bId}`}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 block text-center text-xs text-tt-gray70 underline"
+      >
+        この対決の詳細データを見る（軸別・絞り込み）
+      </a>
     </div>
   );
 }
@@ -326,11 +341,13 @@ function EquipmentCard({
   side,
   picked,
   dimmed,
+  isCurrent,
 }: {
   option: QuestionPayload["question"]["optionA"];
   side: "A" | "B";
   picked: boolean;
   dimmed: boolean;
+  isCurrent?: boolean;
 }) {
   const palette =
     side === "A"
@@ -345,12 +362,19 @@ function EquipmentCard({
       } ${dimmed ? "opacity-50" : ""}`}
     >
       <div className="flex items-baseline justify-between">
-        <span
-          className={`flex h-7 w-7 items-center justify-center rounded-full font-mono text-sm font-bold text-white ${
-            side === "A" ? "bg-tt-green" : "bg-tt-coral"
-          }`}
-        >
-          {side}
+        <span className="flex items-center gap-2">
+          <span
+            className={`flex h-7 w-7 items-center justify-center rounded-full font-mono text-sm font-bold text-white ${
+              side === "A" ? "bg-tt-green" : "bg-tt-coral"
+            }`}
+          >
+            {side}
+          </span>
+          {isCurrent && (
+            <span className="rounded-full bg-tt-charcoal px-2.5 py-0.5 text-xs font-bold text-white">
+              いま使用中
+            </span>
+          )}
         </span>
         <span className="text-xs text-tt-gray70">
           {EQUIPMENT_CATEGORY_LABELS[option.category as EquipmentCategory]}

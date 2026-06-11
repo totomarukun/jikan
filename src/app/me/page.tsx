@@ -94,6 +94,12 @@ export default async function MyPage() {
       </div>
 
       <Link
+        href="/switch"
+        className="mt-3 block rounded-2xl bg-tt-charcoal p-4 text-center text-sm font-bold text-white shadow-lg transition hover:opacity-90 active:scale-[0.99]"
+      >
+        ラバーの乗り換えを検討する →
+      </Link>
+      <Link
         href="/battles"
         className="mt-3 block rounded-2xl bg-white p-4 text-center text-sm font-bold shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
       >

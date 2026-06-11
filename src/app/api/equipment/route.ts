@@ -5,11 +5,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";
   const category = searchParams.get("category");
+  const rubberOnly = searchParams.get("rubberOnly") === "1";
 
   const equipments = await prisma.equipment.findMany({
     where: {
       isActive: true,
       ...(category ? { category } : {}),
+      ...(rubberOnly ? { category: { startsWith: "RUBBER_" } } : {}),
       ...(q
         ? {
             OR: [{ name: { contains: q } }, { manufacturer: { contains: q } }],

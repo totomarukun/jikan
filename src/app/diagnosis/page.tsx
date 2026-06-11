@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionId, getUserId } from "@/lib/session";
-import { getAnswersForDiagnosis } from "@/lib/data";
+import {
+  getAnswersForDiagnosis,
+  getPopularPicksForSimilarUsers,
+} from "@/lib/data";
 import { diagnose, tendencyRows } from "@/lib/diagnosis";
 import { DIAGNOSIS_MILESTONE } from "@/lib/types";
 import { ShareButton } from "@/components/share-button";
@@ -39,6 +42,20 @@ export default async function DiagnosisPage() {
   const sharePct = total > 0 ? Math.round((same / total) * 100) : null;
 
   const userId = await getUserId();
+
+  // 診断をデッドエンドにしない: 似た条件のプレイヤーに支持されるラバーを提示し、
+  // そのまま乗り換え検討へつなげる (検討フローはラバー基準のためラバーのみ)
+  const picks = (
+    await getPopularPicksForSimilarUsers(
+      progress.level,
+      progress.playstyle,
+      sessionId,
+      8,
+    )
+  ).filter(
+    (p) =>
+      p.id !== progress.currentRubberId && p.category.startsWith("RUBBER_"),
+  );
 
   return (
     <div className="mx-auto max-w-md py-8">
@@ -85,6 +102,50 @@ export default async function DiagnosisPage() {
           ))}
         </div>
       </div>
+
+      {picks.length > 0 && (
+        <div className="animate-rise mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 [animation-delay:200ms]">
+          <h2 className="font-bold">あなたと似た条件の人に支持されている用具</h2>
+          <p className="mt-0.5 text-xs text-tt-gray70">
+            {`同じレベル・スタイル帯の「好み」獲得数の上位 (おすすめ断定ではありません)`}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {picks.slice(0, 3).map((p, i) => (
+              <li key={p.id}>
+                <Link
+                  href={`/equipment/${p.id}`}
+                  className="flex items-center gap-3 rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5 transition hover:bg-tt-soft-green"
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-mono text-sm font-bold ${
+                      i === 0
+                        ? "bg-gradient-to-br from-tt-green to-tt-deep-green text-white"
+                        : "bg-tt-gray30/30 text-tt-gray70"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-bold">{p.name}</span>
+                    <span className="text-xs text-tt-gray70">
+                      {p.manufacturer}
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-tt-gray70">
+                    {p.wins}勝
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link
+            href={`/switch?c=${picks.slice(0, 3).map((p) => p.id).join(",")}`}
+            className="mt-4 block rounded-xl bg-tt-charcoal py-3 text-center text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.99]"
+          >
+            この3つを「いまのラバー」と比べて検討する →
+          </Link>
+        </div>
+      )}
 
       <div className="mt-6 space-y-3 text-center">
         {userId ? (

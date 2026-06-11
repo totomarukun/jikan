@@ -21,6 +21,8 @@ export interface GeneratorContext {
   bladeCategory: string;
   level: string;
   playstyle: string;
+  /** いま使っているラバー (超高関連レイヤー: 現用 vs 他 の出題に使う) */
+  currentRubberId?: string | null;
   /** 直近に出題したペア (新しい順、最大10) */
   recentPairs: Array<[string, string]>;
   /** 用具ID → 回答に登場した回数 (人気度・補完優先度の代用) */
@@ -36,6 +38,8 @@ export interface GeneratedQuestion {
   axis: QuestionAxis;
   prompt: string;
   layer: 1 | 2 | 3;
+  /** optionA がユーザーの現用ラバーである出題 (UIで「いま使用中」を表示) */
+  optionAIsCurrent?: boolean;
 }
 
 export function pairKey(aId: string, bId: string): string {
@@ -95,6 +99,37 @@ export function generateQuestion(
     useRubber ? isRubberCategory(e.category) : e.category === "BLADE",
   );
   if (pool.length < 2) return null;
+
+  // 超高関連 (企画書 9.2): 現用ラバーが登録済みなら、ラバー出題の35%を
+  // 「現用 vs 他」に固定する。基準点が明確で答えやすく、乗り換え検討に直結する。
+  if (useRubber && context.currentRubberId && random() < 0.35) {
+    const current = pool.find((e) => e.id === context.currentRubberId);
+    if (current) {
+      const others = pool.filter(
+        (e) =>
+          e.id !== current.id &&
+          e.category === current.category &&
+          !recentKeys.has(pairKey(current.id, e.id)),
+      );
+      if (others.length > 0) {
+        const optionB = pickRandom(others, random);
+        const { axis, template } = selectQuestionType(random);
+        const prompt =
+          axis === "overall"
+            ? `いまの「${current.name}」と比べてどっち？`
+            : template(current, optionB);
+        return {
+          id: pairKey(current.id, optionB.id),
+          optionA: current,
+          optionB,
+          axis,
+          prompt,
+          layer: 1,
+          optionAIsCurrent: true,
+        };
+      }
+    }
+  }
 
   const layerRoll = random();
   const layer: 1 | 2 | 3 = layerRoll < 0.6 ? 1 : layerRoll < 0.9 ? 2 : 3;

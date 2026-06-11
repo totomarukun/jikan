@@ -52,6 +52,8 @@ export const onboardingSchema = z.object({
   level: levelSchema,
   playstyle: playstyleSchema,
   bladeCategory: bladeCategorySchema,
+  // いま使っているフォア面ラバー (任意・スキップ可)
+  currentRubberId: z.string().min(1).optional(),
 });
 
 export const answerSchema = z.object({

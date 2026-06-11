@@ -98,6 +98,8 @@ model SessionProgress {
   level              String   @default("INTERMEDIATE")
   bladeCategory      String   @default("UNKNOWN")
   grip               String   @default("SHAKEHAND")
+  // いま使っているフォア面ラバー (任意)。出題・乗り換え検討の基準点になる
+  currentRubberId    String?
   answerCount        Int      @default(0)
   // JSON 文字列の配列 例: "[5,10]"
   unlockedMilestones String   @default("[]")

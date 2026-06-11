@@ -49,7 +49,15 @@ export async function getPopularPicksForSimilarUsers(
   playstyle: string,
   excludeSessionId: string,
   take = 3,
-): Promise<Array<{ name: string; manufacturer: string; wins: number }>> {
+): Promise<
+  Array<{
+    id: string;
+    name: string;
+    manufacturer: string;
+    category: string;
+    wins: number;
+  }>
+> {
   const similar = await prisma.comparison.findMany({
     where: {
       sessionId: { not: excludeSessionId },
@@ -58,8 +66,8 @@ export async function getPopularPicksForSimilarUsers(
       winnerOverall: { in: ["A", "B"] },
     },
     include: {
-      optionA: { select: { name: true, manufacturer: true } },
-      optionB: { select: { name: true, manufacturer: true } },
+      optionA: { select: { id: true, name: true, manufacturer: true, category: true } },
+      optionB: { select: { id: true, name: true, manufacturer: true, category: true } },
     },
     take: 500,
     orderBy: { answeredAt: "desc" },
@@ -74,17 +82,26 @@ export async function getPopularPicksForSimilarUsers(
             winnerOverall: { in: ["A", "B"] },
           },
           include: {
-            optionA: { select: { name: true, manufacturer: true } },
-            optionB: { select: { name: true, manufacturer: true } },
+            optionA: { select: { id: true, name: true, manufacturer: true, category: true } },
+            optionB: { select: { id: true, name: true, manufacturer: true, category: true } },
           },
           take: 500,
           orderBy: { answeredAt: "desc" },
         });
 
-  const wins = new Map<string, { name: string; manufacturer: string; wins: number }>();
+  const wins = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      manufacturer: string;
+      category: string;
+      wins: number;
+    }
+  >();
   for (const c of pool) {
     const winner = c.winnerOverall === "A" ? c.optionA : c.optionB;
-    const key = `${winner.manufacturer}|${winner.name}`;
+    const key = winner.id;
     const entry = wins.get(key) ?? { ...winner, wins: 0 };
     entry.wins++;
     wins.set(key, entry);

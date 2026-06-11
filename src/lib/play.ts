@@ -46,6 +46,7 @@ export async function buildQuestionPayload(
     bladeCategory: progress.bladeCategory,
     level: progress.level,
     playstyle: progress.playstyle,
+    currentRubberId: progress.currentRubberId,
     recentPairs: recent.map((r) => [r.optionAEquipmentId, r.optionBEquipmentId]),
     appearanceCounts,
   });

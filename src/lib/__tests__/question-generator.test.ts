@@ -85,6 +85,39 @@ describe("generateQuestion", () => {
     expect(q).toBeNull();
   });
 
+  it("現用ラバー登録時は「現用 vs 他」の出題が一定割合で発生する", () => {
+    let pinned = 0;
+    for (let i = 0; i < 300; i++) {
+      const q = generateQuestion(equipments, {
+        ...baseContext,
+        currentRubberId: "r0",
+      });
+      if (q?.optionAIsCurrent) {
+        pinned++;
+        expect(q.optionA.id).toBe("r0");
+        expect(q.optionB.id).not.toBe("r0");
+      }
+    }
+    // ラバー出題75% × ピン留め35% ≈ 26% 前後。下限だけ緩く検証
+    expect(pinned).toBeGreaterThan(30);
+  });
+
+  it("現用ピン留めでも直近ペアとは重複しない", () => {
+    const others = equipments.filter(
+      (e) => e.category === "RUBBER_INVERTED" && e.id !== "r0",
+    );
+    // r0 と他全ラバーの組み合わせを直近に置くと、ピン留め出題は発生しない
+    const recent: Array<[string, string]> = others.map((e) => ["r0", e.id]);
+    for (let i = 0; i < 100; i++) {
+      const q = generateQuestion(equipments, {
+        ...baseContext,
+        currentRubberId: "r0",
+        recentPairs: recent,
+      });
+      expect(q?.optionAIsCurrent ?? false).toBe(false);
+    }
+  });
+
   it("粘着ユーザーのLayer 1では粘着ラバーが優先候補に含まれる", () => {
     const stickyPool = [
       ...Array.from({ length: 5 }, (_, i) =>

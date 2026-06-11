@@ -46,6 +46,12 @@ export default async function LandingPage() {
             {hasSession ? "比較を続ける" : "始める（無料）"}
           </Link>
           <p className="mt-3 text-sm text-tt-gray70">登録なしで参加できます</p>
+          <Link
+            href="/switch"
+            className="mt-4 inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+          >
+            いまのラバーからの乗り換えを検討する →
+          </Link>
         </div>
 
         {/* ライブ統計 */}

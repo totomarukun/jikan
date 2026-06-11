@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       level: progress?.level ?? "INTERMEDIATE",
       bladeCategory: progress?.bladeCategory ?? "UNKNOWN",
       grip: progress?.grip ?? "SHAKEHAND",
+      currentFhRubberId: progress?.currentRubberId ?? null,
     },
   });
 
