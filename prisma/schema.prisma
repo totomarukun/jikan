@@ -1,0 +1,108 @@
+// TacTap data model (企画書 第8章準拠)
+//
+// ローカル開発・検証は SQLite。本番は Supabase (PostgreSQL) を想定しており、
+// provider を "postgresql" に切り替えるだけで移行できるよう、
+// SQLite が未対応の enum はすべて String + アプリ層 (src/lib/types.ts の
+// Zod スキーマ) で検証する方針を取る。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  nickname          String?
+  // enum: DRIVE | QUICK_ATTACK | CUT | OTHER | UNDECIDED
+  playstyle         String       @default("UNDECIDED")
+  // enum: BEGINNER | INTERMEDIATE | ADVANCED | NON_PLAYER
+  level             String       @default("INTERMEDIATE")
+  // enum: OUTER_CARBON | INNER_CARBON | WOOD | STICKY | UNKNOWN
+  bladeCategory     String       @default("UNKNOWN")
+  // enum: SHAKEHAND | PENHOLD_CN | PENHOLD_JP
+  grip              String       @default("SHAKEHAND")
+  currentBladeId    String?
+  currentFhRubberId String?
+  currentBhRubberId String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  comparisons       Comparison[]
+}
+
+model Equipment {
+  id               String       @id @default(cuid())
+  // enum: RUBBER_INVERTED | RUBBER_PIMPLE_OUT | RUBBER_PIMPLE_LONG |
+  //       RUBBER_ANTI | RUBBER_STICKY | BLADE
+  category         String
+  manufacturer     String
+  name             String
+  price            Int?
+  officialSpeed    Int?
+  officialSpin     Int?
+  officialArc      Int?
+  hardness         Int?
+  // enum (ラケットのみ): OUTER_CARBON | INNER_CARBON | WOOD
+  bladeSubcategory String?
+  imageUrl         String?
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  comparisonsAsA   Comparison[] @relation("OptionA")
+  comparisonsAsB   Comparison[] @relation("OptionB")
+
+  @@unique([manufacturer, name])
+  @@index([category, isActive])
+}
+
+// 1回のAB比較回答
+model Comparison {
+  id                   String    @id @default(cuid())
+  userId               String?
+  user                 User?     @relation(fields: [userId], references: [id])
+  sessionId            String
+  // enum: rubber | blade
+  category             String
+  optionAEquipmentId   String
+  optionA              Equipment @relation("OptionA", fields: [optionAEquipmentId], references: [id])
+  optionBEquipmentId   String
+  optionB              Equipment @relation("OptionB", fields: [optionBEquipmentId], references: [id])
+  contextPlaystyle     String
+  contextLevel         String
+  contextBladeCategory String
+  contextGrip          String    @default("SHAKEHAND")
+  // enum: A | B | SAME | UNKNOWN
+  winnerOverall        String?
+  winnerSpeed          String?
+  winnerSpin           String?
+  winnerControl        String?
+  winnerHardness       String?
+  winnerBallHold       String?
+  // enum: BOTH | ONE | NEITHER
+  hasActualExperience  String?
+  answeredAt           DateTime  @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([optionAEquipmentId, optionBEquipmentId])
+}
+
+// 匿名セッションの進捗管理
+model SessionProgress {
+  sessionId          String   @id
+  playstyle          String   @default("UNDECIDED")
+  level              String   @default("INTERMEDIATE")
+  bladeCategory      String   @default("UNKNOWN")
+  grip               String   @default("SHAKEHAND")
+  answerCount        Int      @default(0)
+  // JSON 文字列の配列 例: "[5,10]"
+  unlockedMilestones String   @default("[]")
+  // 30問達成時に確定したスタイル名 (該当率の母集団計算に使用)
+  diagnosedStyle     String?
+  firstAnswerAt      DateTime @default(now())
+  lastAnswerAt       DateTime @updatedAt
+}

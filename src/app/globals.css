@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* TacTap ブランドカラー (企画書 10.3) */
+@theme {
+  --color-tt-green: #1a8917;
+  --color-tt-coral: #d85a30;
+  --color-tt-deep-green: #0f6e56;
+  --color-tt-deep-coral: #993c1d;
+  --color-tt-soft-green: #e1f5ee;
+  --color-tt-soft-coral: #faece7;
+  --color-tt-charcoal: #1a1a1a;
+  --color-tt-gray70: #5f5e5a;
+  --color-tt-gray30: #b4b2a9;
+  --color-tt-offwhite: #fafaf7;
+
+  --font-sans: var(--font-inter), var(--font-noto-sans-jp), system-ui,
+    sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+}
+
+body {
+  background: var(--color-tt-offwhite);
+  color: var(--color-tt-charcoal);
+  font-family: var(--font-sans);
+}
