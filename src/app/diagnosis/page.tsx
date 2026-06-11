@@ -46,30 +46,38 @@ export default async function DiagnosisPage() {
         {DIAGNOSIS_MILESTONE} / {DIAGNOSIS_MILESTONE}問達成
       </p>
 
-      <div className="rounded-2xl bg-tt-soft-green p-6 text-center ring-1 ring-tt-green/30">
-        <p className="text-sm text-tt-deep-green">あなたの卓球用具スタイル</p>
-        <h1 className="mt-2 text-2xl font-bold text-tt-deep-green">
+      <div className="animate-pop rounded-3xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-8 text-center shadow-sm ring-1 ring-tt-green/20">
+        <p className="text-sm font-medium text-tt-deep-green">
+          あなたの卓球用具スタイル
+        </p>
+        <h1 className="mt-3 text-3xl font-bold leading-snug text-tt-deep-green">
           {result.styleName}
         </h1>
         {sharePct !== null && (
-          <p className="mt-2 text-sm text-tt-gray70">
-            全プレイヤーの{sharePct}%が該当
+          <p className="mt-3 inline-block rounded-full bg-white/80 px-4 py-1.5 text-sm text-tt-gray70 ring-1 ring-black/5">
+            全プレイヤーの
+            <span className="font-mono font-bold text-tt-deep-green">
+              {sharePct}%
+            </span>
+            が該当
           </p>
         )}
       </div>
 
-      <div className="mt-6 rounded-xl bg-white p-5 ring-1 ring-tt-gray30/40">
+      <div className="animate-rise mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 [animation-delay:120ms]">
         <h2 className="mb-3 font-bold">傾向スコア</h2>
         <div className="space-y-3">
           {tendencyRows(result).map((row) => (
             <div key={row.label}>
               <div className="flex justify-between text-sm">
                 <span>{row.label}</span>
-                <span className="font-mono">+{row.value.toFixed(1)}</span>
+                <span className="font-mono font-bold">
+                  +{row.value.toFixed(1)}
+                </span>
               </div>
-              <div className="mt-1 h-2 rounded-full bg-tt-gray30/40">
+              <div className="mt-1 h-2.5 rounded-full bg-tt-gray30/30">
                 <div
-                  className="h-2 rounded-full bg-tt-green"
+                  className="bar-grow h-2.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
                   style={{ width: `${Math.min(row.value * 33, 100)}%` }}
                 />
               </div>
@@ -82,14 +90,14 @@ export default async function DiagnosisPage() {
         {userId ? (
           <Link
             href="/me"
-            className="block rounded-full bg-tt-green px-8 py-3 font-bold text-white transition hover:opacity-90"
+            className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
             マイページで見る
           </Link>
         ) : (
           <Link
             href="/signup"
-            className="block rounded-full bg-tt-green px-8 py-3 font-bold text-white transition hover:opacity-90"
+            className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
             登録して詳細レポートを見る
           </Link>

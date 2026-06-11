@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
+import { aggregatePairs } from "@/lib/data";
 import {
   BLADE_CATEGORIES,
   BLADE_CATEGORY_LABELS,
@@ -13,6 +14,7 @@ import {
   type Level,
   type Playstyle,
 } from "@/lib/types";
+import { VersusBar } from "@/components/versus-bar";
 
 export const metadata = { title: "用具対決" };
 
@@ -48,7 +50,7 @@ export default async function CompareViewPage({
     : null;
 
   const mode = typeof sp.mode === "string" ? sp.mode : null;
-  const similarDefault = mode !== "all" && progress != null;
+  const similarDefault = mode !== "all" && mode !== "custom" && progress != null;
 
   const filters: Filters = {
     playstyle:
@@ -82,7 +84,14 @@ export default async function CompareViewPage({
     ...(filters.blade ? { contextBladeCategory: filters.blade } : {}),
     ...(filters.expOnly ? { hasActualExperience: "BOTH" } : {}),
   };
-  const comparisons = await prisma.comparison.findMany({ where });
+  const [comparisons, related] = await Promise.all([
+    prisma.comparison.findMany({ where }),
+    aggregatePairs({
+      involvingEquipmentId: aId,
+      take: 3,
+      excludePair: [aId, bId],
+    }),
+  ]);
 
   // A/B を equipA / equipB 基準に正規化して集計
   const tally = {
@@ -114,24 +123,76 @@ export default async function CompareViewPage({
 
   const insight = buildInsight(equipA.name, equipB.name, tally.overall);
 
+  // neutral: 硬さは中立軸 (企画書 7.3) のため優位表示しない。lowerWins: 価格は安い側を優位とする
+  const specRows: Array<{
+    label: string;
+    a: number | null;
+    b: number | null;
+    unit?: string;
+    neutral?: boolean;
+    lowerWins?: boolean;
+  }> = [
+    { label: "公称スピード", a: equipA.officialSpeed, b: equipB.officialSpeed },
+    { label: "公称スピン", a: equipA.officialSpin, b: equipB.officialSpin },
+    {
+      label: "スポンジ硬度",
+      a: equipA.hardness,
+      b: equipB.hardness,
+      unit: "°",
+      neutral: true,
+    },
+    {
+      label: "参考価格",
+      a: equipA.price,
+      b: equipB.price,
+      unit: "円",
+      lowerWins: true,
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-md py-4">
-      <h1 className="text-center text-xl font-bold">
-        <span className="text-tt-deep-green">{equipA.name}</span>
-        <span className="mx-2 text-sm text-tt-gray70">vs</span>
-        <span className="text-tt-deep-coral">{equipB.name}</span>
-      </h1>
-      <p className="mt-1 text-center text-xs text-tt-gray70">
-        {equipA.manufacturer} / {equipB.manufacturer}
-      </p>
+      {/* ヘッダー: 対決カード */}
+      <div className="relative grid grid-cols-2 gap-3">
+        <Link
+          href={`/equipment/${equipA.id}`}
+          className="rounded-2xl bg-gradient-to-br from-tt-soft-green to-white p-4 shadow-sm ring-1 ring-tt-green/25 transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-tt-green font-mono text-xs font-bold text-white">
+            A
+          </span>
+          <p className="mt-2 font-bold leading-snug">{equipA.name}</p>
+          <p className="text-xs text-tt-gray70">{equipA.manufacturer}</p>
+        </Link>
+        <Link
+          href={`/equipment/${equipB.id}`}
+          className="rounded-2xl bg-gradient-to-br from-tt-soft-coral to-white p-4 text-right shadow-sm ring-1 ring-tt-coral/25 transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-tt-coral font-mono text-xs font-bold text-white">
+            B
+          </span>
+          <p className="mt-2 font-bold leading-snug">{equipB.name}</p>
+          <p className="text-xs text-tt-gray70">{equipB.manufacturer}</p>
+        </Link>
+        <span className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-tt-charcoal font-mono text-xs font-bold text-white shadow-lg">
+          VS
+        </span>
+      </div>
 
       {/* フィルタ */}
       <form
         method="get"
-        className="mt-6 rounded-xl bg-white p-4 ring-1 ring-tt-gray30/40"
+        className="mt-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5"
       >
         <input type="hidden" name="mode" value="custom" />
-        <p className="mb-2 text-sm font-medium">絞り込み</p>
+        <div className="mb-2 flex items-baseline justify-between">
+          <p className="text-sm font-bold">絞り込み</p>
+          {similarDefault && (
+            <p className="text-xs font-medium text-tt-green">
+              あなたと似た人で絞り込み中
+            </p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <FilterSelect
             name="playstyle"
@@ -163,7 +224,7 @@ export default async function CompareViewPage({
             key={filters.expOnly ? "both" : "all"}
             name="exp"
             defaultValue={filters.expOnly ? "both" : ""}
-            className="h-10 rounded-lg border border-tt-gray30/60 bg-white px-2"
+            className="h-10 rounded-xl border border-tt-gray30/50 bg-white px-2"
           >
             <option value="">全データ</option>
             <option value="both">両方使った人のみ</option>
@@ -172,33 +233,28 @@ export default async function CompareViewPage({
         <div className="mt-3 flex gap-2">
           <button
             type="submit"
-            className="h-9 flex-1 rounded-full bg-tt-green text-sm font-bold text-white"
+            className="h-9 flex-1 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
           >
             この条件で見る
           </button>
           <Link
             href={`/compare/${aId}/vs/${bId}?mode=all`}
-            className="flex h-9 flex-1 items-center justify-center rounded-full border border-tt-gray30/60 text-sm"
+            className="flex h-9 flex-1 items-center justify-center rounded-full border border-tt-gray30/50 text-sm transition hover:bg-tt-offwhite"
           >
             絞り込み解除
           </Link>
         </div>
-        {similarDefault && (
-          <p className="mt-2 text-xs text-tt-gray70">
-            現在「あなたと似た人」で絞り込み中
-          </p>
-        )}
       </form>
 
       {/* 集計結果 */}
       <div className="mt-6 space-y-4">
         {total === 0 ? (
-          <div className="rounded-xl bg-white p-5 text-center text-sm text-tt-gray70 ring-1 ring-tt-gray30/40">
+          <div className="rounded-2xl bg-white p-6 text-center text-sm text-tt-gray70 shadow-sm ring-1 ring-black/5">
             <p>このフィルタでは結果がありません。</p>
             {(filters.playstyle || filters.level || filters.blade) && (
               <Link
                 href={`/compare/${aId}/vs/${bId}?mode=all`}
-                className="mt-2 inline-block text-tt-green underline"
+                className="mt-2 inline-block font-medium text-tt-green underline"
               >
                 絞り込みを外して見る
               </Link>
@@ -207,25 +263,114 @@ export default async function CompareViewPage({
         ) : (
           <>
             {total < 20 && (
-              <p className="rounded-lg bg-tt-soft-coral p-3 text-xs text-tt-deep-coral">
+              <p className="rounded-xl bg-tt-soft-coral p-3 text-xs text-tt-deep-coral">
                 データが少ないため参考程度に（n={total}）
               </p>
             )}
-            <VoteBar label="好み" a={tally.overall.a} b={tally.overall.b} same={tally.overall.same} nameA={equipA.name} nameB={equipB.name} />
-            <VoteBar label="スピード" a={tally.speed.a} b={tally.speed.b} same={tally.speed.same} nameA={equipA.name} nameB={equipB.name} />
-            <VoteBar label="スピン" a={tally.spin.a} b={tally.spin.b} same={tally.spin.same} nameA={equipA.name} nameB={equipB.name} />
-            <div className="rounded-xl bg-tt-soft-green p-4 text-sm ring-1 ring-tt-green/30">
+            <AxisCard label="好み" bucket={tally.overall} nameA={equipA.name} nameB={equipB.name} />
+            <AxisCard label="スピード" bucket={tally.speed} nameA={equipA.name} nameB={equipB.name} />
+            <AxisCard label="スピン" bucket={tally.spin} nameA={equipA.name} nameB={equipB.name} />
+            <div className="rounded-2xl bg-tt-soft-green p-4 text-sm ring-1 ring-tt-green/20">
               <p className="font-bold text-tt-deep-green">インサイト</p>
-              <p className="mt-1">{insight}</p>
+              <p className="mt-1 leading-6">{insight}</p>
             </div>
           </>
         )}
       </div>
 
+      {/* 公称スペック比較 */}
+      <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <h2 className="font-bold">公称スペック比較 (参考値)</h2>
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="text-xs text-tt-gray70">
+              <th className="pb-2 text-left font-medium text-tt-deep-green">
+                {equipA.name}
+              </th>
+              <th className="pb-2 text-center font-normal" />
+              <th className="pb-2 text-right font-medium text-tt-deep-coral">
+                {equipB.name}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {specRows
+              .filter((r) => r.a != null || r.b != null)
+              .map((r) => {
+                const comparable =
+                  !r.neutral && r.a != null && r.b != null && r.a !== r.b;
+                const aWins = comparable && (r.lowerWins ? r.a! < r.b! : r.a! > r.b!);
+                const bWins = comparable && !aWins;
+                return (
+                  <tr key={r.label} className="border-t border-tt-gray30/20">
+                    <td
+                      className={`py-2 text-left font-mono ${
+                        aWins ? "font-bold text-tt-deep-green" : ""
+                      }`}
+                    >
+                      {r.a != null
+                        ? `${r.a.toLocaleString()}${r.unit ?? ""}`
+                        : "—"}
+                    </td>
+                    <td className="py-2 text-center text-xs text-tt-gray70">
+                      {r.label}
+                    </td>
+                    <td
+                      className={`py-2 text-right font-mono ${
+                        bWins ? "font-bold text-tt-deep-coral" : ""
+                      }`}
+                    >
+                      {r.b != null
+                        ? `${r.b.toLocaleString()}${r.unit ?? ""}`
+                        : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+        <p className="mt-2 text-xs text-tt-gray70">
+          ※太字は優位側 (価格は安い側)。公称値はメーカー間で基準が異なります。
+        </p>
+      </section>
+
+      {/* 関連対決 */}
+      {related.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 font-bold">よく比較される対決</h2>
+          <div className="space-y-3">
+            {related.map((p) => (
+              <Link
+                key={`${p.aId}-${p.bId}`}
+                href={`/compare/${p.aId}/vs/${p.bId}`}
+                className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-bold">
+                    {p.nameA} <span className="text-tt-gray30">vs</span>{" "}
+                    {p.nameB}
+                  </span>
+                  <span className="font-mono text-xs text-tt-gray70">
+                    n={p.total}
+                  </span>
+                </div>
+                <VersusBar
+                  votesA={p.votesA}
+                  votesB={p.votesB}
+                  votesSame={p.votesSame}
+                  nameA={p.nameA}
+                  nameB={p.nameB}
+                />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="mt-8 space-y-3 text-center">
         <Link
           href="/play"
-          className="block rounded-full bg-tt-green px-8 py-3 font-bold text-white transition hover:opacity-90"
+          className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
         >
           この対決に答える
         </Link>
@@ -235,6 +380,43 @@ export default async function CompareViewPage({
         >
           別の対決を作成
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function AxisCard({
+  label,
+  bucket,
+  nameA,
+  nameB,
+}: {
+  label: string;
+  bucket: { a: number; b: number; same: number };
+  nameA: string;
+  nameB: string;
+}) {
+  const total = bucket.a + bucket.b + bucket.same;
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <div className="flex justify-between text-sm">
+        <p className="font-bold">{label}</p>
+        <p className="font-mono text-xs text-tt-gray70">n={total}</p>
+      </div>
+      <div className="mt-2">
+        {total === 0 ? (
+          <p className="text-xs text-tt-gray70">
+            この軸の回答はまだありません
+          </p>
+        ) : (
+          <VersusBar
+            votesA={bucket.a}
+            votesB={bucket.b}
+            votesSame={bucket.same}
+            nameA={nameA}
+            nameB={nameB}
+          />
+        )}
       </div>
     </div>
   );
@@ -257,7 +439,7 @@ function FilterSelect({
       key={current ?? "all"}
       name={name}
       defaultValue={current ?? ""}
-      className="h-10 rounded-lg border border-tt-gray30/60 bg-white px-2"
+      className="h-10 rounded-xl border border-tt-gray30/50 bg-white px-2"
     >
       <option value="">{allLabel}</option>
       {options.map(([value, label]) => (
@@ -266,62 +448,6 @@ function FilterSelect({
         </option>
       ))}
     </select>
-  );
-}
-
-function VoteBar({
-  label,
-  a,
-  b,
-  same,
-  nameA,
-  nameB,
-}: {
-  label: string;
-  a: number;
-  b: number;
-  same: number;
-  nameA: string;
-  nameB: string;
-}) {
-  const total = a + b + same;
-  if (total === 0) {
-    return (
-      <div className="rounded-xl bg-white p-4 ring-1 ring-tt-gray30/40">
-        <p className="text-sm font-medium">{label}</p>
-        <p className="mt-1 text-xs text-tt-gray70">この軸の回答はまだありません</p>
-      </div>
-    );
-  }
-  const pa = Math.round((a / total) * 100);
-  const pb = Math.round((b / total) * 100);
-  return (
-    <div className="rounded-xl bg-white p-4 ring-1 ring-tt-gray30/40">
-      <div className="flex justify-between text-sm">
-        <p className="font-medium">{label}</p>
-        <p className="font-mono text-xs text-tt-gray70">n={total}</p>
-      </div>
-      <div className="mt-2 flex h-5 overflow-hidden rounded-full bg-tt-gray30/40">
-        {a > 0 && (
-          <div className="bg-tt-green" style={{ width: `${pa}%` }} />
-        )}
-        {same > 0 && (
-          <div
-            className="bg-tt-gray30"
-            style={{ width: `${100 - pa - pb}%` }}
-          />
-        )}
-        {b > 0 && <div className="bg-tt-coral" style={{ width: `${pb}%` }} />}
-      </div>
-      <div className="mt-1 flex justify-between text-xs text-tt-gray70">
-        <span>
-          {nameA} {pa}%
-        </span>
-        <span>
-          {nameB} {pb}%
-        </span>
-      </div>
-    </div>
   );
 }
 

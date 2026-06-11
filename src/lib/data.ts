@@ -91,3 +91,142 @@ export async function getPopularPicksForSimilarUsers(
   }
   return [...wins.values()].sort((a, b) => b.wins - a.wins).slice(0, take);
 }
+
+export interface PairAggregate {
+  aId: string;
+  bId: string;
+  nameA: string;
+  nameB: string;
+  manufacturerA: string;
+  manufacturerB: string;
+  votesA: number;
+  votesB: number;
+  votesSame: number;
+  total: number;
+}
+
+/**
+ * 「好み」回答をペア単位で集計して返す (回答数の多い順)。
+ * Comparison は A/B の格納順が対決ごとに異なるため、ID順に正規化して集計する。
+ */
+export async function aggregatePairs(options?: {
+  /** この用具が含まれるペアのみ */
+  involvingEquipmentId?: string;
+  take?: number;
+  /** このペアは除外 (関連対決の自己除外用) */
+  excludePair?: [string, string];
+}): Promise<PairAggregate[]> {
+  const comparisons = await prisma.comparison.findMany({
+    where: {
+      winnerOverall: { in: ["A", "B", "SAME"] },
+      ...(options?.involvingEquipmentId
+        ? {
+            OR: [
+              { optionAEquipmentId: options.involvingEquipmentId },
+              { optionBEquipmentId: options.involvingEquipmentId },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      optionA: { select: { name: true, manufacturer: true } },
+      optionB: { select: { name: true, manufacturer: true } },
+    },
+    orderBy: { answeredAt: "desc" },
+    take: 2000,
+  });
+
+  const excludeKey = options?.excludePair
+    ? [...options.excludePair].sort().join("|")
+    : null;
+
+  const pairs = new Map<string, PairAggregate>();
+  for (const c of comparisons) {
+    const flip = c.optionAEquipmentId > c.optionBEquipmentId;
+    const [aId, bId] = flip
+      ? [c.optionBEquipmentId, c.optionAEquipmentId]
+      : [c.optionAEquipmentId, c.optionBEquipmentId];
+    const key = `${aId}|${bId}`;
+    if (key === excludeKey) continue;
+    const [a, b] = flip ? [c.optionB, c.optionA] : [c.optionA, c.optionB];
+    const entry =
+      pairs.get(key) ??
+      ({
+        aId,
+        bId,
+        nameA: a.name,
+        nameB: b.name,
+        manufacturerA: a.manufacturer,
+        manufacturerB: b.manufacturer,
+        votesA: 0,
+        votesB: 0,
+        votesSame: 0,
+        total: 0,
+      } satisfies PairAggregate);
+    const winner = c.winnerOverall;
+    if (winner === "SAME") entry.votesSame++;
+    else if ((winner === "A") !== flip) entry.votesA++;
+    else entry.votesB++;
+    entry.total++;
+    pairs.set(key, entry);
+  }
+
+  return [...pairs.values()]
+    .sort((x, y) => y.total - x.total)
+    .slice(0, options?.take ?? 20);
+}
+
+/** 特定ペアの「好み」即時集計 (M3 の回答後フィードバック用) */
+export async function tallyPair(
+  aId: string,
+  bId: string,
+): Promise<{ a: number; b: number; same: number; total: number }> {
+  const rows = await prisma.comparison.findMany({
+    where: {
+      OR: [
+        { optionAEquipmentId: aId, optionBEquipmentId: bId },
+        { optionAEquipmentId: bId, optionBEquipmentId: aId },
+      ],
+      winnerOverall: { in: ["A", "B", "SAME"] },
+    },
+    select: {
+      optionAEquipmentId: true,
+      winnerOverall: true,
+    },
+  });
+  const tally = { a: 0, b: 0, same: 0, total: rows.length };
+  for (const r of rows) {
+    const flipped = r.optionAEquipmentId === bId;
+    if (r.winnerOverall === "SAME") tally.same++;
+    else if ((r.winnerOverall === "A") !== flipped) tally.a++;
+    else tally.b++;
+  }
+  return tally;
+}
+
+/** 用具個別ページ用: 対象用具の勝敗サマリ */
+export async function getEquipmentRecord(equipmentId: string): Promise<{
+  wins: number;
+  losses: number;
+  same: number;
+  total: number;
+}> {
+  const rows = await prisma.comparison.findMany({
+    where: {
+      OR: [
+        { optionAEquipmentId: equipmentId },
+        { optionBEquipmentId: equipmentId },
+      ],
+      winnerOverall: { in: ["A", "B", "SAME"] },
+    },
+    select: { optionAEquipmentId: true, winnerOverall: true },
+  });
+  const record = { wins: 0, losses: 0, same: 0, total: rows.length };
+  for (const r of rows) {
+    const isA = r.optionAEquipmentId === equipmentId;
+    if (r.winnerOverall === "SAME") record.same++;
+    else if ((r.winnerOverall === "A") === isA) record.wins++;
+    else record.losses++;
+  }
+  return record;
+}

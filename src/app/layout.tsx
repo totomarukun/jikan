@@ -39,14 +39,20 @@ export default function RootLayout({
       className={`${inter.variable} ${notoSansJp.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="border-b border-tt-gray30/40 bg-white">
+        <header className="sticky top-0 z-20 border-b border-tt-gray30/30 bg-white/85 backdrop-blur">
           <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
             <LogoHorizontal />
-            <nav className="flex items-center gap-4 text-sm text-tt-gray70">
-              <Link href="/compare/select" className="hover:text-tt-charcoal">
-                用具対決
+            <nav className="flex items-center gap-4 text-sm font-medium text-tt-gray70">
+              <Link href="/battles" className="transition hover:text-tt-green">
+                人気の対決
               </Link>
-              <Link href="/me" className="hover:text-tt-charcoal">
+              <Link
+                href="/compare/select"
+                className="transition hover:text-tt-green"
+              >
+                対決を作る
+              </Link>
+              <Link href="/me" className="transition hover:text-tt-green">
                 マイページ
               </Link>
             </nav>
@@ -55,8 +61,24 @@ export default function RootLayout({
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
           {children}
         </main>
-        <footer className="border-t border-tt-gray30/40 py-6 text-center text-xs text-tt-gray70">
-          <p>TacTap — 卓球用具のAB比較。データで、用具選びの後悔を減らす。</p>
+        <footer className="border-t border-tt-gray30/30 bg-white">
+          <div className="mx-auto w-full max-w-3xl px-4 py-8">
+            <p className="text-sm font-bold">TacTap — 卓球用具のAB比較。</p>
+            <p className="mt-1 text-xs text-tt-gray70">
+              データで、用具選びの後悔を減らす。
+            </p>
+            <nav className="mt-4 flex gap-4 text-xs text-tt-gray70">
+              <Link href="/play" className="hover:text-tt-green">
+                AB比較に答える
+              </Link>
+              <Link href="/battles" className="hover:text-tt-green">
+                人気の対決
+              </Link>
+              <Link href="/terms" className="hover:text-tt-green">
+                利用規約
+              </Link>
+            </nav>
+          </div>
         </footer>
       </body>
     </html>

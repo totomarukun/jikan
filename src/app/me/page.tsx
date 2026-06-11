@@ -81,17 +81,24 @@ export default async function MyPage() {
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Link
           href="/compare/select"
-          className="rounded-xl bg-tt-green p-4 text-center font-bold text-white transition hover:opacity-90"
+          className="rounded-2xl bg-gradient-to-br from-tt-green to-tt-deep-green p-4 text-center font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
         >
           新しい対決を作成
         </Link>
         <Link
           href="/play"
-          className="rounded-xl bg-tt-coral p-4 text-center font-bold text-white transition hover:opacity-90"
+          className="rounded-2xl bg-gradient-to-br from-tt-deep-coral to-tt-coral p-4 text-center font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
         >
           AB比較を続ける
         </Link>
       </div>
+
+      <Link
+        href="/battles"
+        className="mt-3 block rounded-2xl bg-white p-4 text-center text-sm font-bold shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
+      >
+        人気の対決ランキングを見る →
+      </Link>
 
       <h2 className="mt-8 mb-3 font-bold">最近の回答</h2>
       {recent.length === 0 ? (

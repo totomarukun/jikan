@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionId, getUserId } from "@/lib/session";
 import { answerSchema, isRubberCategory, MILESTONES } from "@/lib/types";
+import { tallyPair } from "@/lib/data";
 
 export async function POST(request: Request) {
   const sessionId = await getSessionId();
@@ -70,9 +71,13 @@ export async function POST(request: Request) {
     }),
   ]);
 
+  // 回答直後の「みんなの回答」フィードバック用集計 (今回の回答を含む)
+  const tally = await tallyPair(optionAEquipmentId, optionBEquipmentId);
+
   return NextResponse.json({
     answerCount: newCount,
     reachedMilestone,
     nextMilestone: MILESTONES.find((m) => m > newCount) ?? null,
+    tally,
   });
 }

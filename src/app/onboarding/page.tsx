@@ -67,26 +67,28 @@ export default function OnboardingPage() {
             {step + 1} / {QUESTIONS.length}
           </span>
         </div>
-        <div className="h-2 rounded-full bg-tt-gray30/40">
+        <div className="h-2.5 rounded-full bg-tt-gray30/30">
           <div
-            className="h-2 rounded-full bg-tt-green transition-all"
+            className="h-2.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green transition-all duration-300"
             style={{ width: `${((step + 1) / QUESTIONS.length) * 100}%` }}
           />
         </div>
       </div>
 
-      <h1 className="mb-6 text-lg font-medium">{question.text}</h1>
+      <h1 key={step} className="animate-rise mb-6 text-lg font-bold">
+        {question.text}
+      </h1>
 
-      <div className="flex flex-col gap-3">
+      <div key={`opts-${step}`} className="animate-rise flex flex-col gap-3 [animation-delay:60ms]">
         {question.options.map(([value, label]) => (
           <button
             key={value}
             disabled={submitting}
             onClick={() => select(value)}
-            className={`h-12 rounded-lg border px-4 text-left transition hover:border-tt-green hover:bg-tt-soft-green disabled:opacity-50 ${
+            className={`h-12 rounded-xl border px-4 text-left shadow-sm transition hover:border-tt-green hover:bg-tt-soft-green active:scale-[0.98] disabled:opacity-50 ${
               answers[question.key] === value
                 ? "border-tt-green bg-tt-soft-green"
-                : "border-tt-gray30/60 bg-white"
+                : "border-tt-gray30/50 bg-white"
             }`}
           >
             {label}
