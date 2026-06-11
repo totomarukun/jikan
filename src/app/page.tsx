@@ -35,8 +35,13 @@ export default async function LandingPage() {
           <br className="sm:hidden" />
           どっちが自分に合う？
         </h1>
-        <p className="animate-rise mt-3 text-tt-gray70 [animation-delay:80ms]">
-          3秒のAB比較で、あなたに合う用具がわかる。
+        <p className="animate-rise mt-3 leading-7 text-tt-gray70 [animation-delay:80ms]">
+          「硬い」「弾む」の感じ方は人それぞれ。
+          <br />
+          だからTacTapは、<strong className="text-tt-charcoal">両方使った人の比較</strong>
+          だけを集めて、
+          <br />
+          あなたのいまのラバー基準に翻訳します。
         </p>
         <div className="animate-rise mt-8 [animation-delay:160ms]">
           <Link
@@ -112,29 +117,31 @@ export default async function LandingPage() {
         </section>
       )}
 
-      {/* 価値訴求 */}
+      {/* 価値訴求: 根本ペイン「感覚は人によって違う」への回答 */}
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl bg-tt-soft-green p-5 ring-1 ring-tt-green/10">
           <p className="font-mono text-2xl font-bold text-tt-deep-green">01</p>
           <h2 className="mt-2 font-bold text-tt-deep-green">
-            似た人の選択がわかる
+            あなたの感覚に翻訳
           </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            プレースタイル・レベル・ラケットが近いプレイヤーの選好で絞り込める。
+            レビューの「硬い」はその人の感覚。TacTapは、あなたが使ったことのあるラバーを基準に「それより硬いと感じた人が68%」という形で示します。
           </p>
         </div>
         <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
           <p className="font-mono text-2xl font-bold text-tt-deep-coral">02</p>
-          <h2 className="mt-2 font-bold text-tt-deep-coral">3秒で1問の軽さ</h2>
+          <h2 className="mt-2 font-bold text-tt-deep-coral">
+            両方使った人だけの比較
+          </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            SNSを開く感覚でAB比較に回答。答えた直後に「みんなの回答」が見られる。
+            回答には経験フラグが付きます。実際に両方使った人の判定だけに絞った、試打に最も近いデータ。
           </p>
         </div>
         <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
           <p className="font-mono text-2xl font-bold">03</p>
-          <h2 className="mt-2 font-bold">失敗を減らせる</h2>
+          <h2 className="mt-2 font-bold">割れる意見も、そのまま</h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            絶対評価より精緻な「相対比較データ」で、乗り換えの意思決定が変わる。
+            感じ方が分かれる用具は「意見が割れています」と正直に表示。断定しないから、判断を間違えにくい。
           </p>
         </div>
       </section>

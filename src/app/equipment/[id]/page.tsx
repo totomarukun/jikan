@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 import { aggregatePairs, getEquipmentRecord } from "@/lib/data";
+import { feelStatements, getFeelProfile } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
+import { FeelProfileCard } from "@/components/feel-profile";
 import { VersusBar } from "@/components/versus-bar";
 import {
   EQUIPMENT_CATEGORY_LABELS,
@@ -125,16 +127,15 @@ export default async function EquipmentPage({
         </section>
       )}
 
-      {/* あなたの基準と比べる */}
+      {/* あなたの基準への体感翻訳 */}
       {currentRubberId &&
         currentRubberId !== id &&
         isRubberCategory(equipment.category) && (
-          <Link
-            href={`/compare/${currentRubberId}/vs/${id}`}
-            className="mt-4 block rounded-2xl bg-tt-charcoal p-4 text-center font-bold text-white shadow-lg transition hover:opacity-90 active:scale-[0.99]"
-          >
-            いまのあなたのラバーと比べる →
-          </Link>
+          <YourFeelSection
+            currentRubberId={currentRubberId}
+            targetId={id}
+            targetName={equipment.name}
+          />
         )}
 
       {/* 乗り換え先候補 */}
@@ -244,6 +245,52 @@ export default async function EquipmentPage({
         </Link>
       </div>
     </div>
+  );
+}
+
+// 「使ってみないと分からない」への回答: あなたが使っているラバーを錨に、
+// 両方使った人の相対判定を「あなた基準の体感」として表示する
+async function YourFeelSection({
+  currentRubberId,
+  targetId,
+  targetName,
+}: {
+  currentRubberId: string;
+  targetId: string;
+  targetName: string;
+}) {
+  const [currentRubber, statements] = await Promise.all([
+    prisma.equipment.findUnique({
+      where: { id: currentRubberId },
+      select: { name: true },
+    }),
+    getFeelProfile(currentRubberId, targetId).then(feelStatements),
+  ]);
+  if (!currentRubber) return null;
+
+  return (
+    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+      <h2 className="font-bold">
+        あなたの「{currentRubber.name}」と比べると？
+      </h2>
+      <p className="mt-0.5 text-xs text-tt-gray70">
+        両方使った人の相対判定を、あなたの基準に翻訳して表示します。
+      </p>
+      <div className="mt-3">
+        <FeelProfileCard
+          baseName={currentRubber.name}
+          targetName={targetName}
+          statements={statements}
+          compact
+        />
+      </div>
+      <Link
+        href={`/compare/${currentRubberId}/vs/${targetId}`}
+        className="mt-4 block rounded-xl bg-tt-charcoal py-3 text-center text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.99]"
+      >
+        対決データの詳細を見る →
+      </Link>
+    </section>
   );
 }
 

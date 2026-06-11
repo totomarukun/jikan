@@ -30,6 +30,12 @@ export async function getAnswersForDiagnosis(
     } else if (c.winnerControl) {
       axis = "control";
       winner = c.winnerControl;
+    } else if (c.winnerHardness) {
+      axis = "hardness";
+      winner = c.winnerHardness;
+    } else if (c.winnerBallHold) {
+      axis = "ballHold";
+      winner = c.winnerBallHold;
     }
     return {
       axis,

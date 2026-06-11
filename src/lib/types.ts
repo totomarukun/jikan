@@ -32,7 +32,14 @@ export const EQUIPMENT_CATEGORIES = [
 ] as const;
 export const WINNERS = ["A", "B", "SAME", "UNKNOWN"] as const;
 export const EXPERIENCES = ["BOTH", "ONE", "NEITHER"] as const;
-export const QUESTION_AXES = ["overall", "speed", "spin", "control"] as const;
+export const QUESTION_AXES = [
+  "overall",
+  "speed",
+  "spin",
+  "control",
+  "hardness",
+  "ballHold",
+] as const;
 
 export type Playstyle = (typeof PLAYSTYLES)[number];
 export type Level = (typeof LEVELS)[number];

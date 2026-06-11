@@ -2,8 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 import { aggregatePairs, tallyPair } from "@/lib/data";
+import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
 import { VersusBar } from "@/components/versus-bar";
+import { FeelProfileCard } from "@/components/feel-profile";
 import {
   CandidatePicker,
   CurrentRubberSetter,
@@ -76,9 +78,14 @@ async function SwitchBoard({
       e != null && e.isActive && e.category.startsWith("RUBBER_"),
   );
 
-  const tallies = await Promise.all(
-    candidates.map((c) => tallyPair(current.id, c.id)),
-  );
+  const [tallies, feels] = await Promise.all([
+    Promise.all(candidates.map((c) => tallyPair(current.id, c.id))),
+    Promise.all(
+      candidates.map(async (c) =>
+        feelStatements(await getFeelProfile(current.id, c.id)),
+      ),
+    ),
+  ]);
 
   // ワンタップ候補: この用具と対決データがあるラバー (人気順)
   const suggestions = (
@@ -156,6 +163,7 @@ async function SwitchBoard({
               current={current}
               candidate={cand}
               tally={tallies[i]}
+              feel={feels[i]}
               remainingIds={candidates
                 .filter((c) => c.id !== cand.id)
                 .map((c) => c.id)}
@@ -186,11 +194,13 @@ function CandidateCard({
   current,
   candidate,
   tally,
+  feel,
   remainingIds,
 }: {
   current: Equipment;
   candidate: Equipment;
   tally: { a: number; b: number; same: number; total: number };
+  feel: FeelStatement[];
   remainingIds: string[];
 }) {
   const deltas: Array<{ label: string; delta: number | null; unit: string; neutral?: boolean }> = [
@@ -278,6 +288,21 @@ function CandidateCard({
             />
           </div>
         )}
+      </div>
+
+      {/* 体感翻訳: あなたの現用基準で他人の感覚を読む */}
+      <div className="mt-4">
+        <p className="text-xs font-bold text-tt-gray70">
+          {current.name}と比べた体感
+        </p>
+        <div className="mt-2">
+          <FeelProfileCard
+            baseName={current.name}
+            targetName={candidate.name}
+            statements={feel}
+            compact
+          />
+        </div>
       </div>
 
       {/* スペック差分 (いまの基準) */}

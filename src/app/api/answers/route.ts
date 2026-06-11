@@ -38,7 +38,15 @@ export async function POST(request: Request) {
     speed: "winnerSpeed",
     spin: "winnerSpin",
     control: "winnerControl",
-  }[axis] as "winnerOverall" | "winnerSpeed" | "winnerSpin" | "winnerControl";
+    hardness: "winnerHardness",
+    ballHold: "winnerBallHold",
+  }[axis] as
+    | "winnerOverall"
+    | "winnerSpeed"
+    | "winnerSpin"
+    | "winnerControl"
+    | "winnerHardness"
+    | "winnerBallHold";
 
   const newCount = progress.answerCount + 1;
   const unlocked: number[] = JSON.parse(progress.unlockedMilestones);

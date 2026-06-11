@@ -49,10 +49,12 @@ export function diagnose(answers: DiagnosisInput[]): DiagnosisResult {
     counted++;
 
     if (ans.axis === "speed") {
-      // 「速いのはどちら？」への回答は知覚の表明であり選好ではないため弱く扱う
+      // 「速いのはどちら？」等の軸指定回答は知覚の表明であり選好ではないため除外
       continue;
     }
     if (ans.axis === "spin") continue;
+    if (ans.axis === "hardness") continue;
+    if (ans.axis === "ballHold") continue;
     if (ans.axis === "control") {
       control += 1;
       continue;

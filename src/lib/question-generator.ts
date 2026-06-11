@@ -61,15 +61,26 @@ function selectQuestionType(random: () => number): {
   template: (a: EquipmentLite, b: EquipmentLite) => string;
 } {
   const r = random();
-  // シンプルAB 70% / 軸指定AB 20% / シナリオAB 10% (企画書 7.3 M3)
-  if (r < 0.7) {
+  // シンプルAB 60% / 軸指定AB 30% / シナリオAB 10%。
+  // 軸指定には感覚言語のズレが大きい「硬さ」「球持ち」を含める
+  // (絶対評価では伝わらない感覚を、相対比較として収集する)。
+  if (r < 0.6) {
     return { axis: "overall", template: () => "どちらが好み？" };
   }
-  if (r < 0.8) {
+  if (r < 0.675) {
     return { axis: "speed", template: () => "スピードが速いのはどちら？" };
   }
-  if (r < 0.9) {
+  if (r < 0.75) {
     return { axis: "spin", template: () => "回転がかかるのはどちら？" };
+  }
+  if (r < 0.825) {
+    return { axis: "hardness", template: () => "硬く感じるのはどちら？" };
+  }
+  if (r < 0.9) {
+    return {
+      axis: "ballHold",
+      template: () => "球持ちが良いと感じるのはどちら？",
+    };
   }
   const scenarios = [
     "バック面で使うなら？",

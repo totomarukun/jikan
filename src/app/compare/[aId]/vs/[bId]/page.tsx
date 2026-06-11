@@ -98,6 +98,8 @@ export default async function CompareViewPage({
     overall: { a: 0, b: 0, same: 0 },
     speed: { a: 0, b: 0, same: 0 },
     spin: { a: 0, b: 0, same: 0 },
+    hardness: { a: 0, b: 0, same: 0 },
+    ballHold: { a: 0, b: 0, same: 0 },
   };
   for (const c of comparisons) {
     const flipped = c.optionAEquipmentId === bId;
@@ -118,6 +120,8 @@ export default async function CompareViewPage({
     add(tally.overall, c.winnerOverall);
     add(tally.speed, c.winnerSpeed);
     add(tally.spin, c.winnerSpin);
+    add(tally.hardness, c.winnerHardness);
+    add(tally.ballHold, c.winnerBallHold);
   }
   const total = comparisons.length;
 
@@ -270,6 +274,8 @@ export default async function CompareViewPage({
             <AxisCard label="好み" bucket={tally.overall} nameA={equipA.name} nameB={equipB.name} />
             <AxisCard label="スピード" bucket={tally.speed} nameA={equipA.name} nameB={equipB.name} />
             <AxisCard label="スピン" bucket={tally.spin} nameA={equipA.name} nameB={equipB.name} />
+            <AxisCard label="硬く感じる" bucket={tally.hardness} nameA={equipA.name} nameB={equipB.name} />
+            <AxisCard label="球持ちが良いと感じる" bucket={tally.ballHold} nameA={equipA.name} nameB={equipB.name} />
             <div className="rounded-2xl bg-tt-soft-green p-4 text-sm ring-1 ring-tt-green/20">
               <p className="font-bold text-tt-deep-green">インサイト</p>
               <p className="mt-1 leading-6">{insight}</p>
