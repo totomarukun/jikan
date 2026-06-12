@@ -22,6 +22,127 @@ export interface GearDraft {
   isCurrent: boolean;
 }
 
+const MANUFACTURERS = [
+  "バタフライ",
+  "ニッタク",
+  "ヤサカ",
+  "ヴィクタス",
+  "ティバー",
+  "ドニック",
+  "アンドロ",
+  "XIOM",
+  "スティガ",
+  "JOOLA",
+  "紅双喜",
+  "ミズノ",
+  "その他",
+];
+
+const RUBBER_TYPE_OPTIONS: Array<[string, string]> = [
+  ["RUBBER_INVERTED", "裏ソフト"],
+  ["RUBBER_STICKY", "粘着"],
+  ["RUBBER_PIMPLE_OUT", "表ソフト"],
+  ["RUBBER_PIMPLE_LONG", "粒高"],
+];
+
+// 検索に出てこないラバーをその場でマスタに追加する (UGC補完)
+function SuggestRubber({
+  name,
+  onCreated,
+}: {
+  name: string;
+  onCreated: (item: RubberItem) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [manufacturer, setManufacturer] = useState(MANUFACTURERS[0]);
+  const [category, setCategory] = useState(RUBBER_TYPE_OPTIONS[0][0]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/equipment/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, manufacturer, category }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setError("追加に失敗しました。製品名を確認してください。");
+      return;
+    }
+    const data = await res.json();
+    onCreated(data.equipment);
+  }
+
+  if (!open) {
+    return (
+      <div className="mt-2 rounded-xl border border-dashed border-tt-gray30/60 p-3 text-sm">
+        <p className="text-tt-gray70">
+          「{name}」は見つかりませんでした。
+        </p>
+        <button
+          onClick={() => setOpen(true)}
+          className="mt-1 font-bold text-tt-green underline"
+        >
+          このラバーを追加して登録する →
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-3 rounded-xl border border-tt-green/40 bg-tt-soft-green/40 p-3 text-sm">
+      <p className="font-bold">「{name}」をマスタに追加</p>
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={manufacturer}
+          onChange={(e) => setManufacturer(e.target.value)}
+          className="h-10 rounded-xl border border-tt-gray30/50 bg-white px-2"
+        >
+          {MANUFACTURERS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="h-10 rounded-xl border border-tt-gray30/50 bg-white px-2"
+        >
+          {RUBBER_TYPE_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {error && <p className="text-xs text-tt-deep-coral">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="flex-1 rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-2.5 font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+        >
+          {busy ? "追加中..." : "追加する"}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="rounded-xl border border-tt-gray30/50 bg-white px-4 text-tt-gray70"
+        >
+          やめる
+        </button>
+      </div>
+      <p className="text-xs text-tt-gray70">
+        ※追加された製品はみんなの検索にも表示されます。正式名称での登録にご協力ください。
+      </p>
+    </div>
+  );
+}
+
 // 使ったことのあるラバーを「使用条件つき」で1本追加するフォーム。
 // 厚さ・貼り面・当時のラケットが揃って初めて比較データとして意味を持つ。
 export function GearForm({
@@ -97,6 +218,10 @@ export function GearForm({
                 </button>
               ))}
             </div>
+          )}
+          {/* UGC補完: 見つからないラバーはその場で追加できる */}
+          {query.trim().length >= 2 && rubberResults.length === 0 && (
+            <SuggestRubber name={query.trim()} onCreated={setPicked} />
           )}
         </div>
       )}
