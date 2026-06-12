@@ -98,17 +98,24 @@ export default function GearPage() {
   }
 
   // 出題は同じ面で使ったペアのみ生成されるため、面別にペア数を数える
-  const pairCount = (() => {
-    if (!gear) return 0;
-    let total = 0;
+  const sideCounts = (() => {
+    const counts: Record<GearSide, number> = { FH: 0, BH: 0 };
+    if (!gear) return counts;
     for (const side of ["FH", "BH"] as const) {
-      const n = new Set(
+      counts[side] = new Set(
         gear.filter((g) => g.side === side).map((g) => g.equipment.id),
       ).size;
-      total += (n * (n - 1)) / 2;
     }
-    return total;
+    return counts;
   })();
+  const pairCount = (["FH", "BH"] as const).reduce(
+    (total, side) => total + (sideCounts[side] * (sideCounts[side] - 1)) / 2,
+    0,
+  );
+  // 1本だけの面はペアが組めず出題ゼロになる。理由と次の一手を示す
+  const loneSides = (["FH", "BH"] as const).filter(
+    (side) => sideCounts[side] === 1,
+  );
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -127,6 +134,18 @@ export default function GearPage() {
               {gear.length}本登録済み → 同じ面のペアで最大{" "}
               <span className="font-mono font-bold">{pairCount * 5}</span>{" "}
               問の実体験比較に答えられます
+            </p>
+          )}
+
+          {loneSides.length > 0 && (
+            <p className="mt-2 rounded-xl bg-tt-offwhite p-3 text-xs leading-5 text-tt-gray70 ring-1 ring-black/5">
+              {loneSides
+                .map((side) => GEAR_SIDE_LABELS[side])
+                .join("面・")}
+              面は1本だけなので、まだ比較質問を作れません。
+              同じ面で使ったことのあるラバーをもう1本追加すると、実体験比較が
+              <span className="font-mono font-bold text-tt-charcoal">+5問</span>
+              ずつ増えます。
             </p>
           )}
 

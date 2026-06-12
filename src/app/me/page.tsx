@@ -27,6 +27,17 @@ export default async function MyPage() {
   const sessionId = await getSessionId();
   const answerCount = await prisma.comparison.count({ where: { userId } });
 
+  // プロフィールはオンボーディング回答 (SessionProgress) を優先する。
+  // User 側はデフォルト値のまま残っている既存アカウントがあるため
+  const progress = sessionId
+    ? await prisma.sessionProgress.findUnique({ where: { sessionId } })
+    : null;
+  const profile = {
+    level: progress?.level ?? user.level,
+    playstyle: progress?.playstyle ?? user.playstyle,
+    bladeCategory: progress?.bladeCategory ?? user.bladeCategory,
+  };
+
   let styleName: string | null = null;
   if (sessionId && answerCount >= MIN_DIAGNOSIS_ANSWERS) {
     const answers = await getAnswersForDiagnosis(sessionId);
@@ -54,10 +65,16 @@ export default async function MyPage() {
         <div>
           <h1 className="text-xl font-bold">{user.nickname ?? "プレイヤー"}</h1>
           <p className="text-sm text-tt-gray70">
-            {LEVEL_LABELS[user.level as Level]} ・{" "}
-            {PLAYSTYLE_LABELS[user.playstyle as Playstyle]} ・{" "}
-            {BLADE_CATEGORY_LABELS[user.bladeCategory as BladeCategory]}
+            {LEVEL_LABELS[profile.level as Level]} ・{" "}
+            {PLAYSTYLE_LABELS[profile.playstyle as Playstyle]} ・{" "}
+            {BLADE_CATEGORY_LABELS[profile.bladeCategory as BladeCategory]}
           </p>
+          <Link
+            href="/onboarding"
+            className="text-xs text-tt-gray70 underline"
+          >
+            プロフィールを編集
+          </Link>
         </div>
       </div>
 
