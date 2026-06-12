@@ -4,7 +4,7 @@ import { getSessionId } from "@/lib/session";
 import { aggregatePairs, tallyPair } from "@/lib/data";
 import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
-import { VersusBar } from "@/components/versus-bar";
+import { VersusBarOrPending } from "@/components/versus-bar";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import {
@@ -12,6 +12,7 @@ import {
   CandidatePicker,
   CurrentRubberSetter,
 } from "@/components/switch-picker";
+import { GEAR_SIDE_LABELS, type GearSide } from "@/lib/types";
 import type { Equipment } from "@prisma/client";
 
 export const metadata = { title: "乗り換え検討" };
@@ -28,11 +29,51 @@ export default async function SwitchPage({
   const progress = sessionId
     ? await prisma.sessionProgress.findUnique({ where: { sessionId } })
     : null;
-  const current = progress?.currentRubberId
-    ? await prisma.equipment.findUnique({
-        where: { id: progress.currentRubberId },
+
+  // 基準の切り替え: マイギアのラバーなら ?base= でFH/BHどちらの基準でも検討できる
+  // (フォアとバックで選定基準は別物 — 現用FH固定にしない)
+  const gearRubbers = sessionId
+    ? await prisma.gearItem.findMany({
+        where: { sessionId, equipment: { category: { startsWith: "RUBBER_" } } },
+        include: { equipment: { select: { id: true, name: true } } },
+        orderBy: [{ isCurrent: "desc" }, { createdAt: "asc" }],
       })
-    : null;
+    : [];
+  const baseOptions: Array<{
+    id: string;
+    name: string;
+    sides: string[];
+    isCurrent: boolean;
+  }> = [];
+  for (const g of gearRubbers) {
+    const found = baseOptions.find((o) => o.id === g.equipmentId);
+    const sideLabel = GEAR_SIDE_LABELS[g.side as GearSide] ?? g.side;
+    if (found) {
+      if (!found.sides.includes(sideLabel)) found.sides.push(sideLabel);
+      found.isCurrent = found.isCurrent || g.isCurrent;
+    } else {
+      baseOptions.push({
+        id: g.equipmentId,
+        name: g.equipment.name,
+        sides: [sideLabel],
+        isCurrent: g.isCurrent,
+      });
+    }
+  }
+
+  const baseId = typeof sp.base === "string" ? sp.base : null;
+  let current: Equipment | null = null;
+  if (baseId && baseOptions.some((o) => o.id === baseId)) {
+    current = await prisma.equipment.findUnique({ where: { id: baseId } });
+    if (current && (!current.isActive || !current.category.startsWith("RUBBER_"))) {
+      current = null;
+    }
+  }
+  if (!current && progress?.currentRubberId) {
+    current = await prisma.equipment.findUnique({
+      where: { id: progress.currentRubberId },
+    });
+  }
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -45,7 +86,7 @@ export default async function SwitchPage({
       {!current ? (
         <NoBaseSetup sessionId={sessionId} />
       ) : (
-        <SwitchBoard current={current} sp={sp} />
+        <SwitchBoard current={current} sp={sp} baseOptions={baseOptions} />
       )}
     </div>
   );
@@ -81,13 +122,30 @@ async function NoBaseSetup({ sessionId }: { sessionId: string | null }) {
 async function SwitchBoard({
   current,
   sp,
+  baseOptions,
 }: {
   current: Equipment;
   sp: Record<string, string | string[] | undefined>;
+  baseOptions: Array<{
+    id: string;
+    name: string;
+    sides: string[];
+    isCurrent: boolean;
+  }>;
 }) {
   const candidateIds = (typeof sp.c === "string" ? sp.c.split(",") : [])
     .filter((id) => id && id !== current.id)
     .slice(0, 3);
+
+  // 基準切り替え時も検討中の候補は引き継ぐ (新基準と同じ候補は表示側で除外される)
+  const keepCandidates =
+    typeof sp.c === "string" && sp.c ? `&c=${encodeURIComponent(sp.c)}` : "";
+  const currentBase = baseOptions.find((o) => o.id === current.id);
+  const baseLabel = currentBase
+    ? `あなたの基準 (${currentBase.sides.join("・")}面${
+        currentBase.isCurrent ? "・いま使用中" : "で使用歴あり"
+      })`
+    : "あなたの基準 (いま使用中)";
 
   // 検討フローはラバー基準のため、候補もラバーのみに限定する
   const candidates = (
@@ -141,7 +199,7 @@ async function SwitchBoard({
             />
             <div>
             <p className="text-xs font-bold text-tt-deep-green">
-              あなたの基準 (いま使用中)
+              {baseLabel}
             </p>
             <p className="mt-1 text-lg font-bold">{current.name}</p>
             <p className="text-xs text-tt-gray70">
@@ -161,6 +219,34 @@ async function SwitchBoard({
         </div>
       </div>
 
+      {/* 基準の切り替え: フォアとバックで選定基準は別物なので、
+          マイギアのラバーならどれでも基準にできる */}
+      {baseOptions.length > 1 && (
+        <div className="mt-3">
+          <p className="text-[11px] font-bold text-tt-gray70">基準を切り替え</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {baseOptions.map((o) =>
+              o.id === current.id ? (
+                <span
+                  key={o.id}
+                  className="rounded-full bg-tt-deep-green px-3 py-1.5 text-xs font-bold text-white"
+                >
+                  {o.name} ({o.sides.join("・")})
+                </span>
+              ) : (
+                <Link
+                  key={o.id}
+                  href={`/switch?base=${o.id}${keepCandidates}`}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs ring-1 ring-tt-gray30/50 transition hover:bg-tt-soft-green hover:ring-tt-green/40"
+                >
+                  {o.name} ({o.sides.join("・")})
+                </Link>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 候補追加 (追加中は「集計しています…」を必ず表示) */}
       <div className="mt-4">
         <CandidatePicker
@@ -169,6 +255,7 @@ async function SwitchBoard({
             equipmentId: s.id,
             name: s.name,
           }))}
+          baseId={current.id}
         />
       </div>
 
@@ -275,7 +362,11 @@ function CandidateCard({
           </div>
         </div>
         <Link
-          href={`/switch?c=${remainingIds.join(",")}`}
+          href={
+            remainingIds.length > 0
+              ? `/switch?base=${current.id}&c=${remainingIds.join(",")}`
+              : `/switch?base=${current.id}`
+          }
           className="shrink-0 text-xs text-tt-gray70 underline"
         >
           候補から外す
@@ -297,7 +388,8 @@ function CandidateCard({
           </p>
         ) : (
           <div className="mt-2">
-            <VersusBar
+            {/* n が少ないうちは % を断言しない (リスト類と同じルール) */}
+            <VersusBarOrPending
               votesA={tally.a}
               votesB={tally.b}
               votesSame={tally.same}

@@ -56,6 +56,16 @@ export default async function MyPage() {
     take: 5,
   });
 
+  // 回答を「自分の体感レビュー」として読めるよう、軸ごとの自分の判定を添える
+  const axisColumns: Array<{ key: keyof (typeof recent)[number]; label: string }> = [
+    { key: "winnerOverall", label: "好み" },
+    { key: "winnerSpeed", label: "速さ" },
+    { key: "winnerSpin", label: "回転" },
+    { key: "winnerControl", label: "コントロール" },
+    { key: "winnerHardness", label: "硬さ" },
+    { key: "winnerBallHold", label: "球持ち" },
+  ];
+
   return (
     <div className="mx-auto max-w-md py-4">
       <div className="flex items-center gap-4">
@@ -135,20 +145,52 @@ export default async function MyPage() {
         <p className="text-sm text-tt-gray70">まだ回答がありません。</p>
       ) : (
         <ul className="space-y-2">
-          {recent.map((c) => (
-            <li
-              key={c.id}
-              className="rounded-lg bg-white p-3 text-sm ring-1 ring-tt-gray30/40"
-            >
-              <Link
-                href={`/compare/${c.optionAEquipmentId}/vs/${c.optionBEquipmentId}`}
-                className="hover:underline"
+          {recent.map((c) => {
+            const verdicts = axisColumns
+              .map(({ key, label }) => ({ label, winner: c[key] as string | null }))
+              .filter(
+                (v): v is { label: string; winner: string } =>
+                  v.winner === "A" || v.winner === "B" || v.winner === "SAME",
+              );
+            return (
+              <li
+                key={c.id}
+                className="rounded-lg bg-white p-3 text-sm ring-1 ring-tt-gray30/40"
               >
-                {c.optionA.name} <span className="text-tt-gray70">vs</span>{" "}
-                {c.optionB.name}
-              </Link>
-            </li>
-          ))}
+                <Link
+                  href={`/compare/${c.optionAEquipmentId}/vs/${c.optionBEquipmentId}`}
+                  className="hover:underline"
+                >
+                  {c.optionA.name} <span className="text-tt-gray70">vs</span>{" "}
+                  {c.optionB.name}
+                  {c.hasActualExperience === "BOTH" && (
+                    <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[10px] font-bold text-tt-deep-green">
+                      実体験
+                    </span>
+                  )}
+                </Link>
+                {verdicts.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {verdicts.map((v) => (
+                      <span
+                        key={v.label}
+                        className="rounded-full bg-tt-offwhite px-2 py-0.5 text-[11px] ring-1 ring-black/5"
+                      >
+                        {v.label}:{" "}
+                        <span className="font-bold">
+                          {v.winner === "A"
+                            ? c.optionA.name
+                            : v.winner === "B"
+                              ? c.optionB.name
+                              : "同等"}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

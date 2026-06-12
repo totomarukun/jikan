@@ -14,7 +14,7 @@ import {
   type Level,
   type Playstyle,
 } from "@/lib/types";
-import { VersusBar, VersusBarOrPending } from "@/components/versus-bar";
+import { VersusBarOrPending } from "@/components/versus-bar";
 import { EquipmentVisual } from "@/components/equipment-visual";
 
 export const metadata = { title: "用具対決" };
@@ -434,7 +434,8 @@ function AxisCard({
             この軸の回答はまだありません
           </p>
         ) : (
-          <VersusBar
+          /* n が少ない軸は % を断言しない (リスト類と同じルール) */
+          <VersusBarOrPending
             votesA={bucket.a}
             votesB={bucket.b}
             votesSame={bucket.same}
@@ -482,7 +483,10 @@ function buildInsight(
   overall: { a: number; b: number; same: number },
 ): string {
   const total = overall.a + overall.b + overall.same;
-  if (total === 0) return "「好み」の回答が集まると、ここに傾向の解釈が表示されます。";
+  // n が少ないうちは % や多数派を断言しない (バー表示と同じルール)
+  if (total < 3) {
+    return `「好み」の回答が${total}件あります。あと${3 - total}件集まると傾向の解釈が表示されます。`;
+  }
   if (overall.a === overall.b) {
     return `この条件では ${nameA} と ${nameB} の好みは拮抗しています。`;
   }

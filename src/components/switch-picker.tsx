@@ -14,11 +14,14 @@ export function CandidatePicker({
   candidateIds,
   suggestions = [],
   maxCandidates = 3,
+  baseId,
 }: {
   candidateIds: string[];
   /** よく比較される候補 (ワンタップ追加チップ) */
   suggestions?: GearChip[];
   maxCandidates?: number;
+  /** 検討の基準ラバー (URL に固定し、基準切り替えと共存させる) */
+  baseId?: string;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -30,8 +33,9 @@ export function CandidatePicker({
       return;
     setQuery("");
     // 集計中であることを必ず見せる (無反応に見える問題への恒久対応)
+    const base = baseId ? `base=${baseId}&` : "";
     startTransition(() => {
-      router.push(`/switch?c=${[...candidateIds, id].join(",")}`);
+      router.push(`/switch?${base}c=${[...candidateIds, id].join(",")}`);
     });
   }
 
