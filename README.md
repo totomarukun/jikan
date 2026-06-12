@@ -52,13 +52,40 @@ pnpm build
 
 ## 本番デプロイ（Vercel + Supabase）
 
-1. **Supabase** でプロジェクトを作成し、接続文字列を取得
-2. `prisma/schema.prisma` の `provider` を `"postgresql"` に変更
-   （enumはString+Zod検証で表現しているため、それ以外の変更は不要）
-3. **Vercel** にリポジトリをインポートし、環境変数を設定
-   - `DATABASE_URL` … Supabaseの接続文字列（pgbouncer推奨）
-   - `AUTH_SECRET` … `openssl rand -base64 32` で生成したランダム値
-4. デプロイ後に `pnpm prisma db push && pnpm db:seed` を一度実行
+デプロイ専用設定は用意済み: `vercel.json` がビルドコマンドを
+`pnpm run build:deploy` に切り替え、**PostgreSQL用スキーマ
+(`prisma/schema.postgres.prisma`) での generate / db push / シード投入 /
+next build までを自動実行**する。手作業は以下の3ステップのみ。
+
+### 1. Supabase でデータベースを作る（約3分）
+
+1. [supabase.com](https://supabase.com) → New project（無料枠でOK。リージョンは Tokyo 推奨）
+2. プロジェクト画面上部の **Connect** → `Connection string` から2つコピーする
+   - **Transaction pooler**（port `6543`）→ `DATABASE_URL` に使う
+   - **Direct connection**（port `5432`）→ `DIRECT_URL` に使う
+   - どちらも `[YOUR-PASSWORD]` をプロジェクト作成時のDBパスワードに置換
+
+### 2. Vercel にインポート（約3分）
+
+1. [vercel.com/new](https://vercel.com/new) → このリポジトリを Import
+   （Production Branch を使いたいブランチに設定）
+2. Environment Variables に以下を設定:
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | Supabase の Transaction pooler 接続文字列 |
+| `DIRECT_URL` | Supabase の Direct connection 接続文字列 |
+| `AUTH_SECRET` | `openssl rand -base64 32` で生成したランダム値（未設定だと本番起動を拒否する） |
+
+3. **Deploy** を押す
+
+### 3. スマホで開く
+
+発行された `https://<project>.vercel.app` をスマホで開けば完了。
+ビルド時に用具マスタ129製品が自動投入される（シードは upsert なので再デプロイしても重複しない）。
+
+> 補足: Neon 等の他のPostgreSQLでも動く。プーラーを使わない場合は
+> `DIRECT_URL` に `DATABASE_URL` と同じ値を設定すればよい。
 
 ### 今後の本番強化（Phase 2.1以降の推奨）
 

@@ -4,6 +4,9 @@ import { VersusBar } from "@/components/versus-bar";
 
 export const metadata = { title: "人気の対決" };
 
+// ランキングは蓄積データの入口なので、ビルド時固定ではなく60秒ごとに再集計
+export const revalidate = 60;
+
 // 蓄積データの入口。回答数の多い対決をランキング表示する。
 export default async function BattlesPage() {
   const pairs = await aggregatePairs({ take: 30 });

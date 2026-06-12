@@ -6,9 +6,24 @@ export const USER_COOKIE = "tactap_user";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  maxAge: ONE_YEAR,
+  path: "/",
+} as const;
+
 function secret(): string {
-  // 本番では必ず AUTH_SECRET を設定する (README 参照)
-  return process.env.AUTH_SECRET ?? "tactap-dev-secret-do-not-use-in-prod";
+  const s = process.env.AUTH_SECRET;
+  if (s) return s;
+  // 本番でのシークレット未設定は脆弱なセッションを生むため起動時に弾く
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "AUTH_SECRET が未設定です。`openssl rand -base64 32` で生成した値を環境変数に設定してください。",
+    );
+  }
+  return "tactap-dev-secret-do-not-use-in-prod";
 }
 
 function sign(value: string): string {
@@ -47,12 +62,7 @@ export async function getOrCreateSessionId(): Promise<string> {
   const existing = store.get(SESSION_COOKIE)?.value;
   if (existing) return existing;
   const id = randomUUID();
-  store.set(SESSION_COOKIE, id, {
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: ONE_YEAR,
-    path: "/",
-  });
+  store.set(SESSION_COOKIE, id, COOKIE_OPTIONS);
   return id;
 }
 
@@ -65,12 +75,7 @@ export async function getUserId(): Promise<string | null> {
 /** ログインセッションを開始する。Route Handler / Server Action からのみ呼ぶこと。 */
 export async function setUserSession(userId: string): Promise<void> {
   const store = await cookies();
-  store.set(USER_COOKIE, encodeUserToken(userId), {
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: ONE_YEAR,
-    path: "/",
-  });
+  store.set(USER_COOKIE, encodeUserToken(userId), COOKIE_OPTIONS);
 }
 
 export async function clearUserSession(): Promise<void> {
