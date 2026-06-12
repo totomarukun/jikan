@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/logo";
-import { VersusBar } from "@/components/versus-bar";
+import { VersusBarOrPending } from "@/components/versus-bar";
 import { aggregatePairs } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
@@ -109,7 +109,7 @@ export default async function LandingPage() {
                     n={p.total}
                   </span>
                 </div>
-                <VersusBar
+                <VersusBarOrPending
                   votesA={p.votesA}
                   votesB={p.votesB}
                   votesSame={p.votesSame}

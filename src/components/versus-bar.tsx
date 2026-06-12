@@ -52,3 +52,23 @@ export function VersusBar({
     </div>
   );
 }
+
+/** n が少ないペアは % を出さず「集計中」と表示する (信頼性の一貫性) */
+export function VersusBarOrPending(props: {
+  votesA: number;
+  votesB: number;
+  votesSame?: number;
+  nameA: string;
+  nameB: string;
+  minTotal?: number;
+}) {
+  const total = props.votesA + props.votesB + (props.votesSame ?? 0);
+  if (total < (props.minTotal ?? 3)) {
+    return (
+      <p className="text-xs text-tt-gray70">
+        集計中 — 回答{total}件 (3件以上で結果を表示します)
+      </p>
+    );
+  }
+  return <VersusBar {...props} />;
+}

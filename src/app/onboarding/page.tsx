@@ -165,7 +165,14 @@ export default function OnboardingPage() {
           )}
 
           <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-            <GearForm onAdd={(draft) => setGear([...gear, draft])} />
+            <GearForm
+              onAdd={(draft) => setGear([...gear, draft])}
+              existing={gear.map((g) => ({
+                equipmentId: g.equipment.id,
+                side: g.side,
+                thickness: g.thickness,
+              }))}
+            />
           </div>
 
           {error && <p className="mt-3 text-sm text-tt-deep-coral">{error}</p>}

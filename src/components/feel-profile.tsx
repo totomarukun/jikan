@@ -49,6 +49,29 @@ function FeelRow({ statement: s }: { statement: FeelStatement }) {
   const morePct = Math.round((s.tally.more / total) * 100);
   const lessPct = Math.round((s.tally.less / total) * 100);
 
+  // n が少ないうちは % で断言しない (n=1 の「100%」は信頼性を毀損する)
+  if (s.tally.n < 3) {
+    return (
+      <div className="rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-bold text-tt-gray70">{s.label}</span>
+          <span className="font-mono text-[10px] text-tt-gray70">
+            n={s.tally.n}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-tt-gray70">
+          まだ回答{s.tally.n}件 — 集計中につき参考程度
+          <span className="ml-1.5 text-xs">
+            ({s.tally.more > 0 && `${s.moreLabel} ${s.tally.more}人`}
+            {s.tally.more > 0 && (s.tally.less > 0 || s.tally.same > 0) && " / "}
+            {s.tally.less > 0 && `${s.lessLabel} ${s.tally.less}人`}
+            {s.tally.same > 0 && ` / 同等 ${s.tally.same}人`})
+          </span>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5">
       <div className="flex items-baseline justify-between">

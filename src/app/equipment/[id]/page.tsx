@@ -7,7 +7,7 @@ import { feelStatements, getFeelProfile } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
-import { VersusBar } from "@/components/versus-bar";
+import { VersusBarOrPending } from "@/components/versus-bar";
 import {
   EQUIPMENT_CATEGORY_LABELS,
   isRubberCategory,
@@ -174,7 +174,7 @@ export default async function EquipmentPage({
                     n={p.total}
                   </span>
                 </div>
-                <VersusBar
+                <VersusBarOrPending
                   votesA={p.votesA}
                   votesB={p.votesB}
                   votesSame={p.votesSame}

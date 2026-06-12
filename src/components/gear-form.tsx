@@ -22,6 +22,12 @@ export interface GearDraft {
   isCurrent: boolean;
 }
 
+export interface ExistingGearInfo {
+  equipmentId: string;
+  side: GearSide;
+  thickness: Thickness;
+}
+
 const MANUFACTURERS = [
   "バタフライ",
   "ニッタク",
@@ -148,9 +154,12 @@ function SuggestRubber({
 export function GearForm({
   onAdd,
   submitLabel = "この条件で追加",
+  existing = [],
 }: {
   onAdd: (draft: GearDraft) => void | Promise<void>;
   submitLabel?: string;
+  /** 登録済みギア (重複時に前回条件をプリフィルし、上書き事故を防ぐ) */
+  existing?: ExistingGearInfo[];
 }) {
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<RubberItem | null>(null);
@@ -162,6 +171,19 @@ export function GearForm({
   const [busy, setBusy] = useState(false);
   const rubberResults = useEquipmentSearch(query, "rubber");
   const bladeResults = useEquipmentSearch(bladeQuery, "blade");
+
+  // 既に登録済みのラバーを選んだら、前回の条件をプリフィルする
+  function pick(item: RubberItem) {
+    setPicked(item);
+    const prev = existing.find((e) => e.equipmentId === item.id);
+    if (prev) {
+      setSide(prev.side);
+      setThickness(prev.thickness);
+    }
+  }
+  const duplicate = picked
+    ? existing.find((e) => e.equipmentId === picked.id && e.side === side)
+    : undefined;
 
   async function submit() {
     if (!picked || busy) return;
@@ -208,7 +230,7 @@ export function GearForm({
               {rubberResults.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setPicked(item)}
+                  onClick={() => pick(item)}
                   className="rounded-xl border border-tt-gray30/50 bg-white p-3 text-left text-sm shadow-sm transition hover:border-tt-green hover:bg-tt-soft-green active:scale-[0.98]"
                 >
                   <span className="font-bold">{item.name}</span>
@@ -316,6 +338,14 @@ export function GearForm({
               </div>
             )}
           </div>
+
+          {duplicate && (
+            <p className="rounded-xl bg-tt-soft-coral p-3 text-xs text-tt-deep-coral">
+              このラバーは{duplicate.side === "FH" ? "フォア" : "バック"}面で登録済みです
+              （{THICKNESS_LABELS[duplicate.thickness]}）。
+              条件を変更したい場合のみ追加してください。
+            </p>
+          )}
 
           <label className="flex items-center gap-2 text-sm">
             <input

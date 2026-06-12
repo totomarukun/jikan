@@ -97,11 +97,18 @@ export default function GearPage() {
     await reload();
   }
 
-  const pairCount = gear
-    ? (new Set(gear.map((g) => g.equipment.id)).size *
-        (new Set(gear.map((g) => g.equipment.id)).size - 1)) /
-      2
-    : 0;
+  // 出題は同じ面で使ったペアのみ生成されるため、面別にペア数を数える
+  const pairCount = (() => {
+    if (!gear) return 0;
+    let total = 0;
+    for (const side of ["FH", "BH"] as const) {
+      const n = new Set(
+        gear.filter((g) => g.side === side).map((g) => g.equipment.id),
+      ).size;
+      total += (n * (n - 1)) / 2;
+    }
+    return total;
+  })();
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -117,7 +124,7 @@ export default function GearPage() {
         <>
           {gear.length >= 2 && (
             <p className="mt-4 rounded-xl bg-tt-soft-green p-3 text-sm text-tt-deep-green ring-1 ring-tt-green/20">
-              {gear.length}本登録済み → 最大{" "}
+              {gear.length}本登録済み → 同じ面のペアで最大{" "}
               <span className="font-mono font-bold">{pairCount * 5}</span>{" "}
               問の実体験比較に答えられます
             </p>
@@ -188,7 +195,14 @@ export default function GearPage() {
                     閉じる
                   </button>
                 </div>
-                <GearForm onAdd={add} />
+                <GearForm
+                  onAdd={add}
+                  existing={gear.map((g) => ({
+                    equipmentId: g.equipment.id,
+                    side: g.side,
+                    thickness: g.thickness,
+                  }))}
+                />
               </div>
             ) : (
               <button

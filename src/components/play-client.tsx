@@ -99,6 +99,19 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
         <p className="mb-3 text-center text-xs font-bold text-tt-deep-green">
           あなたが両方使ったことのある2本です
         </p>
+      ) : progress.gearCount >= 2 ? (
+        <div className="mb-3 rounded-xl bg-tt-soft-coral p-3 text-center text-xs ring-1 ring-tt-coral/15">
+          <p className="font-bold text-tt-deep-coral">
+            あなたのギア内の比較は出し尽くしました！
+          </p>
+          <p className="mt-0.5 text-tt-gray70">
+            ここからはイメージ回答 (参考データ)。
+            <Link href="/gear" className="font-bold text-tt-deep-coral underline">
+              ラバーをもう1本追加
+            </Link>
+            すると実体験の質問が最大5問増えます。
+          </p>
+        </div>
       ) : (
         <p className="mb-3 text-center text-xs text-tt-gray70">
           イメージ回答として記録されます（

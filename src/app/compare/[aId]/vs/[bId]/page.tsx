@@ -14,7 +14,7 @@ import {
   type Level,
   type Playstyle,
 } from "@/lib/types";
-import { VersusBar } from "@/components/versus-bar";
+import { VersusBar, VersusBarOrPending } from "@/components/versus-bar";
 import { EquipmentVisual } from "@/components/equipment-visual";
 
 export const metadata = { title: "用具対決" };
@@ -379,7 +379,7 @@ export default async function CompareViewPage({
                     n={p.total}
                   </span>
                 </div>
-                <VersusBar
+                <VersusBarOrPending
                   votesA={p.votesA}
                   votesB={p.votesB}
                   votesSame={p.votesSame}
