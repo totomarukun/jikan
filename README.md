@@ -87,6 +87,16 @@ next build までを自動実行**する。手作業は以下の3ステップの
 > 補足: Neon 等の他のPostgreSQLでも動く。プーラーを使わない場合は
 > `DIRECT_URL` に `DATABASE_URL` と同じ値を設定すればよい。
 
+### もっと簡単に: Vercel の Supabase 統合を使う場合
+
+Vercel プロジェクトの **Storage** (または Marketplace) から Supabase を
+Connect すると、接続情報 (`POSTGRES_PRISMA_URL` /
+`POSTGRES_URL_NON_POOLING` / `SUPABASE_JWT_SECRET` 等) が自動注入される。
+このリポジトリはそれらを自動検出するため、**手動の環境変数設定は不要**
+(上記ステップ1〜2の接続文字列コピーを丸ごとスキップして Redeploy するだけ)。
+手動で `DATABASE_URL` / `DIRECT_URL` / `AUTH_SECRET` を設定した場合は
+そちらが優先される。
+
 ### 今後の本番強化（Phase 2.1以降の推奨）
 
 - 認証を簡易メールログインから **Supabase Auth（マジックリンク）** へ移行

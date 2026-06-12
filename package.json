@@ -10,7 +10,7 @@
     "test": "vitest run",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "build:deploy": "prisma generate --schema prisma/schema.postgres.prisma && prisma db push --schema prisma/schema.postgres.prisma --skip-generate && tsx prisma/seed.ts && next build"
+    "build:deploy": "node scripts/deploy-build.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

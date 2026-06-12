@@ -15,7 +15,8 @@ const COOKIE_OPTIONS = {
 } as const;
 
 function secret(): string {
-  const s = process.env.AUTH_SECRET;
+  // Supabase 統合利用時は SUPABASE_JWT_SECRET をフォールバックとして使える
+  const s = process.env.AUTH_SECRET ?? process.env.SUPABASE_JWT_SECRET;
   if (s) return s;
   // 本番でのシークレット未設定は脆弱なセッションを生むため起動時に弾く
   if (process.env.NODE_ENV === "production") {
