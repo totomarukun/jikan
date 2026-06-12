@@ -54,7 +54,6 @@ export async function buildQuestionPayload(
     prisma.comparison.findMany({
       where: { sessionId },
       orderBy: { answeredAt: "desc" },
-      take: 20,
       select: {
         optionAEquipmentId: true,
         optionBEquipmentId: true,
@@ -76,19 +75,23 @@ export async function buildQuestionPayload(
     isCurrent: g.isCurrent,
   }));
 
-  const recentAsked = recent.map((r) => {
+  // 回答済みの (ペア×軸) をすべて展開して除外する。
+  // 1行 (=1ペア) に複数軸の回答が入るため、1行=1軸とみなすと
+  // 回答済みの質問が再出題されてしまう
+  const recentAsked: Array<{ pairKey: string; axis: string }> = [];
+  for (const r of recent) {
     const key = [r.optionAEquipmentId, r.optionBEquipmentId].sort().join("|");
-    const axis = r.winnerHardness
-      ? "hardness"
-      : r.winnerBallHold
-        ? "ballHold"
-        : r.winnerSpeed
-          ? "speed"
-          : r.winnerSpin
-            ? "spin"
-            : "overall";
-    return { pairKey: key, axis };
-  });
+    const answered: Array<[string, string | null]> = [
+      ["overall", r.winnerOverall],
+      ["speed", r.winnerSpeed],
+      ["spin", r.winnerSpin],
+      ["hardness", r.winnerHardness],
+      ["ballHold", r.winnerBallHold],
+    ];
+    for (const [axis, winner] of answered) {
+      if (winner) recentAsked.push({ pairKey: key, axis });
+    }
+  }
 
   const question = generateQuestion(equipments, { gear, recentAsked });
   if (!question) return null;

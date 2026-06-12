@@ -292,6 +292,86 @@ async function SwitchBoard({
         </div>
       )}
 
+      {/* 検討まとめ: 候補を並べた後の「で、どれにする？」に1表で答える */}
+      {candidates.length >= 2 && (
+        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <h2 className="font-bold">検討まとめ</h2>
+          <p className="mt-0.5 text-xs text-tt-gray70">
+            基準「{current.name}」に対する候補の比較一覧。
+          </p>
+          <table className="mt-3 w-full text-xs">
+            <thead>
+              <tr className="text-left text-[10px] text-tt-gray70">
+                <th className="pb-1.5 font-medium">候補</th>
+                <th className="pb-1.5 font-medium">みんなの好み</th>
+                <th className="pb-1.5 text-right font-medium">公称硬度差</th>
+                <th className="pb-1.5 text-right font-medium">価格差</th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map((cand, i) => {
+                const t = tallies[i];
+                const decidedPct =
+                  t.total >= 3 ? Math.round((t.b / t.total) * 100) : null;
+                const sameMaker = cand.manufacturer === current.manufacturer;
+                const hardnessDelta =
+                  sameMaker && cand.hardness != null && current.hardness != null
+                    ? cand.hardness - current.hardness
+                    : null;
+                const priceDelta =
+                  cand.price != null && current.price != null
+                    ? cand.price - current.price
+                    : null;
+                return (
+                  <tr key={cand.id} className="border-t border-tt-gray30/30">
+                    <td className="py-2 pr-2">
+                      <Link
+                        href={`/equipment/${cand.id}`}
+                        className="font-bold hover:underline"
+                      >
+                        {cand.name}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-2">
+                      {decidedPct != null ? (
+                        <span>
+                          <span className="font-mono font-bold text-tt-deep-green">
+                            {decidedPct}%
+                          </span>
+                          がこちら派
+                          <span className="font-mono text-tt-gray70">
+                            {" "}
+                            (n={t.total})
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-tt-gray70">
+                          集計中 (回答{t.total}件)
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right font-mono">
+                      {hardnessDelta == null
+                        ? "—"
+                        : `${hardnessDelta > 0 ? "+" : ""}${hardnessDelta}°`}
+                    </td>
+                    <td className="py-2 text-right font-mono">
+                      {priceDelta == null
+                        ? "—"
+                        : `${priceDelta > 0 ? "+" : ""}${priceDelta.toLocaleString()}円`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[10px] text-tt-gray70">
+            ※「好み」は判定3件以上のみ%表示。硬度差は同一メーカー間のみ
+            (各社基準が異なるため)。
+          </p>
+        </section>
+      )}
+
       <div className="mt-8 rounded-2xl bg-tt-soft-coral p-4 text-sm ring-1 ring-tt-coral/15">
         <p className="font-bold text-tt-deep-coral">
           データが足りない対決があります？

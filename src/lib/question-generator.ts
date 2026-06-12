@@ -38,7 +38,7 @@ export interface AskedRecord {
 
 export interface GeneratorContext {
   gear: GearLite[];
-  /** 直近に出題した (ペア×軸)。新しい順、最大20程度 */
+  /** 回答済みの (ペア×軸)。新しい順。再出題しないよう恒久的に除外する */
   recentAsked: AskedRecord[];
   random?: () => number;
 }
@@ -115,7 +115,7 @@ export function generateQuestion(
   const random = context.random ?? Math.random;
   const byId = new Map(equipments.map((e) => [e.id, e]));
   const askedKeys = new Set(
-    context.recentAsked.slice(0, 20).map((r) => `${r.pairKey}#${r.axis}`),
+    context.recentAsked.map((r) => `${r.pairKey}#${r.axis}`),
   );
 
   // ギアのうちラバーのみ。同じ用具を複数条件で使っていた場合は最初の1件を代表に

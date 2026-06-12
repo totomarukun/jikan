@@ -56,6 +56,20 @@ export default async function MyPage() {
     take: 5,
   });
 
+  // 体感メモ (自分の回答からできる比較メモ) のペア数
+  const feelPairCount = sessionId
+    ? new Set(
+        (
+          await prisma.comparison.findMany({
+            where: { sessionId },
+            select: { optionAEquipmentId: true, optionBEquipmentId: true },
+          })
+        ).map((c) =>
+          [c.optionAEquipmentId, c.optionBEquipmentId].sort().join("|"),
+        ),
+      ).size
+    : 0;
+
   // 回答を「自分の体感レビュー」として読めるよう、軸ごとの自分の判定を添える
   const axisColumns: Array<{ key: keyof (typeof recent)[number]; label: string }> = [
     { key: "winnerOverall", label: "好み" },
@@ -111,6 +125,21 @@ export default async function MyPage() {
       >
         マイギアを管理する →
       </Link>
+
+      {/* 回答=資産: 自分の体感メモへの常設導線 (B1) */}
+      {feelPairCount > 0 && (
+        <Link
+          href="/gear"
+          className="mt-3 block rounded-2xl bg-tt-soft-green p-4 text-sm shadow-sm ring-1 ring-tt-green/25 transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="font-bold text-tt-deep-green">
+            あなたの体感メモ
+          </span>
+          <span className="ml-2 text-xs text-tt-gray70">
+            {feelPairCount}ペア分の自分用比較メモが見られます →
+          </span>
+        </Link>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Link
