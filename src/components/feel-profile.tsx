@@ -60,7 +60,10 @@ function FeelRow({ statement: s }: { statement: FeelStatement }) {
           </span>
         </div>
         <p className="mt-1 text-sm text-tt-gray70">
-          まだ回答{s.tally.n}件 — 集計中につき参考程度
+          回答{s.tally.n}件 —{" "}
+          <span className="font-bold text-tt-deep-coral">
+            あと{3 - s.tally.n}件で公開
+          </span>
           <span className="ml-1.5 text-xs">
             ({s.tally.more > 0 && `${s.moreLabel} ${s.tally.more}人`}
             {s.tally.more > 0 && (s.tally.less > 0 || s.tally.same > 0) && " / "}

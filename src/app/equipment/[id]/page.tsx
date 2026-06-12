@@ -51,10 +51,9 @@ export default async function EquipmentPage({
     })
     .filter((o) => o.total >= 2 && o.oppVotes > o.myVotes)
     .slice(0, 3);
-  const winRate =
-    record.wins + record.losses > 0
-      ? Math.round((record.wins / (record.wins + record.losses)) * 100)
-      : null;
+  // 判定数が少ないうちは % を断言しない (リスト側の「集計中」ルールと統一)
+  const decided = record.wins + record.losses;
+  const winRate = decided >= 5 ? Math.round((record.wins / decided) * 100) : null;
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -93,7 +92,7 @@ export default async function EquipmentPage({
               <span className="text-tt-gray70"> (自社基準)</span>
             </div>
           )}
-          {winRate != null && (
+          {winRate != null ? (
             <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
               <span className="text-tt-gray70">「好み」勝率 </span>
               <span className="font-mono font-bold text-tt-deep-green">
@@ -101,6 +100,14 @@ export default async function EquipmentPage({
               </span>
               <span className="font-mono text-tt-gray70">
                 ({record.wins}勝{record.losses}敗)
+              </span>
+            </div>
+          ) : (
+            <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
+              <span className="text-tt-gray70">「好み」評価 </span>
+              <span className="font-mono font-bold">収集中</span>
+              <span className="font-mono text-tt-gray70">
+                (判定{decided}件)
               </span>
             </div>
           )}

@@ -258,6 +258,11 @@ function RevealPanel({
       <p className="mt-3 text-sm">{verdict}</p>
       <p className="mt-1 text-xs text-tt-green">
         +1 あなたの回答がこの対決のデータになりました
+        {tally.total < 3 && (
+          <span className="ml-1 text-tt-deep-coral">
+            — あと{3 - tally.total}件でみんなに公開されます
+          </span>
+        )}
       </p>
       <button
         onClick={onNext}

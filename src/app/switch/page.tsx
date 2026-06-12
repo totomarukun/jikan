@@ -8,6 +8,7 @@ import { VersusBar } from "@/components/versus-bar";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import {
+  BaseFromGear,
   CandidatePicker,
   CurrentRubberSetter,
 } from "@/components/switch-picker";
@@ -42,16 +43,37 @@ export default async function SwitchPage({
       </p>
 
       {!current ? (
-        <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-          <h2 className="font-bold">まず、いま使っているラバーを教えてください</h2>
-          <p className="mt-1 mb-4 text-sm text-tt-gray70">
-            すべての比較が「自分の基準」で見られるようになります。
-          </p>
-          <CurrentRubberSetter />
-        </div>
+        <NoBaseSetup sessionId={sessionId} />
       ) : (
         <SwitchBoard current={current} sp={sp} />
       )}
+    </div>
+  );
+}
+
+// 基準未設定時: マイギアがあればワンタップで基準にできる (再入力させない)
+async function NoBaseSetup({ sessionId }: { sessionId: string | null }) {
+  const gearItems = sessionId
+    ? await prisma.gearItem.findMany({
+        where: { sessionId, equipment: { category: { startsWith: "RUBBER_" } } },
+        include: { equipment: { select: { id: true, name: true } } },
+        orderBy: [{ isCurrent: "desc" }, { createdAt: "desc" }],
+        take: 6,
+      })
+    : [];
+  const seen = new Set<string>();
+  const chips = gearItems
+    .filter((g) => !seen.has(g.equipmentId) && seen.add(g.equipmentId))
+    .map((g) => ({ equipmentId: g.equipmentId, name: g.equipment.name }));
+
+  return (
+    <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+      <h2 className="font-bold">まず、基準にするラバーを選んでください</h2>
+      <p className="mt-1 mb-4 text-sm text-tt-gray70">
+        すべての比較が「自分の基準」で見られるようになります。
+      </p>
+      <BaseFromGear gear={chips} />
+      <CurrentRubberSetter />
     </div>
   );
 }
@@ -139,23 +161,15 @@ async function SwitchBoard({
         </div>
       </div>
 
-      {/* 候補追加 */}
+      {/* 候補追加 (追加中は「集計しています…」を必ず表示) */}
       <div className="mt-4">
-        <CandidatePicker candidateIds={candidates.map((c) => c.id)} />
-        {suggestions.length > 0 && candidates.length < 3 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="text-xs text-tt-gray70">よく比較される:</span>
-            {suggestions.map((s) => (
-              <Link
-                key={s.id}
-                href={`/switch?c=${[...candidates.map((c) => c.id), s.id].join(",")}`}
-                className="rounded-full bg-white px-3 py-1 text-xs font-medium shadow-sm ring-1 ring-tt-gray30/40 transition hover:bg-tt-soft-green hover:ring-tt-green"
-              >
-                + {s.name}
-              </Link>
-            ))}
-          </div>
-        )}
+        <CandidatePicker
+          candidateIds={candidates.map((c) => c.id)}
+          suggestions={suggestions.map((s) => ({
+            equipmentId: s.id,
+            name: s.name,
+          }))}
+        />
       </div>
 
       {/* 候補カード */}
