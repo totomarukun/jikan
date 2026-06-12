@@ -10,6 +10,7 @@ import {
 } from "@/lib/types";
 import type { QuestionPayload } from "@/lib/play";
 import { VersusBar } from "@/components/versus-bar";
+import { EquipmentVisual } from "@/components/equipment-visual";
 
 // M3: AB比較カード。
 // マイギア内ペアの出題なので経験フラグの確認は不要 = 1問1タップ。
@@ -308,8 +309,20 @@ function EquipmentCard({
           {EQUIPMENT_CATEGORY_LABELS[option.category as EquipmentCategory]}
         </span>
       </div>
-      <p className="mt-2 text-xl font-bold">{option.name}</p>
-      <p className="mt-0.5 text-sm text-tt-gray70">{option.manufacturer}</p>
+      <div className="mt-2 flex items-center gap-3">
+        <EquipmentVisual
+          category={option.category}
+          manufacturer={option.manufacturer}
+          bladeSubcategory={option.bladeSubcategory}
+          imageUrl={option.imageUrl}
+          name={option.name}
+          size={56}
+        />
+        <div className="min-w-0">
+          <p className="text-xl font-bold leading-snug">{option.name}</p>
+          <p className="mt-0.5 text-sm text-tt-gray70">{option.manufacturer}</p>
+        </div>
+      </div>
       {condition && (
         <p className="mt-1.5 inline-block rounded-full bg-white/80 px-2.5 py-1 text-xs text-tt-gray70 ring-1 ring-black/5">
           {condition}

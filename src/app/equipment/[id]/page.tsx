@@ -6,6 +6,7 @@ import { aggregatePairs, getEquipmentRecord } from "@/lib/data";
 import { feelStatements, getFeelProfile } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
 import { FeelProfileCard } from "@/components/feel-profile";
+import { EquipmentVisual } from "@/components/equipment-visual";
 import { VersusBar } from "@/components/versus-bar";
 import {
   EQUIPMENT_CATEGORY_LABELS,
@@ -65,11 +66,23 @@ export default async function EquipmentPage({
     <div className="mx-auto max-w-md py-4">
       {/* ヘッダーカード */}
       <div className="rounded-3xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-6 shadow-sm ring-1 ring-black/5">
-        <p className="text-xs font-medium text-tt-gray70">
-          {EQUIPMENT_CATEGORY_LABELS[equipment.category as EquipmentCategory]}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold">{equipment.name}</h1>
-        <p className="text-sm text-tt-gray70">{equipment.manufacturer}</p>
+        <div className="flex items-start gap-4">
+          <EquipmentVisual
+            category={equipment.category}
+            manufacturer={equipment.manufacturer}
+            bladeSubcategory={equipment.bladeSubcategory}
+            imageUrl={equipment.imageUrl}
+            name={equipment.name}
+            size={72}
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-tt-gray70">
+              {EQUIPMENT_CATEGORY_LABELS[equipment.category as EquipmentCategory]}
+            </p>
+            <h1 className="mt-1 text-2xl font-bold">{equipment.name}</h1>
+            <p className="text-sm text-tt-gray70">{equipment.manufacturer}</p>
+          </div>
+        </div>
         <dl className="mt-4 flex flex-wrap gap-2 text-xs">
           {equipment.price != null && (
             <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">

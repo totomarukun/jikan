@@ -21,6 +21,7 @@ function makeEquipment(
     hardness: 40,
     price: 5000,
     bladeSubcategory: category === "BLADE" ? "WOOD" : null,
+    imageUrl: null,
     ...overrides,
   };
 }

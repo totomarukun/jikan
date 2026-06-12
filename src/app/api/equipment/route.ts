@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       price: true,
       hardness: true,
       bladeSubcategory: true,
+      imageUrl: true,
     },
   });
 

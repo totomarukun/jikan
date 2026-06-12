@@ -6,6 +6,7 @@ import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
 import { VersusBar } from "@/components/versus-bar";
 import { FeelProfileCard } from "@/components/feel-profile";
+import { EquipmentVisual } from "@/components/equipment-visual";
 import {
   CandidatePicker,
   CurrentRubberSetter,
@@ -108,7 +109,15 @@ async function SwitchBoard({
       {/* 基準: 現用ラバー */}
       <div className="mt-6 rounded-2xl bg-gradient-to-br from-tt-soft-green to-white p-4 shadow-sm ring-1 ring-tt-green/25">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-3">
+            <EquipmentVisual
+              category={current.category}
+              manufacturer={current.manufacturer}
+              imageUrl={current.imageUrl}
+              name={current.name}
+              size={52}
+            />
+            <div>
             <p className="text-xs font-bold text-tt-deep-green">
               あなたの基準 (いま使用中)
             </p>
@@ -119,6 +128,7 @@ async function SwitchBoard({
               {current.price != null &&
                 ` ・ ¥${current.price.toLocaleString()}`}
             </p>
+            </div>
           </div>
           <Link
             href={`/equipment/${current.id}`}
@@ -243,7 +253,15 @@ function CandidateCard({
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
       <div className="flex items-start justify-between">
-        <div>
+        <div className="flex items-center gap-3">
+          <EquipmentVisual
+            category={candidate.category}
+            manufacturer={candidate.manufacturer}
+            imageUrl={candidate.imageUrl}
+            name={candidate.name}
+            size={48}
+          />
+          <div>
           <Link
             href={`/equipment/${candidate.id}`}
             className="text-lg font-bold hover:underline"
@@ -255,6 +273,7 @@ function CandidateCard({
             {candidate.price != null &&
               ` ・ ¥${candidate.price.toLocaleString()}`}
           </p>
+          </div>
         </div>
         <Link
           href={`/switch?c=${remainingIds.join(",")}`}

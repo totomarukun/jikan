@@ -15,6 +15,7 @@ import {
   type Playstyle,
 } from "@/lib/types";
 import { VersusBar } from "@/components/versus-bar";
+import { EquipmentVisual } from "@/components/equipment-visual";
 
 export const metadata = { title: "用具対決" };
 
@@ -165,7 +166,16 @@ export default async function CompareViewPage({
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-tt-green font-mono text-xs font-bold text-white">
             A
           </span>
-          <p className="mt-2 font-bold leading-snug">{equipA.name}</p>
+          <EquipmentVisual
+            category={equipA.category}
+            manufacturer={equipA.manufacturer}
+            bladeSubcategory={equipA.bladeSubcategory}
+            imageUrl={equipA.imageUrl}
+            name={equipA.name}
+            size={48}
+            className="mt-2"
+          />
+          <p className="mt-1 font-bold leading-snug">{equipA.name}</p>
           <p className="text-xs text-tt-gray70">{equipA.manufacturer}</p>
         </Link>
         <Link
@@ -175,7 +185,16 @@ export default async function CompareViewPage({
           <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-tt-coral font-mono text-xs font-bold text-white">
             B
           </span>
-          <p className="mt-2 font-bold leading-snug">{equipB.name}</p>
+          <EquipmentVisual
+            category={equipB.category}
+            manufacturer={equipB.manufacturer}
+            bladeSubcategory={equipB.bladeSubcategory}
+            imageUrl={equipB.imageUrl}
+            name={equipB.name}
+            size={48}
+            className="ml-auto mt-2"
+          />
+          <p className="mt-1 font-bold leading-snug">{equipB.name}</p>
           <p className="text-xs text-tt-gray70">{equipB.manufacturer}</p>
         </Link>
         <span className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-tt-charcoal font-mono text-xs font-bold text-white shadow-lg">

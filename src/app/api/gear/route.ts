@@ -25,7 +25,7 @@ export async function GET() {
     where: { sessionId },
     include: {
       equipment: {
-        select: { id: true, name: true, manufacturer: true, category: true },
+        select: { id: true, name: true, manufacturer: true, category: true, imageUrl: true },
       },
       blade: { select: { id: true, name: true } },
     },

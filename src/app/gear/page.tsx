@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GearForm, type GearDraft } from "@/components/gear-form";
+import { EquipmentVisual } from "@/components/equipment-visual";
 import {
   GEAR_SIDE_LABELS,
   THICKNESS_LABELS,
@@ -18,7 +19,13 @@ interface GearEntry {
   side: GearSide;
   thickness: Thickness;
   isCurrent: boolean;
-  equipment: { id: string; name: string; manufacturer: string };
+  equipment: {
+    id: string;
+    name: string;
+    manufacturer: string;
+    category: string;
+    imageUrl: string | null;
+  };
   blade: { id: string; name: string } | null;
 }
 
@@ -99,7 +106,15 @@ export default function GearPage() {
                 key={g.id}
                 className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5"
               >
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
+                  <EquipmentVisual
+                    category={g.equipment.category}
+                    manufacturer={g.equipment.manufacturer}
+                    imageUrl={g.equipment.imageUrl}
+                    name={g.equipment.name}
+                    size={44}
+                  />
+                  <div className="min-w-0">
                   <p className="font-bold">
                     <Link
                       href={`/equipment/${g.equipment.id}`}
@@ -118,6 +133,7 @@ export default function GearPage() {
                     {THICKNESS_LABELS[g.thickness]}
                     {g.blade && ` / ${g.blade.name}`}
                   </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => remove(g.id)}

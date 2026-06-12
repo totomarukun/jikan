@@ -19,6 +19,7 @@ export interface EquipmentLite {
   hardness: number | null;
   price: number | null;
   bladeSubcategory: string | null;
+  imageUrl: string | null;
 }
 
 export interface GearLite {

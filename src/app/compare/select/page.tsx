@@ -6,6 +6,7 @@ import {
   EQUIPMENT_CATEGORY_LABELS,
   type EquipmentCategory,
 } from "@/lib/types";
+import { EquipmentVisual } from "@/components/equipment-visual";
 
 // C1: 用具マスタ検索 (対決作成)
 
@@ -15,6 +16,7 @@ interface EquipmentItem {
   manufacturer: string;
   name: string;
   price: number | null;
+  imageUrl: string | null;
 }
 
 export default function CompareSelectPage() {
@@ -89,11 +91,22 @@ export default function CompareSelectPage() {
                     : "border-tt-gray30/40 bg-white hover:border-tt-green"
                 }`}
               >
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-tt-gray70">
-                  {item.manufacturer} ・{" "}
-                  {EQUIPMENT_CATEGORY_LABELS[item.category]}
-                </p>
+                <span className="flex items-center gap-3">
+                  <EquipmentVisual
+                    category={item.category}
+                    manufacturer={item.manufacturer}
+                    imageUrl={item.imageUrl}
+                    name={item.name}
+                    size={40}
+                  />
+                  <span className="min-w-0">
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-xs text-tt-gray70">
+                      {item.manufacturer} ・{" "}
+                      {EQUIPMENT_CATEGORY_LABELS[item.category]}
+                    </p>
+                  </span>
+                </span>
               </button>
             </li>
           );
