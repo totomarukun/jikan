@@ -8,8 +8,20 @@ import { spawnSync } from "node:child_process";
 
 const env = { ...process.env };
 
-env.DATABASE_URL =
-  env.DATABASE_URL ?? env.POSTGRES_PRISMA_URL ?? env.POSTGRES_URL;
+// Supabase プーラー (6543) 経由の Prisma には pgbouncer=true が必須。
+// 統合が注入する URL に付かないことがあるため補完する。
+// https://github.com/supabase/supabase/issues/27328
+function withPoolerParams(url) {
+  if (!url || !url.startsWith("postgres")) return url;
+  if (url.includes(":6543") && !url.includes("pgbouncer=true")) {
+    return `${url}${url.includes("?") ? "&" : "?"}pgbouncer=true&connection_limit=1`;
+  }
+  return url;
+}
+
+env.DATABASE_URL = withPoolerParams(
+  env.DATABASE_URL ?? env.POSTGRES_PRISMA_URL ?? env.POSTGRES_URL,
+);
 env.DIRECT_URL =
   env.DIRECT_URL ?? env.POSTGRES_URL_NON_POOLING ?? env.DATABASE_URL;
 
