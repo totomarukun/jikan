@@ -54,31 +54,70 @@ export async function POST(request: Request) {
     | "winnerHardness"
     | "winnerBallHold";
 
-  const newCount = progress.answerCount + 1;
+  // 同一セッション×ペア×軸の再回答は「最新で上書き」する。
+  // 連投で n (母数) と % を1人で水増しできると、表示している
+  // データ全体の信頼が崩れるため、票は常に1セッション1票に丸める
+  const existing = await prisma.comparison.findFirst({
+    where: {
+      sessionId,
+      [axisColumn]: { not: null },
+      OR: [
+        { optionAEquipmentId, optionBEquipmentId },
+        {
+          optionAEquipmentId: optionBEquipmentId,
+          optionBEquipmentId: optionAEquipmentId,
+        },
+      ],
+    },
+    orderBy: { answeredAt: "desc" },
+  });
 
-  await prisma.$transaction([
-    prisma.comparison.create({
+  let newCount = progress.answerCount;
+  let revised = false;
+  if (existing) {
+    // 既存行の A/B 格納順が今回と逆なら勝者も反転させて保存する
+    const flipped = existing.optionAEquipmentId === optionBEquipmentId;
+    const storedWinner =
+      flipped && (winner === "A" || winner === "B")
+        ? winner === "A"
+          ? "B"
+          : "A"
+        : winner;
+    await prisma.comparison.update({
+      where: { id: existing.id },
       data: {
-        sessionId,
-        userId,
-        category: isRubberCategory(optionA.category) ? "rubber" : "blade",
-        optionAEquipmentId,
-        optionBEquipmentId,
-        contextPlaystyle: progress.playstyle,
-        contextLevel: progress.level,
-        contextBladeCategory: progress.bladeCategory,
-        contextGrip: progress.grip,
-        [axisColumn]: winner,
-        hasActualExperience,
-        optionAGearItemId: gearA?.id ?? null,
-        optionBGearItemId: gearB?.id ?? null,
+        [axisColumn]: storedWinner,
+        answeredAt: new Date(),
+        userId: existing.userId ?? userId,
       },
-    }),
-    prisma.sessionProgress.update({
-      where: { sessionId },
-      data: { answerCount: newCount },
-    }),
-  ]);
+    });
+    revised = true;
+  } else {
+    newCount = progress.answerCount + 1;
+    await prisma.$transaction([
+      prisma.comparison.create({
+        data: {
+          sessionId,
+          userId,
+          category: isRubberCategory(optionA.category) ? "rubber" : "blade",
+          optionAEquipmentId,
+          optionBEquipmentId,
+          contextPlaystyle: progress.playstyle,
+          contextLevel: progress.level,
+          contextBladeCategory: progress.bladeCategory,
+          contextGrip: progress.grip,
+          [axisColumn]: winner,
+          hasActualExperience,
+          optionAGearItemId: gearA?.id ?? null,
+          optionBGearItemId: gearB?.id ?? null,
+        },
+      }),
+      prisma.sessionProgress.update({
+        where: { sessionId },
+        data: { answerCount: newCount },
+      }),
+    ]);
+  }
 
   // 回答直後の「みんなの回答」フィードバック用集計 (今回の回答を含む)
   const tally = await tallyPair(optionAEquipmentId, optionBEquipmentId);
@@ -87,5 +126,6 @@ export async function POST(request: Request) {
     answerCount: newCount,
     hasActualExperience,
     tally,
+    revised,
   });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateSessionId, getSessionId } from "@/lib/session";
+import { getOrCreateSessionId, getSessionId, getUserId } from "@/lib/session";
 import { gearSchema } from "@/lib/types";
 
 // マイギア (使ったことのある用具 + 使用条件) の管理
@@ -94,6 +94,8 @@ export async function POST(request: Request) {
     : await prisma.gearItem.create({
         data: {
           sessionId,
+          // ログイン中はユーザーにも紐付ける (旧アカウントのデータ復元の手がかり)
+          userId: await getUserId(),
           equipmentId,
           side,
           thickness,

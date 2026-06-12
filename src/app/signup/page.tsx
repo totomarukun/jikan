@@ -8,6 +8,7 @@ import { useState } from "react";
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -21,7 +22,7 @@ export default function SignupPage() {
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, nickname: nickname || undefined }),
+      body: JSON.stringify({ email, password, nickname: nickname || undefined }),
     });
     if (res.ok) {
       router.push("/me");
@@ -52,6 +53,22 @@ export default function SignupPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="h-11 w-full rounded-lg border border-tt-gray30/60 bg-white px-3 outline-none focus:border-tt-green"
             placeholder="you@example.com"
+          />
+        </div>
+        <div>
+          <label htmlFor="password" className="mb-1 block text-sm font-medium">
+            パスワード（8文字以上）
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={8}
+            maxLength={72}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-11 w-full rounded-lg border border-tt-gray30/60 bg-white px-3 outline-none focus:border-tt-green"
           />
         </div>
         <div>

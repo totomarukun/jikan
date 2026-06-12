@@ -136,10 +136,10 @@ export default async function LandingPage() {
         <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
           <p className="font-mono text-2xl font-bold text-tt-deep-coral">02</p>
           <h2 className="mt-2 font-bold text-tt-deep-coral">
-            両方使った人だけの比較
+            「両方使った人」に絞れる比較
           </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            回答には経験フラグが付きます。実際に両方使った人の判定だけに絞った、試打に最も近いデータ。
+            すべての回答に経験フラグが付きます。イメージ回答も集めますが、ワンタップで「実際に両方使った人の判定だけ」に絞り込めます。
           </p>
         </div>
         <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">

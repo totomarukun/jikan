@@ -7,6 +7,7 @@ import { useState } from "react";
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +19,7 @@ export default function LoginPage() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, password }),
     });
     if (res.ok) {
       router.push("/me");
@@ -45,6 +46,21 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="h-11 w-full rounded-lg border border-tt-gray30/60 bg-white px-3 outline-none focus:border-tt-green"
             placeholder="you@example.com"
+          />
+        </div>
+        <div>
+          <label htmlFor="password" className="mb-1 block text-sm font-medium">
+            パスワード
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            maxLength={72}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-11 w-full rounded-lg border border-tt-gray30/60 bg-white px-3 outline-none focus:border-tt-green"
           />
         </div>
         {error && <p className="text-sm text-tt-deep-coral">{error}</p>}

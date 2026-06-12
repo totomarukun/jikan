@@ -18,6 +18,10 @@ model User {
   id                String       @id @default(cuid())
   email             String       @unique
   nickname          String?
+  // scrypt ハッシュ "salt:hex"。旧アカウント(パスワード未設定)は null
+  passwordHash      String?
+  // この ユーザーのデータ本体が紐づくセッション (ログイン時にcookieへ復元)
+  primarySessionId  String?
   // enum: DRIVE | QUICK_ATTACK | CUT | OTHER | UNDECIDED
   playstyle         String       @default("UNDECIDED")
   // enum: BEGINNER | INTERMEDIATE | ADVANCED | NON_PLAYER

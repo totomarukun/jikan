@@ -86,7 +86,13 @@ export const gearSchema = z.object({
 
 export const signupSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(8).max(72),
   nickname: z.string().max(30).optional(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1).max(72),
 });
 
 // ---- 表示用ラベル ----

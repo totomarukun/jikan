@@ -67,6 +67,15 @@ export async function getOrCreateSessionId(): Promise<string> {
   return id;
 }
 
+/**
+ * セッションIDを指定のものに付け替える (ログイン時のデータ復元用)。
+ * cookie の書き込みを伴うため Route Handler / Server Action からのみ呼ぶこと。
+ */
+export async function adoptSessionId(sessionId: string): Promise<void> {
+  const store = await cookies();
+  store.set(SESSION_COOKIE, sessionId, COOKIE_OPTIONS);
+}
+
 /** ログイン中ユーザーのIDを取得 (未ログインなら null) */
 export async function getUserId(): Promise<string | null> {
   const store = await cookies();
