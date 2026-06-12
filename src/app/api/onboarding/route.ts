@@ -11,33 +11,13 @@ export async function POST(request: Request) {
   }
 
   const sessionId = await getOrCreateSessionId();
-  const { level, playstyle, bladeCategory, currentRubberId } = parsed.data;
+  const { level, playstyle, bladeCategory } = parsed.data;
 
-  // 現用ラバーは実在チェック (不正IDは黙ってスキップ扱い)
-  let validRubberId: string | null = null;
-  if (currentRubberId) {
-    const rubber = await prisma.equipment.findUnique({
-      where: { id: currentRubberId },
-      select: { id: true, category: true },
-    });
-    if (rubber?.category.startsWith("RUBBER_")) validRubberId = rubber.id;
-  }
-
+  // currentRubberId はマイギア (POST /api/gear) 側で同期するため、ここでは触らない
   await prisma.sessionProgress.upsert({
     where: { sessionId },
-    create: {
-      sessionId,
-      level,
-      playstyle,
-      bladeCategory,
-      currentRubberId: validRubberId,
-    },
-    update: {
-      level,
-      playstyle,
-      bladeCategory,
-      currentRubberId: validRubberId,
-    },
+    create: { sessionId, level, playstyle, bladeCategory },
+    update: { level, playstyle, bladeCategory },
   });
 
   return NextResponse.json({ ok: true });

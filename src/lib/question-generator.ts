@@ -1,9 +1,13 @@
 import type { QuestionAxis } from "./types";
 import { isRubberCategory } from "./types";
 
-// 企画書 第9章: 3レイヤー戦略
-//   Layer 1 関連性 60% / Layer 2 データ補完 30% / Layer 3 探索 10%
-// 共通フィルタ: 直近10問のペアと重複しない / 同一カテゴリ (ラバー or ラケット)
+// マイギア中心の出題 (サービス再設計の核):
+// - 出題は原則「ユーザーが使ったことのあるラバー同士」(ギア内ペア)。
+//   両方使った人の相対判定だけが信頼できるデータであり、回答者にとっても
+//   イメージではなく記憶で答えられる。
+// - ギア内ペアを出し尽くしたら「現用 vs 未使用の人気ラバー」を
+//   イメージ回答 (explore) として明示したうえで出す。
+// - 報酬・マイルストーンの概念は持たない。
 
 export interface EquipmentLite {
   id: string;
@@ -17,17 +21,24 @@ export interface EquipmentLite {
   bladeSubcategory: string | null;
 }
 
+export interface GearLite {
+  id: string;
+  equipmentId: string;
+  side: string; // FH | BH
+  thickness: string;
+  bladeName: string | null;
+  isCurrent: boolean;
+}
+
+export interface AskedRecord {
+  pairKey: string;
+  axis: string;
+}
+
 export interface GeneratorContext {
-  bladeCategory: string;
-  level: string;
-  playstyle: string;
-  /** いま使っているラバー (超高関連レイヤー: 現用 vs 他 の出題に使う) */
-  currentRubberId?: string | null;
-  /** 直近に出題したペア (新しい順、最大10) */
-  recentPairs: Array<[string, string]>;
-  /** 用具ID → 回答に登場した回数 (人気度・補完優先度の代用) */
-  appearanceCounts: Map<string, number>;
-  /** 0-1 の乱数源 (テスト時に差し替え可能) */
+  gear: GearLite[];
+  /** 直近に出題した (ペア×軸)。新しい順、最大20程度 */
+  recentAsked: AskedRecord[];
   random?: () => number;
 }
 
@@ -37,184 +48,171 @@ export interface GeneratedQuestion {
   optionB: EquipmentLite;
   axis: QuestionAxis;
   prompt: string;
-  layer: 1 | 2 | 3;
-  /** optionA がユーザーの現用ラバーである出題 (UIで「いま使用中」を表示) */
-  optionAIsCurrent?: boolean;
+  /** gear: ギア内ペア (実体験) / explore: イメージ回答 */
+  source: "gear" | "explore";
+  /** 表示用の使用条件 (ギア由来のときのみ) */
+  gearA: GearLite | null;
+  gearB: GearLite | null;
 }
 
 export function pairKey(aId: string, bId: string): string {
   return [aId, bId].sort().join("|");
 }
 
+const FEEL_AXES: Array<{ axis: QuestionAxis; weight: number }> = [
+  { axis: "overall", weight: 0.35 },
+  { axis: "hardness", weight: 0.2 },
+  { axis: "spin", weight: 0.15 },
+  { axis: "speed", weight: 0.15 },
+  { axis: "ballHold", weight: 0.15 },
+];
+
+const GEAR_PROMPTS: Record<string, string> = {
+  overall: "どちらが好みだった？",
+  hardness: "硬く感じたのはどちら？",
+  spin: "回転がかかったのはどちら？",
+  speed: "スピードが出たのはどちら？",
+  ballHold: "球持ちが良かったのはどちら？",
+};
+
+const EXPLORE_PROMPTS: Record<string, string> = {
+  overall: "イメージでOK: どちらが好みそう？",
+  hardness: "イメージでOK: 硬そうなのはどちら？",
+  spin: "イメージでOK: 回転がかかりそうなのは？",
+  speed: "イメージでOK: 速そうなのはどちら？",
+  ballHold: "イメージでOK: 球持ちが良さそうなのは？",
+};
+
 function pickRandom<T>(items: T[], random: () => number): T {
   return items[Math.floor(random() * items.length)];
 }
 
-/** 文脈に「関連性が高い」ラバーカテゴリ群を返す */
-function relevantRubberCategories(bladeCategory: string): string[] {
-  if (bladeCategory === "STICKY") return ["RUBBER_STICKY", "RUBBER_INVERTED"];
-  return ["RUBBER_INVERTED"];
+function pickAxis(
+  available: QuestionAxis[],
+  random: () => number,
+): QuestionAxis {
+  const candidates = FEEL_AXES.filter((a) => available.includes(a.axis));
+  const total = candidates.reduce((s, a) => s + a.weight, 0);
+  let r = random() * total;
+  for (const c of candidates) {
+    r -= c.weight;
+    if (r <= 0) return c.axis;
+  }
+  return candidates[candidates.length - 1].axis;
 }
 
-function selectQuestionType(random: () => number): {
-  axis: QuestionAxis;
-  template: (a: EquipmentLite, b: EquipmentLite) => string;
-} {
-  const r = random();
-  // シンプルAB 60% / 軸指定AB 30% / シナリオAB 10%。
-  // 軸指定には感覚言語のズレが大きい「硬さ」「球持ち」を含める
-  // (絶対評価では伝わらない感覚を、相対比較として収集する)。
-  if (r < 0.6) {
-    return { axis: "overall", template: () => "どちらが好み？" };
-  }
-  if (r < 0.675) {
-    return { axis: "speed", template: () => "スピードが速いのはどちら？" };
-  }
-  if (r < 0.75) {
-    return { axis: "spin", template: () => "回転がかかるのはどちら？" };
-  }
-  if (r < 0.825) {
-    return { axis: "hardness", template: () => "硬く感じるのはどちら？" };
-  }
-  if (r < 0.9) {
-    return {
-      axis: "ballHold",
-      template: () => "球持ちが良いと感じるのはどちら？",
-    };
-  }
-  const scenarios = [
-    "バック面で使うなら？",
-    "中陣ドライブで威力を出すなら？",
-    "レシーブの安定感を取るなら？",
-  ];
-  const scenario = scenarios[Math.floor(random() * scenarios.length)];
-  return { axis: "overall", template: () => scenario };
-}
+const ASKABLE_AXES = FEEL_AXES.map((a) => a.axis);
 
 /**
- * 出題ペアを1つ生成する。候補が尽きた場合は null。
- * equipments は isActive な全用具を渡す。
+ * 次の1問を生成する。出題できるものがなければ null
+ * (ギアが少ない場合は explore にフォールバックする)。
  */
 export function generateQuestion(
   equipments: EquipmentLite[],
   context: GeneratorContext,
 ): GeneratedQuestion | null {
   const random = context.random ?? Math.random;
-  const recentKeys = new Set(
-    context.recentPairs.slice(0, 10).map(([a, b]) => pairKey(a, b)),
+  const byId = new Map(equipments.map((e) => [e.id, e]));
+  const askedKeys = new Set(
+    context.recentAsked.slice(0, 20).map((r) => `${r.pairKey}#${r.axis}`),
   );
 
-  // カテゴリ選択: ラバー 75% / ラケット 25% (マスタ構成比に概ね一致)
-  const useRubber = random() < 0.75;
-  const pool = equipments.filter((e) =>
-    useRubber ? isRubberCategory(e.category) : e.category === "BLADE",
-  );
-  if (pool.length < 2) return null;
+  // ギアのうちラバーのみ。同じ用具を複数条件で使っていた場合は最初の1件を代表に
+  const gearRubbers: GearLite[] = [];
+  const seen = new Set<string>();
+  for (const g of context.gear) {
+    const eq = byId.get(g.equipmentId);
+    if (!eq || !isRubberCategory(eq.category)) continue;
+    if (seen.has(g.equipmentId)) continue;
+    seen.add(g.equipmentId);
+    gearRubbers.push(g);
+  }
 
-  // 超高関連 (企画書 9.2): 現用ラバーが登録済みなら、ラバー出題の35%を
-  // 「現用 vs 他」に固定する。基準点が明確で答えやすく、乗り換え検討に直結する。
-  if (useRubber && context.currentRubberId && random() < 0.35) {
-    const current = pool.find((e) => e.id === context.currentRubberId);
-    if (current) {
-      const others = pool.filter(
-        (e) =>
-          e.id !== current.id &&
-          e.category === current.category &&
-          !recentKeys.has(pairKey(current.id, e.id)),
+  // 1) ギア内ペア (実体験): ペア×軸の未出題組み合わせから選ぶ
+  if (gearRubbers.length >= 2) {
+    const candidates: Array<{
+      a: GearLite;
+      b: GearLite;
+      axes: QuestionAxis[];
+      sameSide: boolean;
+    }> = [];
+    for (let i = 0; i < gearRubbers.length; i++) {
+      for (let j = i + 1; j < gearRubbers.length; j++) {
+        const a = gearRubbers[i];
+        const b = gearRubbers[j];
+        const key = pairKey(a.equipmentId, b.equipmentId);
+        const axes = ASKABLE_AXES.filter(
+          (axis) => !askedKeys.has(`${key}#${axis}`),
+        );
+        if (axes.length > 0) {
+          candidates.push({ a, b, axes, sameSide: a.side === b.side });
+        }
+      }
+    }
+    if (candidates.length > 0) {
+      // 同じ面で使ったペアを優先 (条件が近く比較しやすい)
+      const sameSide = candidates.filter((c) => c.sameSide);
+      const pool = sameSide.length > 0 && random() < 0.8 ? sameSide : candidates;
+      const picked = pickRandom(pool, random);
+      const axis = pickAxis(picked.axes, random);
+      const optionA = byId.get(picked.a.equipmentId)!;
+      const optionB = byId.get(picked.b.equipmentId)!;
+      return {
+        id: pairKey(optionA.id, optionB.id),
+        optionA,
+        optionB,
+        axis,
+        prompt: GEAR_PROMPTS[axis],
+        source: "gear",
+        gearA: picked.a,
+        gearB: picked.b,
+      };
+    }
+  }
+
+  // 2) explore: 基準 (現用 or ギア内ランダム) vs 未使用の人気ラバー。
+  //    ギアが空なら完全ランダムの2本 (イメージ回答として明示)。
+  const rubberPool = equipments.filter(
+    (e) => isRubberCategory(e.category) && e.category !== "RUBBER_ANTI",
+  );
+  if (rubberPool.length < 2) return null;
+
+  const base =
+    gearRubbers.find((g) => g.isCurrent) ??
+    (gearRubbers.length > 0 ? pickRandom(gearRubbers, random) : null);
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    let optionA: EquipmentLite;
+    let optionB: EquipmentLite;
+    let gearA: GearLite | null = null;
+    if (base) {
+      optionA = byId.get(base.equipmentId)!;
+      gearA = base;
+      const others = rubberPool.filter(
+        (e) => e.id !== optionA.id && !seen.has(e.id),
       );
-      if (others.length > 0) {
-        const optionB = pickRandom(others, random);
-        const { axis, template } = selectQuestionType(random);
-        const prompt =
-          axis === "overall"
-            ? `いまの「${current.name}」と比べてどっち？`
-            : template(current, optionB);
-        return {
-          id: pairKey(current.id, optionB.id),
-          optionA: current,
-          optionB,
-          axis,
-          prompt,
-          layer: 1,
-          optionAIsCurrent: true,
-        };
-      }
+      if (others.length === 0) return null;
+      optionB = pickRandom(others, random);
+    } else {
+      optionA = pickRandom(rubberPool, random);
+      optionB = pickRandom(rubberPool, random);
+      if (optionA.id === optionB.id) continue;
+      if (optionA.category !== optionB.category) continue;
     }
+    const key = pairKey(optionA.id, optionB.id);
+    const axes = ASKABLE_AXES.filter((axis) => !askedKeys.has(`${key}#${axis}`));
+    if (axes.length === 0) continue;
+    const axis = pickAxis(axes, random);
+    return {
+      id: key,
+      optionA,
+      optionB,
+      axis,
+      prompt: EXPLORE_PROMPTS[axis],
+      source: "explore",
+      gearA,
+      gearB: null,
+    };
   }
-
-  const layerRoll = random();
-  const layer: 1 | 2 | 3 = layerRoll < 0.6 ? 1 : layerRoll < 0.9 ? 2 : 3;
-
-  let candidates = pool;
-  if (layer === 1 && useRubber) {
-    // Layer 1: 投稿者のラケット系統に合うラバー群を優先
-    const cats = relevantRubberCategories(context.bladeCategory);
-    const filtered = pool.filter((e) => cats.includes(e.category));
-    if (filtered.length >= 2) candidates = filtered;
-  } else if (layer === 1 && !useRubber) {
-    // 同系統のラケット同士を優先
-    const sub =
-      context.bladeCategory === "OUTER_CARBON" ||
-      context.bladeCategory === "INNER_CARBON"
-        ? context.bladeCategory
-        : null;
-    if (sub) {
-      const filtered = pool.filter((e) => e.bladeSubcategory === sub);
-      if (filtered.length >= 2) candidates = filtered;
-    }
-  }
-  // Layer 3 (探索) はカテゴリ・系統を問わず pool 全体から選ぶ
-
-  const tryPick = (cands: EquipmentLite[]): [EquipmentLite, EquipmentLite] | null => {
-    for (let attempt = 0; attempt < 30; attempt++) {
-      let a: EquipmentLite;
-      let b: EquipmentLite;
-      if (layer === 2) {
-        // Layer 2: 登場回数が少ない用具を優先してデータの偏りを補完。
-        // 上位グループ内の全ペアが直近出題と重複し得るため、試行ごとに候補を広げる
-        const sorted = [...cands].sort(
-          (x, y) =>
-            (context.appearanceCounts.get(x.id) ?? 0) -
-            (context.appearanceCounts.get(y.id) ?? 0),
-        );
-        const head = sorted.slice(
-          0,
-          Math.max(2, Math.ceil(sorted.length / 3)) + attempt,
-        );
-        a = pickRandom(head, random);
-        b = pickRandom(head, random);
-      } else {
-        a = pickRandom(cands, random);
-        b = pickRandom(cands, random);
-      }
-      if (a.id === b.id) continue;
-      // 異種ラバー同士の対決は避ける (裏 vs 粒高 等は比較が成立しにくい)
-      if (
-        isRubberCategory(a.category) &&
-        isRubberCategory(b.category) &&
-        a.category !== b.category &&
-        layer !== 3
-      ) {
-        continue;
-      }
-      if (recentKeys.has(pairKey(a.id, b.id))) continue;
-      return [a, b];
-    }
-    return null;
-  };
-
-  let picked = tryPick(candidates);
-  if (!picked && candidates !== pool) picked = tryPick(pool);
-  if (!picked) return null;
-
-  const [optionA, optionB] = picked;
-  const { axis, template } = selectQuestionType(random);
-  return {
-    id: pairKey(optionA.id, optionB.id),
-    optionA,
-    optionB,
-    axis,
-    prompt: template(optionA, optionB),
-    layer,
-  };
+  return null;
 }

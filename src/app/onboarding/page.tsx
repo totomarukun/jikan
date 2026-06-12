@@ -2,17 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  useRubberSearch,
-  type RubberItem,
-} from "@/components/use-rubber-search";
+import { GearForm, type GearDraft } from "@/components/gear-form";
 import {
   BLADE_CATEGORY_LABELS,
+  GEAR_SIDE_LABELS,
   LEVEL_LABELS,
   PLAYSTYLE_LABELS,
+  THICKNESS_LABELS,
 } from "@/lib/types";
 
-// M2: 前提質問 (3問 + 任意の現用ラバー登録)
+// M2: 前提質問 (3問) + マイギア登録。
+// マイギア (使ったことのあるラバー) がこのサービスの土台:
+// 出題はギア内ペアから生成されるため、2本以上の登録を促す。
 const QUESTIONS = [
   {
     key: "level" as const,
@@ -30,45 +31,57 @@ const QUESTIONS = [
     options: Object.entries(BLADE_CATEGORY_LABELS),
   },
 ];
-const RUBBER_STEP = QUESTIONS.length; // 4問目: 現用ラバー (任意)
+const GEAR_STEP = QUESTIONS.length;
 const TOTAL_STEPS = QUESTIONS.length + 1;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [gear, setGear] = useState<GearDraft[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function finish(currentRubberId: string | null) {
-    setSubmitting(true);
-    setError(null);
-    const res = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...answers,
-        ...(currentRubberId ? { currentRubberId } : {}),
-      }),
-    });
-    if (res.ok) {
-      router.push("/play");
-    } else {
-      setSubmitting(false);
-      setError("送信に失敗しました。お手数ですが、もう一度お試しください。");
-    }
-  }
 
   function select(value: string) {
     setAnswers({ ...answers, [QUESTIONS[step].key]: value });
     setStep(step + 1);
   }
 
+  async function finish() {
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const res = await fetch("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(answers),
+    });
+    if (!res.ok) {
+      setSubmitting(false);
+      setError("送信に失敗しました。お手数ですが、もう一度お試しください。");
+      return;
+    }
+    for (const g of gear) {
+      await fetch("/api/gear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          equipmentId: g.equipment.id,
+          side: g.side,
+          thickness: g.thickness,
+          bladeEquipmentId: g.blade?.id,
+          isCurrent: g.isCurrent,
+        }),
+      });
+    }
+    router.push("/play");
+  }
+
   return (
     <div className="mx-auto max-w-md py-8">
       <div className="mb-6">
         <div className="mb-2 flex justify-between text-sm text-tt-gray70">
-          <span>前提質問</span>
+          <span>{step < GEAR_STEP ? "前提質問" : "マイギア登録"}</span>
           <span className="font-mono">
             {step + 1} / {TOTAL_STEPS}
           </span>
@@ -81,7 +94,7 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {step < RUBBER_STEP ? (
+      {step < GEAR_STEP ? (
         <>
           <h1 key={step} className="animate-rise mb-6 text-lg font-bold">
             {QUESTIONS[step].text}
@@ -107,12 +120,82 @@ export default function OnboardingPage() {
           </div>
         </>
       ) : (
-        <RubberStep submitting={submitting} onFinish={finish} />
+        <div className="animate-rise">
+          <h1 className="mb-1 text-lg font-bold">
+            使ったことのあるラバーを登録
+          </h1>
+          <p className="mb-4 text-sm leading-6 text-tt-gray70">
+            あなたが<strong className="text-tt-charcoal">実際に使った</strong>
+            ラバー同士の比較だけを質問します。
+            <strong className="text-tt-charcoal">2本以上</strong>
+            登録すると比較が始まります（あとから追加できます）。
+          </p>
+
+          {/* 登録済みリスト */}
+          {gear.length > 0 && (
+            <ul className="mb-4 space-y-2">
+              {gear.map((g, i) => (
+                <li
+                  key={`${g.equipment.id}-${g.side}-${i}`}
+                  className="flex items-center justify-between rounded-xl bg-tt-soft-green p-3 text-sm ring-1 ring-tt-green/20"
+                >
+                  <div>
+                    <p className="font-bold">
+                      {g.equipment.name}
+                      {g.isCurrent && (
+                        <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[10px] font-bold text-white">
+                          いま使用中
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-tt-gray70">
+                      {GEAR_SIDE_LABELS[g.side]}面・{THICKNESS_LABELS[g.thickness]}
+                      {g.blade && ` / ${g.blade.name}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setGear(gear.filter((_, j) => j !== i))}
+                    className="text-xs text-tt-gray70 underline"
+                  >
+                    削除
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <GearForm onAdd={(draft) => setGear([...gear, draft])} />
+          </div>
+
+          {error && <p className="mt-3 text-sm text-tt-deep-coral">{error}</p>}
+
+          <div className="mt-5 space-y-3">
+            <button
+              disabled={submitting || gear.length === 0}
+              onClick={finish}
+              className="w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+            >
+              {submitting
+                ? "保存中..."
+                : gear.length >= 2
+                  ? `${gear.length}本のギアで始める`
+                  : gear.length === 1
+                    ? "1本だけで始める（イメージ比較になります）"
+                    : "ラバーを追加してください"}
+            </button>
+            <button
+              disabled={submitting}
+              onClick={finish}
+              className="w-full rounded-xl border border-tt-gray30/50 bg-white py-3 text-sm text-tt-gray70 transition hover:bg-tt-offwhite disabled:opacity-50"
+            >
+              あとで登録する（スキップ）
+            </button>
+          </div>
+        </div>
       )}
 
-      {error && <p className="mt-4 text-sm text-tt-deep-coral">{error}</p>}
-
-      {step > 0 && (
+      {step > 0 && step < GEAR_STEP && (
         <button
           onClick={() => setStep(step - 1)}
           disabled={submitting}
@@ -121,85 +204,6 @@ export default function OnboardingPage() {
           ← 戻る
         </button>
       )}
-    </div>
-  );
-}
-
-function RubberStep({
-  submitting,
-  onFinish,
-}: {
-  submitting: boolean;
-  onFinish: (currentRubberId: string | null) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState<RubberItem | null>(null);
-  const results = useRubberSearch(query);
-
-  return (
-    <div className="animate-rise">
-      <h1 className="mb-1 text-lg font-bold">
-        いま使っているフォア面ラバーは？
-      </h1>
-      <p className="mb-5 text-sm text-tt-gray70">
-        登録すると「いまの自分の用具と比べてどうか」で比較できます（あとで変更可）。
-      </p>
-
-      {picked ? (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-tt-green bg-tt-soft-green p-4">
-          <div>
-            <p className="font-bold">{picked.name}</p>
-            <p className="text-xs text-tt-gray70">{picked.manufacturer}</p>
-          </div>
-          <button
-            onClick={() => setPicked(null)}
-            className="text-sm text-tt-gray70 underline"
-          >
-            変更
-          </button>
-        </div>
-      ) : (
-        <>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="例: ロゼナ / テナジー / マークV"
-            className="mb-3 h-12 w-full rounded-xl border border-tt-gray30/50 bg-white px-4 shadow-sm outline-none focus:border-tt-green"
-          />
-          <div className="mb-4 flex flex-col gap-2">
-            {results.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setPicked(item)}
-                className="rounded-xl border border-tt-gray30/50 bg-white p-3 text-left text-sm shadow-sm transition hover:border-tt-green hover:bg-tt-soft-green active:scale-[0.98]"
-              >
-                <span className="font-bold">{item.name}</span>
-                <span className="ml-2 text-xs text-tt-gray70">
-                  {item.manufacturer}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      <div className="space-y-3">
-        <button
-          disabled={submitting || !picked}
-          onClick={() => onFinish(picked!.id)}
-          className="w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
-        >
-          この内容で始める
-        </button>
-        <button
-          disabled={submitting}
-          onClick={() => onFinish(null)}
-          className="w-full rounded-xl border border-tt-gray30/50 bg-white py-3 text-sm text-tt-gray70 transition hover:bg-tt-offwhite disabled:opacity-50"
-        >
-          わからない / 使っていない（スキップ）
-        </button>
-      </div>
     </div>
   );
 }

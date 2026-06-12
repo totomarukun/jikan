@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionId, getUserId } from "@/lib/session";
-import { answerSchema, isRubberCategory, MILESTONES } from "@/lib/types";
+import { answerSchema, isRubberCategory } from "@/lib/types";
 import { tallyPair } from "@/lib/data";
 
 export async function POST(request: Request) {
@@ -21,16 +21,22 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
   }
-  const { optionAEquipmentId, optionBEquipmentId, axis, winner, hasActualExperience } =
-    parsed.data;
+  const { optionAEquipmentId, optionBEquipmentId, axis, winner } = parsed.data;
 
-  const [optionA, optionB] = await Promise.all([
+  const [optionA, optionB, gearItems] = await Promise.all([
     prisma.equipment.findUnique({ where: { id: optionAEquipmentId } }),
     prisma.equipment.findUnique({ where: { id: optionBEquipmentId } }),
+    prisma.gearItem.findMany({ where: { sessionId } }),
   ]);
   if (!optionA || !optionB || optionA.id === optionB.id) {
     return NextResponse.json({ error: "用具が見つかりません" }, { status: 400 });
   }
+
+  // 経験フラグはマイギアから自動判定 (クライアントには聞かない)
+  const gearA = gearItems.find((g) => g.equipmentId === optionAEquipmentId);
+  const gearB = gearItems.find((g) => g.equipmentId === optionBEquipmentId);
+  const hasActualExperience =
+    gearA && gearB ? "BOTH" : gearA || gearB ? "ONE" : "NEITHER";
 
   const userId = await getUserId();
   const axisColumn = {
@@ -49,10 +55,6 @@ export async function POST(request: Request) {
     | "winnerBallHold";
 
   const newCount = progress.answerCount + 1;
-  const unlocked: number[] = JSON.parse(progress.unlockedMilestones);
-  const reachedMilestone =
-    MILESTONES.find((m) => m === newCount && !unlocked.includes(m)) ?? null;
-  if (reachedMilestone) unlocked.push(reachedMilestone);
 
   await prisma.$transaction([
     prisma.comparison.create({
@@ -68,14 +70,13 @@ export async function POST(request: Request) {
         contextGrip: progress.grip,
         [axisColumn]: winner,
         hasActualExperience,
+        optionAGearItemId: gearA?.id ?? null,
+        optionBGearItemId: gearB?.id ?? null,
       },
     }),
     prisma.sessionProgress.update({
       where: { sessionId },
-      data: {
-        answerCount: newCount,
-        unlockedMilestones: JSON.stringify(unlocked),
-      },
+      data: { answerCount: newCount },
     }),
   ]);
 
@@ -84,8 +85,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     answerCount: newCount,
-    reachedMilestone,
-    nextMilestone: MILESTONES.find((m) => m > newCount) ?? null,
+    hasActualExperience,
     tally,
   });
 }

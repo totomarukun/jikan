@@ -41,11 +41,17 @@ export async function POST(request: Request) {
     },
   });
 
-  // 匿名回答をユーザーに紐付け (企画書 8.2: sessionId → userId マージ)
-  await prisma.comparison.updateMany({
-    where: { sessionId, userId: null },
-    data: { userId: user.id },
-  });
+  // 匿名データをユーザーに紐付け (企画書 8.2: sessionId → userId マージ)
+  await prisma.$transaction([
+    prisma.comparison.updateMany({
+      where: { sessionId, userId: null },
+      data: { userId: user.id },
+    }),
+    prisma.gearItem.updateMany({
+      where: { sessionId, userId: null },
+      data: { userId: user.id },
+    }),
+  ]);
 
   await setUserSession(user.id);
   return NextResponse.json({ ok: true });

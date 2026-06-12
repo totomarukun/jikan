@@ -8,8 +8,12 @@ export interface RubberItem {
   manufacturer: string;
 }
 
-/** ラバー名のデバウンス付きインクリメンタル検索 */
-export function useRubberSearch(query: string, limit = 6): RubberItem[] {
+/** 用具名のデバウンス付きインクリメンタル検索 */
+export function useEquipmentSearch(
+  query: string,
+  kind: "rubber" | "blade" = "rubber",
+  limit = 6,
+): RubberItem[] {
   const [results, setResults] = useState<RubberItem[]>([]);
 
   useEffect(() => {
@@ -19,8 +23,9 @@ export function useRubberSearch(query: string, limit = 6): RubberItem[] {
         setResults([]);
         return;
       }
+      const filter = kind === "rubber" ? "rubberOnly=1" : "bladeOnly=1";
       const res = await fetch(
-        `/api/equipment?q=${encodeURIComponent(query)}&rubberOnly=1`,
+        `/api/equipment?q=${encodeURIComponent(query)}&${filter}`,
         { signal: controller.signal },
       ).catch(() => null);
       if (res?.ok) {
@@ -32,7 +37,12 @@ export function useRubberSearch(query: string, limit = 6): RubberItem[] {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, limit]);
+  }, [query, kind, limit]);
 
   return results;
+}
+
+/** 後方互換のエイリアス */
+export function useRubberSearch(query: string, limit = 6): RubberItem[] {
+  return useEquipmentSearch(query, "rubber", limit);
 }

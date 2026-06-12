@@ -7,7 +7,7 @@ import {
   getPopularPicksForSimilarUsers,
 } from "@/lib/data";
 import { diagnose, tendencyRows } from "@/lib/diagnosis";
-import { DIAGNOSIS_MILESTONE } from "@/lib/types";
+import { MIN_DIAGNOSIS_ANSWERS } from "@/lib/types";
 import { ShareButton } from "@/components/share-button";
 
 export const metadata = { title: "スタイル診断" };
@@ -20,7 +20,27 @@ export default async function DiagnosisPage() {
     where: { sessionId },
   });
   if (!progress) redirect("/onboarding");
-  if (progress.answerCount < DIAGNOSIS_MILESTONE) redirect("/play");
+  // 報酬ゲートは廃止。精度の下限だけ設け、足りなければ案内する
+  if (progress.answerCount < MIN_DIAGNOSIS_ANSWERS) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <h1 className="text-xl font-bold">スタイル診断</h1>
+        <p className="mt-3 text-sm leading-6 text-tt-gray70">
+          診断にはあと
+          <span className="font-mono font-bold text-tt-green">
+            {MIN_DIAGNOSIS_ANSWERS - progress.answerCount}
+          </span>
+          件の回答が必要です（現在 {progress.answerCount} 件）。
+        </p>
+        <Link
+          href="/play"
+          className="mt-6 inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
+        >
+          比較に答える
+        </Link>
+      </div>
+    );
+  }
 
   const answers = await getAnswersForDiagnosis(sessionId);
   const result = diagnose(answers);
@@ -60,7 +80,7 @@ export default async function DiagnosisPage() {
   return (
     <div className="mx-auto max-w-md py-8">
       <p className="mb-4 text-center font-mono text-sm text-tt-gray70">
-        {DIAGNOSIS_MILESTONE} / {DIAGNOSIS_MILESTONE}問達成
+        {progress.answerCount}件の回答から推定
       </p>
 
       <div className="animate-pop rounded-3xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-8 text-center shadow-sm ring-1 ring-tt-green/20">

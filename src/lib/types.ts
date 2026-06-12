@@ -32,6 +32,8 @@ export const EQUIPMENT_CATEGORIES = [
 ] as const;
 export const WINNERS = ["A", "B", "SAME", "UNKNOWN"] as const;
 export const EXPERIENCES = ["BOTH", "ONE", "NEITHER"] as const;
+export const GEAR_SIDES = ["FH", "BH"] as const;
+export const THICKNESSES = ["TOKUATSU", "ATSU", "CHU", "USU", "UNKNOWN"] as const;
 export const QUESTION_AXES = [
   "overall",
   "speed",
@@ -48,6 +50,8 @@ export type EquipmentCategory = (typeof EQUIPMENT_CATEGORIES)[number];
 export type Winner = (typeof WINNERS)[number];
 export type Experience = (typeof EXPERIENCES)[number];
 export type QuestionAxis = (typeof QUESTION_AXES)[number];
+export type GearSide = (typeof GEAR_SIDES)[number];
+export type Thickness = (typeof THICKNESSES)[number];
 
 export const playstyleSchema = z.enum(PLAYSTYLES);
 export const levelSchema = z.enum(LEVELS);
@@ -63,13 +67,21 @@ export const onboardingSchema = z.object({
   currentRubberId: z.string().min(1).optional(),
 });
 
+// 経験フラグはクライアントから受け取らず、サーバー側でマイギアから自動判定する
 export const answerSchema = z.object({
   questionId: z.string().min(1),
   optionAEquipmentId: z.string().min(1),
   optionBEquipmentId: z.string().min(1),
   axis: z.enum(QUESTION_AXES),
   winner: winnerSchema,
-  hasActualExperience: experienceSchema,
+});
+
+export const gearSchema = z.object({
+  equipmentId: z.string().min(1),
+  side: z.enum(GEAR_SIDES),
+  thickness: z.enum(THICKNESSES),
+  bladeEquipmentId: z.string().min(1).optional(),
+  isCurrent: z.boolean().optional(),
 });
 
 export const signupSchema = z.object({
@@ -117,8 +129,21 @@ export const EXPERIENCE_LABELS: Record<Experience, string> = {
   NEITHER: "どちらも使ったことはない（イメージで回答）",
 };
 
-export const MILESTONES = [5, 10, 20, 30] as const;
-export const DIAGNOSIS_MILESTONE = 30;
+export const GEAR_SIDE_LABELS: Record<GearSide, string> = {
+  FH: "フォア",
+  BH: "バック",
+};
+
+export const THICKNESS_LABELS: Record<Thickness, string> = {
+  TOKUATSU: "特厚(MAX)",
+  ATSU: "厚",
+  CHU: "中",
+  USU: "薄",
+  UNKNOWN: "厚さ不明",
+};
+
+/** スタイル診断に最低限必要な回答数 (報酬ゲートではなく精度の下限) */
+export const MIN_DIAGNOSIS_ANSWERS = 10;
 
 export function isRubberCategory(category: string): boolean {
   return category.startsWith("RUBBER_");

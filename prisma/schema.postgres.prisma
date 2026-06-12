@@ -55,9 +55,34 @@ model Equipment {
   updatedAt        DateTime     @updatedAt
   comparisonsAsA   Comparison[] @relation("OptionA")
   comparisonsAsB   Comparison[] @relation("OptionB")
+  gearEntries      GearItem[]   @relation("GearEquipment")
+  gearAsBlade      GearItem[]   @relation("GearBlade")
 
   @@unique([manufacturer, name])
   @@index([category, isActive])
+}
+
+// マイギア: ユーザーが過去〜現在に使った用具 (使用条件つき)。
+// 出題はここから生成する。「両方使った人の相対判定」だけが信頼できるため。
+model GearItem {
+  id               String     @id @default(cuid())
+  sessionId        String
+  userId           String?
+  equipmentId      String
+  equipment        Equipment  @relation("GearEquipment", fields: [equipmentId], references: [id])
+  // enum: FH | BH (ラバーの貼り面)
+  side             String     @default("FH")
+  // enum: TOKUATSU | ATSU | CHU | USU | UNKNOWN (スポンジ厚)
+  thickness        String     @default("UNKNOWN")
+  // 当時使っていたラケット (任意)
+  bladeEquipmentId String?
+  blade            Equipment? @relation("GearBlade", fields: [bladeEquipmentId], references: [id])
+  // いま使っているか
+  isCurrent        Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
 }
 
 // 1回のAB比較回答
@@ -83,8 +108,11 @@ model Comparison {
   winnerControl        String?
   winnerHardness       String?
   winnerBallHold       String?
-  // enum: BOTH | ONE | NEITHER
+  // enum: BOTH | ONE | NEITHER (マイギアから自動判定)
   hasActualExperience  String?
+  // 回答時に参照したギア (使用条件の追跡用)
+  optionAGearItemId    String?
+  optionBGearItemId    String?
   answeredAt           DateTime  @default(now())
 
   @@index([sessionId])

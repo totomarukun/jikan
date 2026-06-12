@@ -6,7 +6,7 @@ import { getAnswersForDiagnosis } from "@/lib/data";
 import { diagnose } from "@/lib/diagnosis";
 import {
   BLADE_CATEGORY_LABELS,
-  DIAGNOSIS_MILESTONE,
+  MIN_DIAGNOSIS_ANSWERS,
   LEVEL_LABELS,
   PLAYSTYLE_LABELS,
   type BladeCategory,
@@ -28,9 +28,9 @@ export default async function MyPage() {
   const answerCount = await prisma.comparison.count({ where: { userId } });
 
   let styleName: string | null = null;
-  if (sessionId && answerCount >= DIAGNOSIS_MILESTONE) {
+  if (sessionId && answerCount >= MIN_DIAGNOSIS_ANSWERS) {
     const answers = await getAnswersForDiagnosis(sessionId);
-    if (answers.length >= DIAGNOSIS_MILESTONE) {
+    if (answers.length >= MIN_DIAGNOSIS_ANSWERS) {
       styleName = diagnose(answers).styleName;
     }
   }
@@ -72,13 +72,20 @@ export default async function MyPage() {
       ) : (
         <div className="mt-6 rounded-xl bg-white p-4 ring-1 ring-tt-gray30/40">
           <p className="text-sm text-tt-gray70">
-            30問回答するとスタイル診断がアンロックされます（現在{" "}
+            {MIN_DIAGNOSIS_ANSWERS}問以上回答するとスタイル診断が見られます（現在{" "}
             <span className="font-mono">{answerCount}</span> 問回答済み）。
           </p>
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <Link
+        href="/gear"
+        className="mt-6 block rounded-2xl bg-white p-4 text-center text-sm font-bold shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
+      >
+        マイギアを管理する →
+      </Link>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <Link
           href="/compare/select"
           className="rounded-2xl bg-gradient-to-br from-tt-green to-tt-deep-green p-4 text-center font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"

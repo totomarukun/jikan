@@ -3,11 +3,12 @@ import {
   generateQuestion,
   pairKey,
   type EquipmentLite,
+  type GearLite,
 } from "../question-generator";
 
 function makeEquipment(
   id: string,
-  category: string,
+  category = "RUBBER_INVERTED",
   overrides: Partial<EquipmentLite> = {},
 ): EquipmentLite {
   return {
@@ -24,117 +25,98 @@ function makeEquipment(
   };
 }
 
-const baseContext = {
-  bladeCategory: "OUTER_CARBON",
-  level: "INTERMEDIATE",
-  playstyle: "DRIVE",
-  recentPairs: [] as Array<[string, string]>,
-  appearanceCounts: new Map<string, number>(),
-};
+function makeGear(
+  equipmentId: string,
+  overrides: Partial<GearLite> = {},
+): GearLite {
+  return {
+    id: `gear-${equipmentId}`,
+    equipmentId,
+    side: "FH",
+    thickness: "ATSU",
+    bladeName: null,
+    isCurrent: false,
+    ...overrides,
+  };
+}
 
-describe("generateQuestion", () => {
-  const equipments = [
-    ...Array.from({ length: 10 }, (_, i) =>
-      makeEquipment(`r${i}`, "RUBBER_INVERTED"),
-    ),
-    ...Array.from({ length: 5 }, (_, i) => makeEquipment(`b${i}`, "BLADE")),
-  ];
+const equipments = [
+  ...Array.from({ length: 10 }, (_, i) => makeEquipment(`r${i}`)),
+  makeEquipment("b0", "BLADE"),
+];
 
-  it("異なる2つの用具からなるペアを生成する", () => {
+const AXES = ["overall", "hardness", "spin", "speed", "ballHold"];
+
+describe("generateQuestion (マイギア中心)", () => {
+  it("ギアが2本以上あればギア内ペアから出題し、使用条件を返す", () => {
     for (let i = 0; i < 50; i++) {
-      const q = generateQuestion(equipments, baseContext);
-      expect(q).not.toBeNull();
-      expect(q!.optionA.id).not.toBe(q!.optionB.id);
-    }
-  });
-
-  it("直近10問のペアと重複しない", () => {
-    const rubbers = equipments.filter((e) => e.category === "RUBBER_INVERTED");
-    // r0-r4 の全組み合わせ10ペアを「直近」とし、残りからのみ出題されること
-    const recent: Array<[string, string]> = [];
-    for (let i = 0; i < 5; i++) {
-      for (let j = i + 1; j < 5; j++) {
-        recent.push([rubbers[i].id, rubbers[j].id]);
-      }
-    }
-    const recentKeys = new Set(recent.map(([a, b]) => pairKey(a, b)));
-    for (let i = 0; i < 100; i++) {
       const q = generateQuestion(equipments, {
-        ...baseContext,
-        recentPairs: recent,
+        gear: [makeGear("r0"), makeGear("r1")],
+        recentAsked: [],
       });
       expect(q).not.toBeNull();
-      expect(recentKeys.has(pairKey(q!.optionA.id, q!.optionB.id))).toBe(false);
+      expect(q!.source).toBe("gear");
+      expect([q!.optionA.id, q!.optionB.id].sort()).toEqual(["r0", "r1"]);
+      expect(q!.gearA).not.toBeNull();
+      expect(q!.gearB).not.toBeNull();
     }
   });
 
-  it("ラバーとラケットを混ぜたペアは生成しない", () => {
-    for (let i = 0; i < 100; i++) {
-      const q = generateQuestion(equipments, baseContext)!;
-      const aIsRubber = q.optionA.category.startsWith("RUBBER_");
-      const bIsRubber = q.optionB.category.startsWith("RUBBER_");
-      expect(aIsRubber).toBe(bIsRubber);
+  it("同一ペアでも軸が違えば出題し、(ペア×軸) を出し尽くすと explore に切り替わる", () => {
+    const gear = [makeGear("r0"), makeGear("r1")];
+    const key = pairKey("r0", "r1");
+    // 5軸のうち4軸を出題済みにすると、残り1軸が出る
+    const asked4 = AXES.slice(0, 4).map((axis) => ({ pairKey: key, axis }));
+    for (let i = 0; i < 20; i++) {
+      const q = generateQuestion(equipments, { gear, recentAsked: asked4 });
+      expect(q!.source).toBe("gear");
+      expect(q!.axis).toBe(AXES[4]);
+    }
+    // 全軸出題済みなら explore (ギア外との比較)
+    const asked5 = AXES.map((axis) => ({ pairKey: key, axis }));
+    const q = generateQuestion(equipments, { gear, recentAsked: asked5 });
+    expect(q!.source).toBe("explore");
+  });
+
+  it("explore は現用ギアを基準にギア外のラバーと比較する", () => {
+    const gear = [makeGear("r0", { isCurrent: true })];
+    for (let i = 0; i < 30; i++) {
+      const q = generateQuestion(equipments, { gear, recentAsked: [] });
+      expect(q!.source).toBe("explore");
+      expect(q!.optionA.id).toBe("r0");
+      expect(q!.optionB.id).not.toBe("r0");
+      expect(q!.optionB.category).not.toBe("BLADE");
     }
   });
 
-  it("候補が2つ未満なら null を返す", () => {
-    const q = generateQuestion([makeEquipment("solo", "RUBBER_INVERTED")], {
-      ...baseContext,
-      random: () => 0.0, // ラバー側を選択
+  it("ギアが空でもラバー同士の explore を出題できる", () => {
+    const q = generateQuestion(equipments, { gear: [], recentAsked: [] });
+    expect(q).not.toBeNull();
+    expect(q!.source).toBe("explore");
+    expect(q!.optionA.id).not.toBe(q!.optionB.id);
+  });
+
+  it("同じ面で使ったギア同士のペアが優先される", () => {
+    const gear = [
+      makeGear("r0", { side: "FH" }),
+      makeGear("r1", { side: "FH" }),
+      makeGear("r2", { side: "BH" }),
+    ];
+    let sameSide = 0;
+    const total = 200;
+    for (let i = 0; i < total; i++) {
+      const q = generateQuestion(equipments, { gear, recentAsked: [] });
+      if (q!.gearA!.side === q!.gearB!.side) sameSide++;
+    }
+    // 80%で同面優先のため過半数を大きく超えるはず
+    expect(sameSide).toBeGreaterThan(total * 0.6);
+  });
+
+  it("用具が1つしかなければ null", () => {
+    const q = generateQuestion([makeEquipment("solo")], {
+      gear: [],
+      recentAsked: [],
     });
     expect(q).toBeNull();
-  });
-
-  it("現用ラバー登録時は「現用 vs 他」の出題が一定割合で発生する", () => {
-    let pinned = 0;
-    for (let i = 0; i < 300; i++) {
-      const q = generateQuestion(equipments, {
-        ...baseContext,
-        currentRubberId: "r0",
-      });
-      if (q?.optionAIsCurrent) {
-        pinned++;
-        expect(q.optionA.id).toBe("r0");
-        expect(q.optionB.id).not.toBe("r0");
-      }
-    }
-    // ラバー出題75% × ピン留め35% ≈ 26% 前後。下限だけ緩く検証
-    expect(pinned).toBeGreaterThan(30);
-  });
-
-  it("現用ピン留めでも直近ペアとは重複しない", () => {
-    const others = equipments.filter(
-      (e) => e.category === "RUBBER_INVERTED" && e.id !== "r0",
-    );
-    // r0 と他全ラバーの組み合わせを直近に置くと、ピン留め出題は発生しない
-    const recent: Array<[string, string]> = others.map((e) => ["r0", e.id]);
-    for (let i = 0; i < 100; i++) {
-      const q = generateQuestion(equipments, {
-        ...baseContext,
-        currentRubberId: "r0",
-        recentPairs: recent,
-      });
-      expect(q?.optionAIsCurrent ?? false).toBe(false);
-    }
-  });
-
-  it("粘着ユーザーのLayer 1では粘着ラバーが優先候補に含まれる", () => {
-    const stickyPool = [
-      ...Array.from({ length: 5 }, (_, i) =>
-        makeEquipment(`s${i}`, "RUBBER_STICKY"),
-      ),
-      ...Array.from({ length: 5 }, (_, i) =>
-        makeEquipment(`v${i}`, "RUBBER_INVERTED"),
-      ),
-    ];
-    let sawSticky = false;
-    for (let i = 0; i < 200; i++) {
-      const q = generateQuestion(stickyPool, {
-        ...baseContext,
-        bladeCategory: "STICKY",
-      });
-      if (q && q.optionA.category === "RUBBER_STICKY") sawSticky = true;
-    }
-    expect(sawSticky).toBe(true);
   });
 });
