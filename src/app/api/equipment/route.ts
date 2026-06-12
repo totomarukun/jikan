@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPopularRubbers } from "@/lib/data";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -7,6 +8,12 @@ export async function GET(request: Request) {
   const category = searchParams.get("category");
   const rubberOnly = searchParams.get("rubberOnly") === "1";
   const bladeOnly = searchParams.get("bladeOnly") === "1";
+
+  // よく使われているラバー (検索前のワンタップ候補)
+  if (searchParams.get("popular") === "1") {
+    const equipments = await getPopularRubbers(8);
+    return NextResponse.json({ equipments });
+  }
 
   const equipments = await prisma.equipment.findMany({
     where: {

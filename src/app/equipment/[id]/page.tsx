@@ -25,14 +25,21 @@ export default async function EquipmentPage({
   if (!equipment || !equipment.isActive) notFound();
 
   const sessionId = await getSessionId();
-  const [record, battles, progress] = await Promise.all([
+  const [record, battles, progress, gearEntry] = await Promise.all([
     getEquipmentRecord(id),
     aggregatePairs({ involvingEquipmentId: id, take: 5 }),
     sessionId
       ? prisma.sessionProgress.findUnique({ where: { sessionId } })
       : null,
+    sessionId
+      ? prisma.gearItem.findFirst({
+          where: { sessionId, equipmentId: id },
+          select: { id: true },
+        })
+      : null,
   ]);
   const currentRubberId = progress?.currentRubberId ?? null;
+  const isMyGear = gearEntry != null || currentRubberId === id;
 
   // 乗り換え先候補: この用具との対決で勝ち越している相手 (n>=2)
   const alternatives = battles
@@ -221,6 +228,23 @@ export default async function EquipmentPage({
       </section>
 
       <div className="mt-8 space-y-3 text-center">
+        {/* 気になる→検討の導線を1タップに (用具ページを行き止まりにしない) */}
+        {isRubberCategory(equipment.category) &&
+          (isMyGear ? (
+            <Link
+              href={`/switch?base=${id}`}
+              className="block rounded-full bg-tt-charcoal px-8 py-3.5 font-bold text-white shadow-lg transition hover:opacity-90 active:scale-95"
+            >
+              これを基準に乗り換えを検討する →
+            </Link>
+          ) : (
+            <Link
+              href={`/switch?c=${id}`}
+              className="block rounded-full bg-tt-charcoal px-8 py-3.5 font-bold text-white shadow-lg transition hover:opacity-90 active:scale-95"
+            >
+              乗り換え検討の候補に入れる →
+            </Link>
+          ))}
         <Link
           href="/compare/select"
           className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"

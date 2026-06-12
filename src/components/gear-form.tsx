@@ -11,6 +11,7 @@ import {
 } from "@/lib/types";
 import {
   useEquipmentSearch,
+  usePopularRubbers,
   type RubberItem,
 } from "./use-rubber-search";
 
@@ -171,6 +172,7 @@ export function GearForm({
   const [busy, setBusy] = useState(false);
   const rubberResults = useEquipmentSearch(query, "rubber");
   const bladeResults = useEquipmentSearch(bladeQuery, "blade");
+  const popularRubbers = usePopularRubbers();
 
   // 既に登録済みのラバーを選んだら、前回の条件をプリフィルする
   function pick(item: RubberItem) {
@@ -244,6 +246,23 @@ export function GearForm({
           {/* UGC補完: 見つからないラバーはその場で追加できる */}
           {query.trim().length >= 2 && rubberResults.length === 0 && (
             <SuggestRubber name={query.trim()} onCreated={setPicked} />
+          )}
+          {/* 検索前はよく使われているラバーをワンタップで選べる (入力の手間を減らす) */}
+          {query.trim().length === 0 && popularRubbers.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-tt-gray70">よく登録されているラバー:</p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {popularRubbers.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => pick(item)}
+                    className="rounded-full bg-white px-3 py-1.5 text-xs font-medium shadow-sm ring-1 ring-tt-gray30/40 transition hover:bg-tt-soft-green hover:ring-tt-green active:scale-95"
+                  >
+                    + {item.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

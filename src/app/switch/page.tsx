@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
-import { aggregatePairs, tallyPair } from "@/lib/data";
+import { aggregatePairs, getPopularRubbers, tallyPair } from "@/lib/data";
 import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
 import { VersusBarOrPending } from "@/components/versus-bar";
@@ -169,7 +169,8 @@ async function SwitchBoard({
   ]);
 
   // ワンタップ候補: この用具と対決データがあるラバー (人気順)
-  const suggestions = (
+  let suggestionsLabel = "よく比較される:";
+  let suggestions = (
     await aggregatePairs({ involvingEquipmentId: current.id, take: 6 })
   )
     .map((p) => {
@@ -183,6 +184,13 @@ async function SwitchBoard({
       (s) => !candidateIds.includes(s.id) && s.id !== current.id,
     )
     .slice(0, 4);
+  // 対決データがまだない基準でも、検索ゼロで検討を始められるようにする
+  if (suggestions.length === 0) {
+    suggestionsLabel = "よく使われている:";
+    suggestions = (
+      await getPopularRubbers(4, [current.id, ...candidateIds])
+    ).map((p) => ({ id: p.id, name: p.name }));
+  }
 
   return (
     <>
@@ -255,6 +263,7 @@ async function SwitchBoard({
             equipmentId: s.id,
             name: s.name,
           }))}
+          suggestionsLabel={suggestionsLabel}
           baseId={current.id}
         />
       </div>

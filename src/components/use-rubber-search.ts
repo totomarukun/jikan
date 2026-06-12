@@ -42,6 +42,22 @@ export function useEquipmentSearch(
   return results;
 }
 
+/** よく使われているラバー (検索前のワンタップ候補)。初回マウント時に一度だけ取得 */
+export function usePopularRubbers(): RubberItem[] {
+  const [results, setResults] = useState<RubberItem[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/equipment?popular=1", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setResults(d.equipments);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  return results;
+}
+
 /** 後方互換のエイリアス */
 export function useRubberSearch(query: string, limit = 6): RubberItem[] {
   return useEquipmentSearch(query, "rubber", limit);

@@ -115,6 +115,66 @@ export async function getPopularPicksForSimilarUsers(
   return [...wins.values()].sort((a, b) => b.wins - a.wins).slice(0, take);
 }
 
+/** 定番ラバー (登録実績が少ないうちのワンタップ候補のフォールバック) */
+const STAPLE_RUBBER_NAMES = [
+  "ロゼナ",
+  "テナジー05",
+  "ファスタークG-1",
+  "マークV",
+  "ラクザ7",
+  "ヴェガアジア",
+  "V>15エキストラ",
+  "エボリューションMX-P",
+];
+
+/**
+ * よく使われているラバーの上位を返す (マイギア登録数の多い順)。
+ * 登録がまだ少ないうちは定番ラバーで埋める。
+ */
+export async function getPopularRubbers(
+  take = 8,
+  excludeIds: string[] = [],
+): Promise<Array<{ id: string; name: string; manufacturer: string }>> {
+  const grouped = await prisma.gearItem.groupBy({
+    by: ["equipmentId"],
+    _count: { equipmentId: true },
+    orderBy: { _count: { equipmentId: "desc" } },
+    take: take * 3,
+  });
+  const byCount = grouped
+    .map((g) => g.equipmentId)
+    .filter((id) => !excludeIds.includes(id));
+  const fromGear = (
+    await prisma.equipment.findMany({
+      where: {
+        id: { in: byCount },
+        isActive: true,
+        category: { startsWith: "RUBBER_" },
+      },
+      select: { id: true, name: true, manufacturer: true },
+    })
+  ).sort((a, b) => byCount.indexOf(a.id) - byCount.indexOf(b.id));
+
+  const out = fromGear.slice(0, take);
+  if (out.length < take) {
+    const staples = await prisma.equipment.findMany({
+      where: {
+        name: { in: STAPLE_RUBBER_NAMES },
+        isActive: true,
+        category: { startsWith: "RUBBER_" },
+        id: { notIn: [...excludeIds, ...out.map((o) => o.id)] },
+      },
+      select: { id: true, name: true, manufacturer: true },
+    });
+    staples.sort(
+      (a, b) =>
+        STAPLE_RUBBER_NAMES.indexOf(a.name) - STAPLE_RUBBER_NAMES.indexOf(b.name),
+    );
+    out.push(...staples.slice(0, take - out.length));
+  }
+  return out;
+}
+
 export interface PairAggregate {
   aId: string;
   bId: string;
