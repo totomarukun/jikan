@@ -56,12 +56,6 @@ export default async function EquipmentPage({
       ? Math.round((record.wins / (record.wins + record.losses)) * 100)
       : null;
 
-  const specs: Array<{ label: string; value: number | null; max: number; unit?: string }> = [
-    { label: "スピード", value: equipment.officialSpeed, max: 100 },
-    { label: "スピン", value: equipment.officialSpin, max: 100 },
-    { label: "弧線", value: equipment.officialArc, max: 100 },
-  ];
-
   return (
     <div className="mx-auto max-w-md py-4">
       {/* ヘッダーカード */}
@@ -94,13 +88,14 @@ export default async function EquipmentPage({
           )}
           {equipment.hardness != null && (
             <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
-              <span className="text-tt-gray70">スポンジ硬度 </span>
+              <span className="text-tt-gray70">公称硬度 </span>
               <span className="font-mono font-bold">{equipment.hardness}°</span>
+              <span className="text-tt-gray70"> (自社基準)</span>
             </div>
           )}
           {winRate != null && (
             <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
-              <span className="text-tt-gray70">AB比較勝率 </span>
+              <span className="text-tt-gray70">「好み」勝率 </span>
               <span className="font-mono font-bold text-tt-deep-green">
                 {winRate}%
               </span>
@@ -111,34 +106,6 @@ export default async function EquipmentPage({
           )}
         </dl>
       </div>
-
-      {/* 公称スペック */}
-      {specs.some((s) => s.value != null) && (
-        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-          <h2 className="font-bold">公称スペック (参考値)</h2>
-          <div className="mt-3 space-y-3">
-            {specs
-              .filter((s) => s.value != null)
-              .map((s) => (
-                <div key={s.label}>
-                  <div className="flex justify-between text-sm">
-                    <span>{s.label}</span>
-                    <span className="font-mono font-bold">{s.value}</span>
-                  </div>
-                  <div className="mt-1 h-2 rounded-full bg-tt-gray30/30">
-                    <div
-                      className="bar-grow h-2 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
-                      style={{ width: `${(s.value! / s.max) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-          </div>
-          <p className="mt-3 text-xs text-tt-gray70">
-            ※メーカー公称値をもとにした0-100の正規化値。実際の使用感はAB比較データを参照してください。
-          </p>
-        </section>
-      )}
 
       {/* あなたの基準への体感翻訳 */}
       {currentRubberId &&

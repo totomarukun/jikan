@@ -129,31 +129,35 @@ export function generateQuestion(
     gearRubbers.push(g);
   }
 
-  // 1) ギア内ペア (実体験): ペア×軸の未出題組み合わせから選ぶ
+  // 1) ギア内ペア (実体験): ペア×軸の未出題組み合わせから選ぶ。
+  //    フォアとバックで役割が違うため、同じ面で使ったペアのみ比較する
+  //    (面を跨いだ「どちらが速い？」は比較として成立しない)。
   if (gearRubbers.length >= 2) {
     const candidates: Array<{
       a: GearLite;
       b: GearLite;
       axes: QuestionAxis[];
-      sameSide: boolean;
+      key: string;
     }> = [];
     for (let i = 0; i < gearRubbers.length; i++) {
       for (let j = i + 1; j < gearRubbers.length; j++) {
         const a = gearRubbers[i];
         const b = gearRubbers[j];
+        if (a.side !== b.side) continue;
         const key = pairKey(a.equipmentId, b.equipmentId);
         const axes = ASKABLE_AXES.filter(
           (axis) => !askedKeys.has(`${key}#${axis}`),
         );
         if (axes.length > 0) {
-          candidates.push({ a, b, axes, sameSide: a.side === b.side });
+          candidates.push({ a, b, axes, key });
         }
       }
     }
     if (candidates.length > 0) {
-      // 同じ面で使ったペアを優先 (条件が近く比較しやすい)
-      const sameSide = candidates.filter((c) => c.sameSide);
-      const pool = sameSide.length > 0 && random() < 0.8 ? sameSide : candidates;
+      // 直前と同じペアの連続出題を避ける (他に選択肢がある場合)
+      const lastPair = context.recentAsked[0]?.pairKey;
+      const fresh = candidates.filter((c) => c.key !== lastPair);
+      const pool = fresh.length > 0 ? fresh : candidates;
       const picked = pickRandom(pool, random);
       const axis = pickAxis(picked.axes, random);
       const optionA = byId.get(picked.a.equipmentId)!;

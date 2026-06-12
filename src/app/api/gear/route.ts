@@ -85,8 +85,9 @@ export async function POST(request: Request) {
     ? await prisma.gearItem.update({
         where: { id: existing.id },
         data: {
-          thickness,
-          bladeEquipmentId: bladeEquipmentId ?? null,
+          // 再追加時に未指定 (UNKNOWN/null) で既存の詳細情報を潰さない
+          thickness: thickness === "UNKNOWN" ? existing.thickness : thickness,
+          bladeEquipmentId: bladeEquipmentId ?? existing.bladeEquipmentId,
           isCurrent: isCurrent ?? existing.isCurrent,
         },
       })

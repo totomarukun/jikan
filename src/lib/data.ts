@@ -138,6 +138,8 @@ export async function aggregatePairs(options?: {
   take?: number;
   /** このペアは除外 (関連対決の自己除外用) */
   excludePair?: [string, string];
+  /** この回答数未満のペアを除外 (n=1 の100%表示は信頼性を毀損する) */
+  minTotal?: number;
 }): Promise<PairAggregate[]> {
   const comparisons = await prisma.comparison.findMany({
     where: {
@@ -195,6 +197,7 @@ export async function aggregatePairs(options?: {
   }
 
   return [...pairs.values()]
+    .filter((p) => p.total >= (options?.minTotal ?? 0))
     .sort((x, y) => y.total - x.total)
     .slice(0, options?.take ?? 20);
 }

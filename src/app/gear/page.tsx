@@ -14,6 +14,23 @@ import {
 // マイギア: このサービスの土台。使ったことのあるラバーの記録 (使用条件つき)。
 // ここに登録された用具同士から出題が生成される。
 
+interface FeelEntry {
+  aId: string;
+  bId: string;
+  nameA: string;
+  nameB: string;
+  isGearBased: boolean;
+  axes: Record<string, string>;
+}
+
+const AXIS_SHORT: Record<string, string> = {
+  overall: "好み",
+  hardness: "硬さ",
+  speed: "速さ",
+  spin: "回転",
+  ballHold: "球持ち",
+};
+
 interface GearEntry {
   id: string;
   side: GearSide;
@@ -31,6 +48,7 @@ interface GearEntry {
 
 export default function GearPage() {
   const [gear, setGear] = useState<GearEntry[] | null>(null);
+  const [feel, setFeel] = useState<FeelEntry[]>([]);
   const [showForm, setShowForm] = useState(false);
 
   async function reload() {
@@ -47,6 +65,11 @@ export default function GearPage() {
       .then((r) => (r.ok ? r.json() : { gear: [] }))
       .then((d) => {
         if (!cancelled) setGear(d.gear);
+      });
+    fetch("/api/my-feel")
+      .then((r) => (r.ok ? r.json() : { entries: [] }))
+      .then((d) => {
+        if (!cancelled) setFeel(d.entries);
       });
     return () => {
       cancelled = true;
@@ -184,6 +207,55 @@ export default function GearPage() {
             >
               このギアで比較に答える →
             </Link>
+          )}
+
+          {/* あなたの体感メモ: 回答が自分の資産として残る */}
+          {feel.length > 0 && (
+            <section className="mt-8">
+              <h2 className="font-bold">あなたの体感メモ</h2>
+              <p className="mt-0.5 text-xs text-tt-gray70">
+                あなたの回答から自動でできる、自分用の比較メモ。
+              </p>
+              <ul className="mt-3 space-y-2">
+                {feel.map((f) => (
+                  <li key={`${f.aId}-${f.bId}`}>
+                    <Link
+                      href={`/compare/${f.aId}/vs/${f.bId}`}
+                      className="block rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <p className="text-sm font-bold">
+                        {f.nameA} <span className="text-tt-gray30">vs</span>{" "}
+                        {f.nameB}
+                        {f.isGearBased && (
+                          <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[10px] font-bold text-tt-deep-green">
+                            実体験
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {Object.entries(f.axes).map(([axis, winner]) => (
+                          <span
+                            key={axis}
+                            className="rounded-full bg-tt-offwhite px-2 py-0.5 text-[11px] ring-1 ring-black/5"
+                          >
+                            {AXIS_SHORT[axis] ?? axis}:{" "}
+                            <span className="font-bold">
+                              {winner === "A"
+                                ? f.nameA
+                                : winner === "B"
+                                  ? f.nameB
+                                  : winner === "SAME"
+                                    ? "同等"
+                                    : "—"}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </>
       )}

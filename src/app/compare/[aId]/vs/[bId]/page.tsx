@@ -128,7 +128,8 @@ export default async function CompareViewPage({
 
   const insight = buildInsight(equipA.name, equipB.name, tally.overall);
 
-  // neutral: 硬さは中立軸 (企画書 7.3) のため優位表示しない。lowerWins: 価格は安い側を優位とする
+  // 表示するのはメーカー公称の生値のみ (独自の0-100正規化値は信頼性を
+  // 毀損するため廃止)。硬さは中立軸のため優位表示しない。価格は安い側を優位
   const specRows: Array<{
     label: string;
     a: number | null;
@@ -137,10 +138,8 @@ export default async function CompareViewPage({
     neutral?: boolean;
     lowerWins?: boolean;
   }> = [
-    { label: "公称スピード", a: equipA.officialSpeed, b: equipB.officialSpeed },
-    { label: "公称スピン", a: equipA.officialSpin, b: equipB.officialSpin },
     {
-      label: "スポンジ硬度",
+      label: "公称硬度",
       a: equipA.hardness,
       b: equipB.hardness,
       unit: "°",
@@ -305,7 +304,7 @@ export default async function CompareViewPage({
 
       {/* 公称スペック比較 */}
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-        <h2 className="font-bold">公称スペック比較 (参考値)</h2>
+        <h2 className="font-bold">メーカー公称情報</h2>
         <table className="mt-3 w-full text-sm">
           <thead>
             <tr className="text-xs text-tt-gray70">
@@ -355,7 +354,8 @@ export default async function CompareViewPage({
           </tbody>
         </table>
         <p className="mt-2 text-xs text-tt-gray70">
-          ※太字は優位側 (価格は安い側)。公称値はメーカー間で基準が異なります。
+          ※硬度は各社独自基準のため、メーカーが異なる場合は直接比較できません。
+          使用感は上のAB比較データを参照してください。太字は価格の安い側。
         </p>
       </section>
 

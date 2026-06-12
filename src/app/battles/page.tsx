@@ -8,14 +8,20 @@ export const metadata = { title: "人気の対決" };
 export const revalidate = 60;
 
 // 蓄積データの入口。回答数の多い対決をランキング表示する。
+const MIN_N = 3;
+
 export default async function BattlesPage() {
-  const pairs = await aggregatePairs({ take: 30 });
+  const [pairs, all] = await Promise.all([
+    aggregatePairs({ take: 30, minTotal: MIN_N }),
+    aggregatePairs({ take: 500 }),
+  ]);
+  const pendingCount = all.filter((p) => p.total < MIN_N).length;
 
   return (
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">人気の対決</h1>
       <p className="mt-1 text-sm text-tt-gray70">
-        回答が集まっている用具対決のランキング。タップすると絞り込み付きの詳細が見られます。
+        回答{MIN_N}件以上が集まった対決のランキング。タップすると絞り込み付きの詳細が見られます。
       </p>
 
       {pairs.length === 0 ? (
@@ -72,6 +78,12 @@ export default async function BattlesPage() {
             </li>
           ))}
         </ol>
+      )}
+
+      {pendingCount > 0 && (
+        <p className="mt-4 text-center text-xs text-tt-gray70">
+          ほか {pendingCount} 対決が集計中（回答{MIN_N}件未満のため非表示）
+        </p>
       )}
 
       <div className="mt-8 text-center">

@@ -213,40 +213,25 @@ function CandidateCard({
   feel: FeelStatement[];
   remainingIds: string[];
 }) {
-  const deltas: Array<{ label: string; delta: number | null; unit: string; neutral?: boolean }> = [
+  // メーカー公称の生値の差のみ表示 (独自正規化値は廃止)。
+  // 硬度は同一メーカー同士のときだけ差を出す (各社基準が異なるため)
+  const sameMaker = candidate.manufacturer === current.manufacturer;
+  const deltas: Array<{ label: string; delta: number | null; unit: string }> = [
     {
-      label: "スピード",
+      label: sameMaker ? "公称硬度差" : "公称硬度差(他社)",
       delta:
-        candidate.officialSpeed != null && current.officialSpeed != null
-          ? candidate.officialSpeed - current.officialSpeed
-          : null,
-      unit: "",
-    },
-    {
-      label: "スピン",
-      delta:
-        candidate.officialSpin != null && current.officialSpin != null
-          ? candidate.officialSpin - current.officialSpin
-          : null,
-      unit: "",
-    },
-    {
-      label: "硬度",
-      delta:
-        candidate.hardness != null && current.hardness != null
+        sameMaker && candidate.hardness != null && current.hardness != null
           ? candidate.hardness - current.hardness
           : null,
       unit: "°",
-      neutral: true,
     },
     {
-      label: "価格",
+      label: "価格差",
       delta:
         candidate.price != null && current.price != null
           ? candidate.price - current.price
           : null,
       unit: "円",
-      neutral: true,
     },
   ];
 
@@ -324,20 +309,12 @@ function CandidateCard({
         </div>
       </div>
 
-      {/* スペック差分 (いまの基準) */}
-      <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+      {/* メーカー公称の差分 (いまの基準) */}
+      <div className="mt-4 grid grid-cols-2 gap-2 text-center">
         {deltas.map((d) => (
           <div key={d.label} className="rounded-xl bg-tt-offwhite p-2 ring-1 ring-black/5">
             <p className="text-[10px] text-tt-gray70">{d.label}</p>
-            <p
-              className={`font-mono text-sm font-bold ${
-                d.delta == null || d.neutral || d.delta === 0
-                  ? ""
-                  : d.delta > 0
-                    ? "text-tt-deep-green"
-                    : "text-tt-deep-coral"
-              }`}
-            >
+            <p className="font-mono text-sm font-bold">
               {d.delta == null
                 ? "—"
                 : `${d.delta > 0 ? "+" : ""}${d.delta.toLocaleString()}${d.unit}`}
@@ -346,7 +323,7 @@ function CandidateCard({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-tt-gray70">
-        ※いまの{current.name}との公称値の差。硬度・価格は中立 (好み次第)。
+        ※硬度は各社独自基準のため他社間では表示しません。体感は上の実体験データを参照。
       </p>
 
       {/* アクション */}

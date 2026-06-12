@@ -243,6 +243,9 @@ function RevealPanel({
         />
       </div>
       <p className="mt-3 text-sm">{verdict}</p>
+      <p className="mt-1 text-xs text-tt-green">
+        +1 あなたの回答がこの対決のデータになりました
+      </p>
       <button
         onClick={onNext}
         disabled={busy}

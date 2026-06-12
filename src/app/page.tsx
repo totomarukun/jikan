@@ -9,13 +9,18 @@ import { getSessionId } from "@/lib/session";
 // SNS流入の着地点。実データ (注目の対決・累計回答数) を見せて
 // 「答えるとこのデータが見られる/育つ」を3秒で伝える。
 export default async function LandingPage() {
-  const [featured, totalAnswers, equipmentCount, sessionId] =
+  // eslint-disable-next-line prefer-const
+  let [featured, totalAnswers, equipmentCount, sessionId] =
     await Promise.all([
-      aggregatePairs({ take: 3 }),
+      aggregatePairs({ take: 3, minTotal: 3 }),
       prisma.comparison.count(),
       prisma.equipment.count({ where: { isActive: true } }),
       getSessionId(),
     ]);
+  if (featured.length === 0) {
+    // コールドスタート時のみ少数サンプルでも見せる (正直に n を表示している)
+    featured = await aggregatePairs({ take: 3 });
+  }
   const hasSession = sessionId
     ? (await prisma.sessionProgress.findUnique({
         where: { sessionId },
