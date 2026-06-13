@@ -119,8 +119,8 @@ export async function POST(request: Request) {
     ]);
   }
 
-  // 回答直後の「みんなの回答」フィードバック用集計 (今回の回答を含む)
-  const tally = await tallyPair(optionAEquipmentId, optionBEquipmentId);
+  // 回答直後の「みんなの回答」フィードバック用集計 (答えた軸・今回の回答を含む)
+  const tally = await tallyPair(optionAEquipmentId, optionBEquipmentId, axis);
 
   return NextResponse.json({
     answerCount: newCount,

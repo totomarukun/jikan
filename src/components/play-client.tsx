@@ -99,7 +99,8 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
         <p className="mb-3 text-center text-xs font-bold text-tt-deep-green">
           あなたが両方使ったことのある2本です
         </p>
-      ) : progress.gearCount >= 2 ? (
+      ) : progress.gearPairCount > 0 ? (
+        /* 実体験ペアが「あった」が全軸出し尽くした、という正しい状態 */
         <div className="mb-3 rounded-xl bg-tt-soft-coral p-3 text-center text-xs ring-1 ring-tt-coral/15">
           <p className="font-bold text-tt-deep-coral">
             あなたのギア内の比較は出し尽くしました！
@@ -113,13 +114,22 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
           </p>
         </div>
       ) : (
-        <p className="mb-3 text-center text-xs text-tt-gray70">
-          イメージ回答として記録されます（
-          <Link href="/gear" className="underline">
-            ギアを追加
-          </Link>
-          すると実体験の比較になります）
-        </p>
+        /* 実体験ペアがまだ作れていない (同面2本未満)。「出し尽くした」ではない。
+           面跨ぎの2本は比較にならないため、同じ面にもう1本を促す */
+        <div className="mb-3 rounded-xl bg-tt-soft-coral p-3 text-center text-xs ring-1 ring-tt-coral/15">
+          <p className="font-bold text-tt-deep-coral">
+            これはイメージ回答 (参考データ) です
+          </p>
+          <p className="mt-0.5 text-tt-gray70">
+            {progress.gearCount === 0
+              ? "まだギアが未登録です。"
+              : "フォアとバックの2本は「両方使った比較」にはなりません。"}
+            <Link href="/gear" className="font-bold text-tt-deep-coral underline">
+              同じ面にもう1本
+            </Link>
+            使ったラバーを登録すると、あなただけの実体験比較 (最大5問) が出せます。
+          </p>
+        </div>
       )}
 
       {/* メインカード */}

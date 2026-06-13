@@ -4,7 +4,7 @@ import {
   type GearLite,
   type GeneratedQuestion,
 } from "./question-generator";
-import { GEAR_SIDE_LABELS, THICKNESS_LABELS } from "./types";
+import { GEAR_SIDE_LABELS, THICKNESS_LABELS, isRubberCategory } from "./types";
 import type { GearSide, Thickness } from "./types";
 
 export interface QuestionPayload {
@@ -16,6 +16,8 @@ export interface QuestionPayload {
   progress: {
     answerCount: number;
     gearCount: number;
+    /** 同じ面に2本以上ある = 実体験ペアを作れる組み合わせの数 */
+    gearPairCount: number;
     context: {
       level: string;
       playstyle: string;
@@ -93,6 +95,21 @@ export async function buildQuestionPayload(
     }
   }
 
+  // 同じ面に2本以上あるラバー = 実体験ペアを作れる。これが 0 のときは
+  // 「出し尽くした」のではなく「まだ作れていない」ので、UI の文言を分ける。
+  const catById = new Map(equipments.map((e) => [e.id, e.category]));
+  const rubberIdsBySide = new Map<string, Set<string>>();
+  for (const g of gear) {
+    const cat = catById.get(g.equipmentId);
+    if (!cat || !isRubberCategory(cat)) continue;
+    if (!rubberIdsBySide.has(g.side)) rubberIdsBySide.set(g.side, new Set());
+    rubberIdsBySide.get(g.side)!.add(g.equipmentId);
+  }
+  let gearPairCount = 0;
+  for (const set of rubberIdsBySide.values()) {
+    gearPairCount += (set.size * (set.size - 1)) / 2;
+  }
+
   const question = generateQuestion(equipments, { gear, recentAsked });
   if (!question) return null;
 
@@ -105,6 +122,7 @@ export async function buildQuestionPayload(
     progress: {
       answerCount: progress.answerCount,
       gearCount: gear.length,
+      gearPairCount,
       context: {
         level: progress.level,
         playstyle: progress.playstyle,

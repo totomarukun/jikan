@@ -86,7 +86,12 @@ export default async function SwitchPage({
       {!current ? (
         <NoBaseSetup sessionId={sessionId} />
       ) : (
-        <SwitchBoard current={current} sp={sp} baseOptions={baseOptions} />
+        <SwitchBoard
+          current={current}
+          sp={sp}
+          baseOptions={baseOptions}
+          sessionId={sessionId}
+        />
       )}
     </div>
   );
@@ -123,6 +128,7 @@ async function SwitchBoard({
   current,
   sp,
   baseOptions,
+  sessionId,
 }: {
   current: Equipment;
   sp: Record<string, string | string[] | undefined>;
@@ -132,10 +138,38 @@ async function SwitchBoard({
     sides: string[];
     isCurrent: boolean;
   }>;
+  sessionId: string | null;
 }) {
-  const candidateIds = (typeof sp.c === "string" ? sp.c.split(",") : [])
+  let candidateIds = (typeof sp.c === "string" ? sp.c.split(",") : [])
     .filter((id) => id && id !== current.id)
     .slice(0, 3);
+
+  // 候補が未指定なら、自分が基準ラバーと比較回答済みのラバーを自動で候補にする。
+  // せっかく実体験を答えたのに乗り換え画面が空のまま、という分断を防ぐ。
+  let autoFilledFromMyAnswers = false;
+  if (candidateIds.length === 0 && sessionId) {
+    const myRows = await prisma.comparison.findMany({
+      where: {
+        sessionId,
+        OR: [
+          { optionAEquipmentId: current.id },
+          { optionBEquipmentId: current.id },
+        ],
+      },
+      orderBy: { answeredAt: "desc" },
+      select: { optionAEquipmentId: true, optionBEquipmentId: true },
+    });
+    const opp: string[] = [];
+    for (const r of myRows) {
+      const id =
+        r.optionAEquipmentId === current.id
+          ? r.optionBEquipmentId
+          : r.optionAEquipmentId;
+      if (id !== current.id && !opp.includes(id)) opp.push(id);
+    }
+    candidateIds = opp.slice(0, 3);
+    autoFilledFromMyAnswers = candidateIds.length > 0;
+  }
 
   // 基準切り替え時も検討中の候補は引き継ぐ (新基準と同じ候補は表示側で除外される)
   const keepCandidates =
@@ -277,6 +311,11 @@ async function SwitchBoard({
         </div>
       ) : (
         <div className="mt-6 space-y-4">
+          {autoFilledFromMyAnswers && (
+            <p className="rounded-xl bg-tt-soft-green p-3 text-xs text-tt-deep-green ring-1 ring-tt-green/20">
+              あなたが「{current.name}」と比較した候補を表示しています。
+            </p>
+          )}
           {candidates.map((cand, i) => (
             <CandidateCard
               key={cand.id}

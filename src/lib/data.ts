@@ -269,29 +269,43 @@ export async function aggregatePairs(options?: {
     .slice(0, options?.take ?? 20);
 }
 
-/** 特定ペアの「好み」即時集計 (M3 の回答後フィードバック用) */
+const TALLY_AXIS_COLUMN = {
+  overall: "winnerOverall",
+  speed: "winnerSpeed",
+  spin: "winnerSpin",
+  control: "winnerControl",
+  hardness: "winnerHardness",
+  ballHold: "winnerBallHold",
+} as const;
+
+/** 特定ペア・特定軸の即時集計 (M3 の回答後フィードバック用) */
 export async function tallyPair(
   aId: string,
   bId: string,
+  axis: keyof typeof TALLY_AXIS_COLUMN = "overall",
 ): Promise<{ a: number; b: number; same: number; total: number }> {
+  // 回答直後のフィードバックは「答えた軸」の集計を返す。
+  // overall 固定だと、スピン/球持ちを答えても好みの集計が出て誤解を招く。
+  const col = TALLY_AXIS_COLUMN[axis];
   const rows = await prisma.comparison.findMany({
     where: {
       OR: [
         { optionAEquipmentId: aId, optionBEquipmentId: bId },
         { optionAEquipmentId: bId, optionBEquipmentId: aId },
       ],
-      winnerOverall: { in: ["A", "B", "SAME"] },
+      [col]: { in: ["A", "B", "SAME"] },
     },
     select: {
       optionAEquipmentId: true,
-      winnerOverall: true,
+      [col]: true,
     },
   });
   const tally = { a: 0, b: 0, same: 0, total: rows.length };
   for (const r of rows) {
+    const winner = (r as Record<string, string | null>)[col];
     const flipped = r.optionAEquipmentId === bId;
-    if (r.winnerOverall === "SAME") tally.same++;
-    else if ((r.winnerOverall === "A") !== flipped) tally.a++;
+    if (winner === "SAME") tally.same++;
+    else if ((winner === "A") !== flipped) tally.a++;
     else tally.b++;
   }
   return tally;
