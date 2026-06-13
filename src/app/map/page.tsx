@@ -4,6 +4,7 @@ import { getSessionId } from "@/lib/session";
 import { buildRelativeMap } from "@/lib/relative-map";
 import type { AxisKey } from "@/lib/ranking";
 import { EquipmentVisual } from "@/components/equipment-visual";
+import { MapExplorer } from "@/components/map-explorer";
 
 export const metadata = { title: "用具マップ" };
 
@@ -105,7 +106,7 @@ export default async function MapPage({
         </div>
       )}
 
-      {/* 全体マップ */}
+      {/* 全体マップ (検索・絞り込み付き) */}
       {map.entries.length === 0 ? (
         <div className="mt-6 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
           まだこの軸の比較データがありません。
@@ -116,18 +117,12 @@ export default async function MapPage({
           と、1票から地図が描かれ始めます。
         </div>
       ) : (
-        <div className="mt-4 space-y-2">
-          {map.entries.map((e, i) => (
-            <PositionBar
-              key={e.id}
-              entry={e}
-              rank={i + 1}
-              isGear={gearIds.has(e.id)}
-              isCurrent={currentIds.has(e.id)}
-              axisLabel={axis.label}
-            />
-          ))}
-        </div>
+        <MapExplorer
+          entries={map.entries}
+          gearIds={[...gearIds]}
+          currentIds={[...currentIds]}
+          axisLabel={axis.label}
+        />
       )}
 
       <p className="mt-6 text-xs leading-6 text-tt-gray70">

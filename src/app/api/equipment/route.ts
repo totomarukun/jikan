@@ -15,20 +15,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ equipments });
   }
 
+  // all=1: 全件返す (クライアント側で正規化・あいまい検索する用。約137件で十分軽量)
+  const all = searchParams.get("all") === "1";
+
   const equipments = await prisma.equipment.findMany({
     where: {
       isActive: true,
       ...(category ? { category } : {}),
       ...(rubberOnly ? { category: { startsWith: "RUBBER_" } } : {}),
       ...(bladeOnly ? { category: "BLADE" } : {}),
-      ...(q
+      ...(q && !all
         ? {
             OR: [{ name: { contains: q } }, { manufacturer: { contains: q } }],
           }
         : {}),
     },
     orderBy: [{ manufacturer: "asc" }, { name: "asc" }],
-    take: 50,
+    take: all ? 1000 : 50,
     select: {
       id: true,
       category: true,
