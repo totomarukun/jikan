@@ -32,9 +32,16 @@ export function MapExplorer({
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
   const [mfr, setMfr] = useState<string>("");
+  const [sort, setSort] = useState<"rank" | "near">("rank");
 
   const gearSet = useMemo(() => new Set(gearIds), [gearIds]);
   const currentSet = useMemo(() => new Set(currentIds), [currentIds]);
+
+  // 現用ラバーがこの軸にデータを持っていれば「現用に近い順」を提供できる
+  const currentEntry = useMemo(
+    () => entries.find((e) => currentSet.has(e.id)) ?? null,
+    [entries, currentSet],
+  );
 
   // ファセット候補 (表示中のエントリに存在する種類・メーカーのみ)
   const cats = useMemo(() => {
@@ -58,8 +65,14 @@ export function MapExplorer({
       );
       list = list.filter((e) => matched.has(e.id)); // 相対順位の並びは保持
     }
+    if (sort === "near" && currentEntry) {
+      const base = currentEntry.score;
+      list = [...list].sort(
+        (a, b) => Math.abs(a.score - base) - Math.abs(b.score - base),
+      );
+    }
     return list;
-  }, [entries, cat, mfr, query]);
+  }, [entries, cat, mfr, query, sort, currentEntry]);
 
   const hasFilter = Boolean(query.trim() || cat || mfr);
 
@@ -104,6 +117,18 @@ export function MapExplorer({
         </select>
       )}
 
+      {/* 並び替え (現用ラバーがこの軸にデータを持つときのみ「現用に近い順」) */}
+      {currentEntry && (
+        <div className="mt-2 flex gap-1.5">
+          <FacetChip active={sort === "rank"} onClick={() => setSort("rank")}>
+            相対順位
+          </FacetChip>
+          <FacetChip active={sort === "near"} onClick={() => setSort("near")}>
+            現用に近い順
+          </FacetChip>
+        </div>
+      )}
+
       {/* 件数 + 絞り込み解除 */}
       <div className="mt-3 flex items-center justify-between text-xs text-tt-gray70">
         <span>
@@ -137,10 +162,15 @@ export function MapExplorer({
             <PositionBar
               key={e.id}
               entry={e}
-              rank={i + 1}
+              rank={sort === "near" ? undefined : i + 1}
               isGear={gearSet.has(e.id)}
               isCurrent={currentSet.has(e.id)}
               axisLabel={axisLabel}
+              deltaVsCurrent={
+                sort === "near" && currentEntry && e.id !== currentEntry.id
+                  ? Math.round(e.score - currentEntry.score)
+                  : null
+              }
             />
           ))}
         </div>
@@ -178,12 +208,14 @@ function PositionBar({
   isGear,
   isCurrent,
   axisLabel,
+  deltaVsCurrent,
 }: {
   entry: MapEntry;
   rank?: number;
   isGear: boolean;
   isCurrent: boolean;
   axisLabel: string;
+  deltaVsCurrent?: number | null;
 }) {
   const pct = Math.round(entry.score);
   const lowConfidence = entry.comparisons < 3;
@@ -220,6 +252,20 @@ function PositionBar({
             </span>
           )}
         </span>
+        {deltaVsCurrent != null && (
+          <span
+            className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+              deltaVsCurrent > 0
+                ? "bg-tt-soft-green text-tt-deep-green"
+                : deltaVsCurrent < 0
+                  ? "bg-tt-soft-coral text-tt-deep-coral"
+                  : "bg-tt-gray30/30 text-tt-gray70"
+            }`}
+          >
+            現用比 {deltaVsCurrent > 0 ? "+" : ""}
+            {deltaVsCurrent}
+          </span>
+        )}
         <span className="shrink-0 font-mono text-xs text-tt-gray70">
           {entry.bothComparisons > 0
             ? `実${entry.bothComparisons}/全${entry.comparisons}件`

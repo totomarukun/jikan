@@ -224,7 +224,7 @@ export function GearForm({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ラバー名で検索 (例: ロゼナ / テナジー)"
+            placeholder="ラバー名で検索（ひらがな・英語・ローマ字OK 例: rozena / tenergy）"
             className="h-12 w-full rounded-xl border border-tt-gray30/50 bg-white px-4 shadow-sm outline-none focus:border-tt-green"
           />
           {rubberResults.length > 0 && (
@@ -332,7 +332,7 @@ export function GearForm({
                   type="search"
                   value={bladeQuery}
                   onChange={(e) => setBladeQuery(e.target.value)}
-                  placeholder="ラケット名で検索 (例: ビスカリア) / 空欄でスキップ"
+                  placeholder="ラケット名で検索（英語・ローマ字OK 例: viscaria）/ 空欄でスキップ"
                   className="h-11 w-full rounded-xl border border-tt-gray30/50 bg-white px-3 text-sm shadow-sm outline-none focus:border-tt-green"
                 />
                 {bladeResults.length > 0 && (
