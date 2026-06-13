@@ -117,6 +117,8 @@ model Comparison {
   winnerControl        String?
   winnerHardness       String?
   winnerBallHold       String?
+  // 弧線の高さ (高い=山なり / 低い=直線的)
+  winnerArc            String?
   // enum: BOTH | ONE | NEITHER (マイギアから自動判定)
   hasActualExperience  String?
   // 回答時に参照したギア (使用条件の追跡用)

@@ -64,6 +64,7 @@ export async function buildQuestionPayload(
         winnerSpin: true,
         winnerHardness: true,
         winnerBallHold: true,
+        winnerArc: true,
       },
     }),
   ]);
@@ -89,6 +90,7 @@ export async function buildQuestionPayload(
       ["spin", r.winnerSpin],
       ["hardness", r.winnerHardness],
       ["ballHold", r.winnerBallHold],
+      ["arc", r.winnerArc],
     ];
     for (const [axis, winner] of answered) {
       if (winner) recentAsked.push({ pairKey: key, axis });

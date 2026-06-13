@@ -61,11 +61,12 @@ export function pairKey(aId: string, bId: string): string {
 }
 
 const FEEL_AXES: Array<{ axis: QuestionAxis; weight: number }> = [
-  { axis: "overall", weight: 0.35 },
-  { axis: "hardness", weight: 0.2 },
-  { axis: "spin", weight: 0.15 },
-  { axis: "speed", weight: 0.15 },
-  { axis: "ballHold", weight: 0.15 },
+  { axis: "overall", weight: 0.32 },
+  { axis: "hardness", weight: 0.18 },
+  { axis: "spin", weight: 0.14 },
+  { axis: "speed", weight: 0.14 },
+  { axis: "ballHold", weight: 0.12 },
+  { axis: "arc", weight: 0.1 },
 ];
 
 const GEAR_PROMPTS: Record<string, string> = {
@@ -74,6 +75,7 @@ const GEAR_PROMPTS: Record<string, string> = {
   spin: "回転がかかったのはどちら？",
   speed: "スピードが出たのはどちら？",
   ballHold: "球持ちが良かったのはどちら？",
+  arc: "弧線が高かった (山なりだった) のはどちら？",
 };
 
 const EXPLORE_PROMPTS: Record<string, string> = {
@@ -82,6 +84,7 @@ const EXPLORE_PROMPTS: Record<string, string> = {
   spin: "イメージでOK: 回転がかかりそうなのは？",
   speed: "イメージでOK: 速そうなのはどちら？",
   ballHold: "イメージでOK: 球持ちが良さそうなのは？",
+  arc: "イメージでOK: 弧線が高そう (山なり) なのは？",
 };
 
 function pickRandom<T>(items: T[], random: () => number): T {

@@ -12,6 +12,7 @@ const AXIS_COLUMN: Record<AxisKey, keyof ComparisonAxisRow> = {
   control: "winnerControl",
   hardness: "winnerHardness",
   ballHold: "winnerBallHold",
+  arc: "winnerArc",
 };
 
 interface ComparisonAxisRow {
@@ -24,6 +25,7 @@ interface ComparisonAxisRow {
   winnerControl: string | null;
   winnerHardness: string | null;
   winnerBallHold: string | null;
+  winnerArc: string | null;
 }
 
 // 実体験ほど信頼できるので重み付け (イメージ回答も地図には薄く効かせる)
@@ -83,6 +85,7 @@ export async function buildRelativeMap(axis: AxisKey): Promise<RelativeMap> {
         winnerControl: true,
         winnerHardness: true,
         winnerBallHold: true,
+        winnerArc: true,
       },
     }),
   ]);
@@ -159,6 +162,7 @@ const ALL_AXES: AxisKey[] = [
   "spin",
   "control",
   "ballHold",
+  "arc",
   "hardness",
 ];
 
@@ -181,6 +185,7 @@ export async function getEquipmentAxisPositions(
         winnerControl: true,
         winnerHardness: true,
         winnerBallHold: true,
+        winnerArc: true,
       },
     }),
   ]);

@@ -19,7 +19,8 @@ export type AxisKey =
   | "spin"
   | "control"
   | "hardness"
-  | "ballHold";
+  | "ballHold"
+  | "arc";
 
 export interface PairwiseInput {
   aId: string;

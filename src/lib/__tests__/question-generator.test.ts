@@ -46,7 +46,7 @@ const equipments = [
   makeEquipment("b0", "BLADE"),
 ];
 
-const AXES = ["overall", "hardness", "spin", "speed", "ballHold"];
+const AXES = ["overall", "hardness", "spin", "speed", "ballHold", "arc"];
 
 describe("generateQuestion (マイギア中心)", () => {
   it("ギアが2本以上あればギア内ペアから出題し、使用条件を返す", () => {
@@ -66,16 +66,22 @@ describe("generateQuestion (マイギア中心)", () => {
   it("同一ペアでも軸が違えば出題し、(ペア×軸) を出し尽くすと explore に切り替わる", () => {
     const gear = [makeGear("r0"), makeGear("r1")];
     const key = pairKey("r0", "r1");
-    // 5軸のうち4軸を出題済みにすると、残り1軸が出る
-    const asked4 = AXES.slice(0, 4).map((axis) => ({ pairKey: key, axis }));
+    // 全6軸のうち5軸を出題済みにすると、残り1軸が出る
+    const askedAllButLast = AXES.slice(0, AXES.length - 1).map((axis) => ({
+      pairKey: key,
+      axis,
+    }));
     for (let i = 0; i < 20; i++) {
-      const q = generateQuestion(equipments, { gear, recentAsked: asked4 });
+      const q = generateQuestion(equipments, {
+        gear,
+        recentAsked: askedAllButLast,
+      });
       expect(q!.source).toBe("gear");
-      expect(q!.axis).toBe(AXES[4]);
+      expect(q!.axis).toBe(AXES[AXES.length - 1]);
     }
     // 全軸出題済みなら explore (ギア外との比較)
-    const asked5 = AXES.map((axis) => ({ pairKey: key, axis }));
-    const q = generateQuestion(equipments, { gear, recentAsked: asked5 });
+    const askedAll = AXES.map((axis) => ({ pairKey: key, axis }));
+    const q = generateQuestion(equipments, { gear, recentAsked: askedAll });
     expect(q!.source).toBe("explore");
   });
 
