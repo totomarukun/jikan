@@ -175,49 +175,73 @@ export function generateQuestion(
     }
   }
 
-  // 2) explore: 基準 (現用 or ギア内ランダム) vs 未使用の人気ラバー。
-  //    ギアが空なら完全ランダムの2本 (イメージ回答として明示)。
+  // 2) explore: 基準ラバー vs 未使用の人気ラバー (イメージ回答)。
+  //    ギアが空なら完全ランダムの2本。
+  //
+  //    基準は「現用1本」に固定しない。所有ラバー全体を巡回し、実体験データの
+  //    薄いラバーを優先して基準にする。これがないと、フォア現用+バック1本の
+  //    ユーザーはバック面のラバー(=乗り換え本命のことが多い)が永遠に出題されず、
+  //    検討の行き止まりになる (B3本丸)。同面ペアを作れない単独面のラバーも、
+  //    explore を通じて候補比較のデータが育つようにする。
   const rubberPool = equipments.filter(
     (e) => isRubberCategory(e.category) && e.category !== "RUBBER_ANTI",
   );
   if (rubberPool.length < 2) return null;
 
-  const base =
-    gearRubbers.find((g) => g.isCurrent) ??
-    (gearRubbers.length > 0 ? pickRandom(gearRubbers, random) : null);
-
-  for (let attempt = 0; attempt < 40; attempt++) {
-    let optionA: EquipmentLite;
-    let optionB: EquipmentLite;
-    let gearA: GearLite | null = null;
-    if (base) {
-      optionA = byId.get(base.equipmentId)!;
-      gearA = base;
-      const others = rubberPool.filter(
-        (e) => e.id !== optionA.id && !seen.has(e.id),
-      );
-      if (others.length === 0) return null;
-      optionB = pickRandom(others, random);
-    } else {
-      optionA = pickRandom(rubberPool, random);
-      optionB = pickRandom(rubberPool, random);
-      if (optionA.id === optionB.id) continue;
-      if (optionA.category !== optionB.category) continue;
+  // ペアに登場した回数 = そのラバーの実体験データの厚み
+  const coverage = new Map<string, number>();
+  for (const r of context.recentAsked) {
+    for (const id of r.pairKey.split("|")) {
+      coverage.set(id, (coverage.get(id) ?? 0) + 1);
     }
-    const key = pairKey(optionA.id, optionB.id);
-    const axes = ASKABLE_AXES.filter((axis) => !askedKeys.has(`${key}#${axis}`));
-    if (axes.length === 0) continue;
-    const axis = pickAxis(axes, random);
-    return {
-      id: key,
-      optionA,
-      optionB,
-      axis,
-      prompt: EXPLORE_PROMPTS[axis],
-      source: "explore",
-      gearA,
-      gearB: null,
-    };
+  }
+  const baseOrder: Array<GearLite | null> =
+    gearRubbers.length > 0
+      ? [...gearRubbers].sort((a, b) => {
+          const ca = coverage.get(a.equipmentId) ?? 0;
+          const cb = coverage.get(b.equipmentId) ?? 0;
+          if (ca !== cb) return ca - cb; // データが薄い面・ラバーを先に
+          if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+          return random() - 0.5;
+        })
+      : [null];
+
+  for (const base of baseOrder) {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      let optionA: EquipmentLite;
+      let optionB: EquipmentLite;
+      let gearA: GearLite | null = null;
+      if (base) {
+        optionA = byId.get(base.equipmentId)!;
+        gearA = base;
+        const others = rubberPool.filter(
+          (e) => e.id !== optionA.id && !seen.has(e.id),
+        );
+        if (others.length === 0) break; // この基準は出し尽くし → 次の基準へ
+        optionB = pickRandom(others, random);
+      } else {
+        optionA = pickRandom(rubberPool, random);
+        optionB = pickRandom(rubberPool, random);
+        if (optionA.id === optionB.id) continue;
+        if (optionA.category !== optionB.category) continue;
+      }
+      const key = pairKey(optionA.id, optionB.id);
+      const axes = ASKABLE_AXES.filter(
+        (axis) => !askedKeys.has(`${key}#${axis}`),
+      );
+      if (axes.length === 0) continue;
+      const axis = pickAxis(axes, random);
+      return {
+        id: key,
+        optionA,
+        optionB,
+        axis,
+        prompt: EXPLORE_PROMPTS[axis],
+        source: "explore",
+        gearA,
+        gearB: null,
+      };
+    }
   }
   return null;
 }

@@ -90,6 +90,29 @@ describe("generateQuestion (マイギア中心)", () => {
     }
   });
 
+  it("フォア現用+バック1本でも、バック面ラバーが explore 基準として出題される (B3行き止まり解消)", () => {
+    // 同面ペアを作れない単独面のラバー(ロゼナ役 r1=BH)が永遠に出題されない問題
+    const gear = [
+      makeGear("r0", { side: "FH", isCurrent: true }), // 現用フォア
+      makeGear("r1", { side: "BH" }), // バック1本 = 本命
+    ];
+    // 回答するたび履歴を蓄積する実セッションを再現
+    const recentAsked: Array<{ pairKey: string; axis: string }> = [];
+    const baseIds = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const q = generateQuestion(equipments, { gear, recentAsked });
+      expect(q!.source).toBe("explore"); // 同面ペアがないので必ず explore
+      baseIds.add(q!.optionA.id); // optionA = 基準ラバー
+      expect(q!.optionB.id).not.toBe("r0"); // 所有ラバーは相手側に来ない
+      expect(q!.optionB.id).not.toBe("r1");
+      recentAsked.unshift({ pairKey: pairKey(q!.optionA.id, q!.optionB.id), axis: q!.axis });
+    }
+    // データが偏らないよう基準は巡回する。r0(現用フォア)だけでなく
+    // r1(バック面の本命)も基準として登場すること
+    expect(baseIds.has("r1")).toBe(true);
+    expect(baseIds.has("r0")).toBe(true);
+  });
+
   it("ギアが空でもラバー同士の explore を出題できる", () => {
     const q = generateQuestion(equipments, { gear: [], recentAsked: [] });
     expect(q).not.toBeNull();
