@@ -15,8 +15,9 @@ const AXES: Array<{ key: AxisKey; label: string; high: string }> = [
   { key: "overall", label: "好み", high: "好まれる" },
   { key: "speed", label: "スピード", high: "速い" },
   { key: "spin", label: "スピン", high: "かかる" },
-  { key: "hardness", label: "硬さ", high: "硬い" },
+  { key: "control", label: "コントロール", high: "扱いやすい" },
   { key: "ballHold", label: "球持ち", high: "球持ち良い" },
+  { key: "hardness", label: "硬さ", high: "硬い" },
 ];
 
 export default async function MapPage({

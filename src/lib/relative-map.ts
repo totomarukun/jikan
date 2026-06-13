@@ -9,6 +9,7 @@ const AXIS_COLUMN: Record<AxisKey, keyof ComparisonAxisRow> = {
   overall: "winnerOverall",
   speed: "winnerSpeed",
   spin: "winnerSpin",
+  control: "winnerControl",
   hardness: "winnerHardness",
   ballHold: "winnerBallHold",
 };
@@ -20,6 +21,7 @@ interface ComparisonAxisRow {
   winnerOverall: string | null;
   winnerSpeed: string | null;
   winnerSpin: string | null;
+  winnerControl: string | null;
   winnerHardness: string | null;
   winnerBallHold: string | null;
 }
@@ -78,6 +80,7 @@ export async function buildRelativeMap(axis: AxisKey): Promise<RelativeMap> {
         winnerOverall: true,
         winnerSpeed: true,
         winnerSpin: true,
+        winnerControl: true,
         winnerHardness: true,
         winnerBallHold: true,
       },

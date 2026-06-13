@@ -13,7 +13,13 @@
 // ことで、(1)比較グラフが分断していても単一スケールに乗る (2)全勝/全敗でも
 // 有限値になる (3)支持データが薄い項目は中央へ縮約される、を同時に満たす。
 
-export type AxisKey = "overall" | "speed" | "spin" | "hardness" | "ballHold";
+export type AxisKey =
+  | "overall"
+  | "speed"
+  | "spin"
+  | "control"
+  | "hardness"
+  | "ballHold";
 
 export interface PairwiseInput {
   aId: string;
