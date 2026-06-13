@@ -167,6 +167,10 @@ function RelativeCandidateRow({
       : d === "down"
         ? "text-tt-deep-coral"
         : "text-tt-gray70";
+  // 支持が薄い軸は「量」を信用できない(疎データの飽和値)。確信度が乗るまで
+  // 数値を出さず方向のみ・グレーに縮約する。閾値=実比較3件。
+  const LOW = 3;
+  const provisional = c.axes.some((a) => a.comparisons < LOW);
   return (
     <li>
       <Link
@@ -187,27 +191,40 @@ function RelativeCandidateRow({
           <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
             共通{c.sharedAxes}軸
           </span>
+          {provisional && (
+            <span className="shrink-0 rounded-full bg-tt-gray30/40 px-1.5 py-0.5 text-[9px] font-bold text-tt-gray70">
+              参考程度
+            </span>
+          )}
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {c.axes.map((a) => (
-            <span
-              key={a.axis}
-              className={`rounded-full bg-white px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${color(
-                a.diff,
-              )}`}
-            >
-              {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
-              {a.diff !== "even" && a.scoreDelta !== 0 && (
-                <span className="ml-0.5 font-mono">
-                  {a.scoreDelta > 0 ? "+" : ""}
-                  {a.scoreDelta}
+          {c.axes.map((a) => {
+            const low = a.comparisons < LOW;
+            return (
+              <span
+                key={a.axis}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${
+                  low ? "bg-tt-gray30/20 text-tt-gray70" : `bg-white ${color(a.diff)}`
+                }`}
+              >
+                {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
+                {/* 量は支持が十分なときだけ出す。薄い根拠では方向のみ。 */}
+                {!low && a.diff !== "even" && a.scoreDelta !== 0 && (
+                  <span className="ml-0.5 font-mono">
+                    {a.scoreDelta > 0 ? "+" : ""}
+                    {a.scoreDelta}
+                  </span>
+                )}
+                <span className="ml-0.5 font-mono text-[9px] opacity-60">
+                  n{a.comparisons}
                 </span>
-              )}
-            </span>
-          ))}
+              </span>
+            );
+          })}
         </div>
         <p className="mt-1 text-[10px] text-tt-gray70">
-          {baseName}比 ・ 数値=相対位置の差(0-100スケール) ▲高い ▼低い ≈同等
+          {baseName}比 ・ 数値=相対位置の差(0-100) ・ n=支持本数 ・ 薄い根拠(グレー)は
+          方向のみ ▲高い ▼低い ≈同等
         </p>
       </Link>
     </li>
