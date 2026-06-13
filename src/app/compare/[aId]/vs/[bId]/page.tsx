@@ -413,7 +413,7 @@ export default async function CompareViewPage({
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
         <h2 className="font-bold">両方使った人の声</h2>
         <p className="mt-0.5 text-xs text-tt-gray70">
-          数値でなく言葉で。勝率より、乗り換え判断に効くことがあります。
+          数字より、使った人のひとこと。乗り換えの決め手になります。
         </p>
         {pairVoices.length > 0 ? (
           <ul className="mt-3 space-y-2">

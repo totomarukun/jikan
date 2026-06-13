@@ -45,9 +45,9 @@ export default async function LandingPage() {
           「硬い」「弾む」の感じ方は人それぞれ。
           <br />
           だからTacTapは、<strong className="text-tt-charcoal">両方使った人の比較</strong>
-          を1枚の地図に合成して、
+          だけを集めて、
           <br />
-          用具の特徴を<strong className="text-tt-charcoal">相対的に</strong>見られるようにしました。
+          いまの用具と<strong className="text-tt-charcoal">どう違うか</strong>がわかります。
         </p>
         <div className="animate-rise mt-8 [animation-delay:160ms]">
           <Link

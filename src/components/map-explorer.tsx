@@ -22,12 +22,10 @@ export function MapExplorer({
   entries,
   gearIds,
   currentIds,
-  axisLabel,
 }: {
   entries: MapEntry[];
   gearIds: string[];
   currentIds: string[];
-  axisLabel: string;
 }) {
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
@@ -121,7 +119,7 @@ export function MapExplorer({
       {currentEntry && (
         <div className="mt-2 flex gap-1.5">
           <FacetChip active={sort === "rank"} onClick={() => setSort("rank")}>
-            相対順位
+            ランキング
           </FacetChip>
           <FacetChip active={sort === "near"} onClick={() => setSort("near")}>
             現用に近い順
@@ -165,7 +163,6 @@ export function MapExplorer({
               rank={sort === "near" ? undefined : i + 1}
               isGear={gearSet.has(e.id)}
               isCurrent={currentSet.has(e.id)}
-              axisLabel={axisLabel}
               deltaVsCurrent={
                 sort === "near" && currentEntry && e.id !== currentEntry.id
                   ? Math.round(e.score - currentEntry.score)
@@ -207,14 +204,12 @@ function PositionBar({
   rank,
   isGear,
   isCurrent,
-  axisLabel,
   deltaVsCurrent,
 }: {
   entry: MapEntry;
   rank?: number;
   isGear: boolean;
   isCurrent: boolean;
-  axisLabel: string;
   deltaVsCurrent?: number | null;
 }) {
   const pct = Math.round(entry.score);
@@ -267,9 +262,7 @@ function PositionBar({
           </span>
         )}
         <span className="shrink-0 font-mono text-xs text-tt-gray70">
-          {entry.bothComparisons > 0
-            ? `実${entry.bothComparisons}/全${entry.comparisons}件`
-            : `${entry.comparisons}件`}
+          {entry.comparisons}件
         </span>
       </div>
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-tt-gray30/30">
@@ -284,7 +277,7 @@ function PositionBar({
       </div>
       {lowConfidence && (
         <p className="mt-1 text-[10px] text-tt-gray70">
-          支持が少なく中央寄りの暫定位置（{axisLabel}）
+          データ少なめ（おおよその位置）
         </p>
       )}
     </Link>
