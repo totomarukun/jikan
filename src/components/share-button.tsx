@@ -11,7 +11,14 @@ export function ShareButton({
     const pctLine =
       sharePct !== null ? `全プレイヤーの${sharePct}%が該当するタイプ。\n` : "";
     const text = `私の卓球用具スタイルは「${styleName}」でした！\n${pctLine}あなたも診断してみる→`;
-    const url = window.location.origin;
+    // 診断結果カード(動的OG)が出る公開URLをシェアする
+    const q = new URLSearchParams({ type: styleName });
+    if (sharePct !== null) q.set("pct", String(sharePct));
+    const url = `${window.location.origin}/share/diagnosis?${q.toString()}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({ text, url }).catch(() => {});
+      return;
+    }
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       "_blank",
