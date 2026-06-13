@@ -57,14 +57,22 @@ export default async function LandingPage() {
             用具マップを見る
           </Link>
           <p className="mt-3 text-sm text-tt-gray70">登録なしで見られます</p>
-          <Link
-            href={hasSession ? "/switch" : "/onboarding"}
-            className="mt-4 inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
-          >
-            {hasSession
-              ? "いまのラバー基準で見る →"
-              : "自分のギア基準で見る（無料登録）→"}
-          </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/catalog"
+              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+            >
+              用具カタログを探す →
+            </Link>
+            <Link
+              href={hasSession ? "/switch" : "/onboarding"}
+              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+            >
+              {hasSession
+                ? "いまのラバー基準で見る →"
+                : "自分のギア基準で見る（無料登録）→"}
+            </Link>
+          </div>
         </div>
 
         {/* ライブ統計 */}

@@ -116,6 +116,12 @@ export default async function MapPage({
             AB比較に答える
           </Link>
           と、1票から地図が描かれ始めます。
+          <br />
+          まずは{" "}
+          <Link href="/catalog" className="font-bold text-tt-green underline">
+            用具カタログ
+          </Link>{" "}
+          から探すこともできます。
         </div>
       ) : (
         <MapExplorer

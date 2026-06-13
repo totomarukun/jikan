@@ -17,6 +17,7 @@ export interface CatalogItem {
   price: number | null;
   imageUrl: string | null;
   bladeSubcategory: string | null;
+  popularity: number;
 }
 
 const CAT_LABEL: Record<string, string> = {
@@ -36,8 +37,15 @@ const PRICE_BANDS: Array<{ label: string; min: number; max: number }> = [
   { label: "8,000円〜", min: 8000, max: Infinity },
 ];
 
+const HARDNESS_BANDS: Array<{ label: string; min: number; max: number }> = [
+  { label: "軟（〜37°）", min: 0, max: 37 },
+  { label: "中（37〜45°）", min: 37, max: 45 },
+  { label: "硬（45〜50°）", min: 45, max: 50 },
+  { label: "極硬（50°〜）", min: 50, max: Infinity },
+];
+
 type Kind = "all" | "rubber" | "blade";
-type Sort = "name" | "priceAsc" | "priceDesc" | "hardness";
+type Sort = "popular" | "name" | "priceAsc" | "priceDesc" | "hardness";
 
 export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
   const [kind, setKind] = useState<Kind>("rubber");
@@ -45,7 +53,8 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
   const [cat, setCat] = useState<string | null>(null);
   const [mfr, setMfr] = useState("");
   const [band, setBand] = useState<number>(-1);
-  const [sort, setSort] = useState<Sort>("name");
+  const [hard, setHard] = useState<number>(-1);
+  const [sort, setSort] = useState<Sort>("popular");
 
   const byKind = useMemo(
     () =>
@@ -82,6 +91,12 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
       const { min, max } = PRICE_BANDS[band];
       list = list.filter((e) => e.price != null && e.price >= min && e.price < max);
     }
+    if (hard >= 0) {
+      const { min, max } = HARDNESS_BANDS[hard];
+      list = list.filter(
+        (e) => e.hardness != null && e.hardness >= min && e.hardness < max,
+      );
+    }
     if (query.trim()) {
       const matched = new Set(
         searchEquipment(list as SearchableItem[], query, { limit: 400 }).map(
@@ -90,20 +105,23 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
       );
       list = list.filter((e) => matched.has(e.id));
     }
+    const byName = (a: CatalogItem, b: CatalogItem) =>
+      a.manufacturer.localeCompare(b.manufacturer, "ja") ||
+      a.name.localeCompare(b.name, "ja");
     const sorted = [...list];
     sorted.sort((a, b) => {
+      if (sort === "popular") return b.popularity - a.popularity || byName(a, b);
       if (sort === "priceAsc") return (a.price ?? 1e9) - (b.price ?? 1e9);
       if (sort === "priceDesc") return (b.price ?? -1) - (a.price ?? -1);
       if (sort === "hardness") return (b.hardness ?? -1) - (a.hardness ?? -1);
-      return (
-        a.manufacturer.localeCompare(b.manufacturer, "ja") ||
-        a.name.localeCompare(b.name, "ja")
-      );
+      return byName(a, b);
     });
     return sorted;
-  }, [byKind, cat, mfr, band, query, sort]);
+  }, [byKind, cat, mfr, band, hard, query, sort]);
 
-  const hasFilter = Boolean(query.trim() || cat || mfr || band >= 0);
+  const hasFilter = Boolean(
+    query.trim() || cat || mfr || band >= 0 || hard >= 0,
+  );
 
   return (
     <div>
@@ -175,11 +193,26 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
             </option>
           ))}
         </select>
+        {kind !== "blade" && (
+          <select
+            value={hard}
+            onChange={(e) => setHard(Number(e.target.value))}
+            className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
+          >
+            <option value={-1}>すべての硬度</option>
+            {HARDNESS_BANDS.map((h, i) => (
+              <option key={h.label} value={i}>
+                {h.label}
+              </option>
+            ))}
+          </select>
+        )}
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
           className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
         >
+          <option value="popular">人気順</option>
           <option value="name">メーカー順</option>
           <option value="priceAsc">価格が安い順</option>
           <option value="priceDesc">価格が高い順</option>
@@ -201,6 +234,7 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
               setCat(null);
               setMfr("");
               setBand(-1);
+              setHard(-1);
             }}
             className="font-bold text-tt-green underline"
           >
