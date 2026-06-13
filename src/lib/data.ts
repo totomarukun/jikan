@@ -200,10 +200,17 @@ export async function aggregatePairs(options?: {
   excludePair?: [string, string];
   /** この回答数未満のペアを除外 (n=1 の100%表示は信頼性を毀損する) */
   minTotal?: number;
+  /**
+   * 両方使った人 (BOTH) の判定だけを数える。
+   * 看板・ランキング等の公開集計は、匿名セッションを量産した票の水増しに
+   * 汚染されうるため、サーバ計算で詐称不能な実体験フラグでガードする。
+   */
+  experiencedOnly?: boolean;
 }): Promise<PairAggregate[]> {
   const comparisons = await prisma.comparison.findMany({
     where: {
       winnerOverall: { in: ["A", "B", "SAME"] },
+      ...(options?.experiencedOnly ? { hasActualExperience: "BOTH" } : {}),
       ...(options?.involvingEquipmentId
         ? {
             OR: [
@@ -304,6 +311,8 @@ export async function getEquipmentRecord(equipmentId: string): Promise<{
         { optionBEquipmentId: equipmentId },
       ],
       winnerOverall: { in: ["A", "B", "SAME"] },
+      // 公開する「好み勝率」も実体験基準に揃える (水増し票を排除)
+      hasActualExperience: "BOTH",
     },
     select: { optionAEquipmentId: true, winnerOverall: true },
   });

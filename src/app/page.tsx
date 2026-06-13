@@ -12,14 +12,15 @@ export default async function LandingPage() {
   // eslint-disable-next-line prefer-const
   let [featured, totalAnswers, equipmentCount, sessionId] =
     await Promise.all([
-      aggregatePairs({ take: 3, minTotal: 3 }),
-      prisma.comparison.count(),
+      aggregatePairs({ take: 3, minTotal: 3, experiencedOnly: true }),
+      // 看板数値は匿名セッション量産で水増しできない「実体験ベースの判定数」を出す
+      prisma.comparison.count({ where: { hasActualExperience: "BOTH" } }),
       prisma.equipment.count({ where: { isActive: true } }),
       getSessionId(),
     ]);
   if (featured.length === 0) {
     // コールドスタート時のみ少数サンプルでも見せる (正直に n を表示している)
-    featured = await aggregatePairs({ take: 3 });
+    featured = await aggregatePairs({ take: 3, experiencedOnly: true });
   }
   const hasSession = sessionId
     ? (await prisma.sessionProgress.findUnique({
@@ -67,7 +68,7 @@ export default async function LandingPage() {
         {/* ライブ統計 */}
         <dl className="mt-8 grid grid-cols-2 gap-3 text-center">
           <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-            <dt className="text-xs text-tt-gray70">累計AB比較回答</dt>
+            <dt className="text-xs text-tt-gray70">両方使った人の判定</dt>
             <dd className="font-mono text-2xl font-bold text-tt-deep-green">
               {totalAnswers.toLocaleString()}
             </dd>

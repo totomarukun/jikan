@@ -27,7 +27,7 @@ export default async function EquipmentPage({
   const sessionId = await getSessionId();
   const [record, battles, progress, gearEntry] = await Promise.all([
     getEquipmentRecord(id),
-    aggregatePairs({ involvingEquipmentId: id, take: 5 }),
+    aggregatePairs({ involvingEquipmentId: id, take: 5, experiencedOnly: true }),
     sessionId
       ? prisma.sessionProgress.findUnique({ where: { sessionId } })
       : null,
