@@ -138,10 +138,10 @@ export default async function EquipmentPage({
             </div>
           ) : (
             <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
-              <span className="text-tt-gray70">「好み」評価 </span>
-              <span className="font-mono font-bold">収集中</span>
+              <span className="text-tt-gray70">みんなの「好み」 </span>
+              <span className="font-mono font-bold">集計前</span>
               <span className="font-mono text-tt-gray70">
-                (判定{decided}件)
+                ({decided}件)
               </span>
             </div>
           )}

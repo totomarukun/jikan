@@ -78,7 +78,7 @@ const FEEL_AXES: Array<{ axis: QuestionAxis; weight: number }> = [
 const GEAR_PROMPTS: Record<string, string> = {
   overall: "どちらが好みだった？",
   hardness: "硬く感じたのはどちら？",
-  spin: "回転がかかったのはどちら？",
+  spin: "スピンがかかったのはどちら？",
   speed: "スピードが出たのはどちら？",
   ballHold: "球持ちが良かったのはどちら？",
   arc: "弧線が高かった (山なりだった) のはどちら？",
@@ -88,7 +88,7 @@ const GEAR_PROMPTS: Record<string, string> = {
 const EXPLORE_PROMPTS: Record<string, string> = {
   overall: "イメージでOK: どちらが好みそう？",
   hardness: "イメージでOK: 硬そうなのはどちら？",
-  spin: "イメージでOK: 回転がかかりそうなのは？",
+  spin: "イメージでOK: スピンがかかりそうなのは？",
   speed: "イメージでOK: 速そうなのはどちら？",
   ballHold: "イメージでOK: 球持ちが良さそうなのは？",
   arc: "イメージでOK: 弧線が高そう (山なり) なのは？",

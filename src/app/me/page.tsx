@@ -74,7 +74,7 @@ export default async function MyPage() {
   const axisColumns: Array<{ key: keyof (typeof recent)[number]; label: string }> = [
     { key: "winnerOverall", label: "好み" },
     { key: "winnerSpeed", label: "速さ" },
-    { key: "winnerSpin", label: "回転" },
+    { key: "winnerSpin", label: "スピン" },
     { key: "winnerControl", label: "コントロール" },
     { key: "winnerHardness", label: "硬さ" },
     { key: "winnerBallHold", label: "球持ち" },
@@ -154,7 +154,7 @@ export default async function MyPage() {
           href="/play"
           className="rounded-2xl bg-gradient-to-br from-tt-deep-coral to-tt-coral p-4 text-center font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
         >
-          AB比較を続ける
+          比較を続ける
         </Link>
       </div>
 
@@ -196,7 +196,7 @@ export default async function MyPage() {
                   {c.optionB.name}
                   {c.hasActualExperience === "BOTH" && (
                     <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[10px] font-bold text-tt-deep-green">
-                      実体験
+                      両方使った
                     </span>
                   )}
                 </Link>

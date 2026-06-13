@@ -23,7 +23,7 @@ export default async function BattlesPage() {
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">人気の対決</h1>
       <p className="mt-1 text-sm text-tt-gray70">
-        回答{MIN_N}件以上が集まった対決のランキング。タップすると絞り込み付きの詳細が見られます。
+        {MIN_N}件以上の回答が集まった対決のランキングです。タップで詳しく見られます。
       </p>
 
       {pairs.length === 0 ? (

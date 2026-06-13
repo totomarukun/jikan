@@ -110,7 +110,7 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
             <Link href="/gear" className="font-bold text-tt-deep-coral underline">
               ラバーをもう1本追加
             </Link>
-            すると実体験の質問が最大5問増えます。
+            すると質問が最大5問増えます。
           </p>
         </div>
       ) : (
@@ -127,7 +127,7 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
             <Link href="/gear" className="font-bold text-tt-deep-coral underline">
               同じ面にもう1本
             </Link>
-            使ったラバーを登録すると、あなただけの実体験比較 (最大5問) が出せます。
+            使ったラバーを登録すると、あなただけの比較 (最大5問) が出せます。
           </p>
         </div>
       )}

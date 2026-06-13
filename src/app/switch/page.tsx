@@ -83,8 +83,7 @@ export default async function SwitchPage({
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">乗り換え検討</h1>
       <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        いま使っているラバーを基準に、候補を実データで比べる。
-        「弾む」「球持ち」の言葉のズレに惑わされない用具選びを。
+        いま使っているラバーを基準に、気になる候補を実際の比較で見比べられます。
       </p>
 
       {!current ? (
@@ -688,7 +687,7 @@ function CandidateCard({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-tt-gray70">
-        ※硬度は各社独自基準のため他社間では表示しません。体感は上の実体験データを参照。
+        ※硬度は各社の独自基準です。他社とは比べられません。使い心地は上の比較を。
       </p>
 
       {/* アクション */}

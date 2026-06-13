@@ -12,15 +12,15 @@ export const metadata = { title: "用具マップ" };
 // 全A/B比較を1枚の順序推定に合成し、軸ごとに全ラバーの相対位置を見せる。
 // 3票ゲートで「結論を出さない」のをやめ、推定位置 + 支持本数(信頼度)を出す。
 
-const AXES: Array<{ key: AxisKey; label: string; high: string }> = [
-  { key: "overall", label: "好み", high: "好まれる" },
-  { key: "speed", label: "スピード", high: "速い" },
-  { key: "spin", label: "スピン", high: "かかる" },
-  { key: "control", label: "コントロール", high: "扱いやすい" },
-  { key: "ballHold", label: "球持ち", high: "球持ち良い" },
-  { key: "arc", label: "弧線", high: "弧線が高い" },
-  { key: "tackiness", label: "粘着", high: "粘着が強い" },
-  { key: "hardness", label: "硬さ", high: "硬い" },
+const AXES: Array<{ key: AxisKey; label: string; low: string; high: string }> = [
+  { key: "overall", label: "好み", low: "ひかえめ", high: "好まれる" },
+  { key: "speed", label: "スピード", low: "おそい", high: "はやい" },
+  { key: "spin", label: "スピン", low: "かからない", high: "かかる" },
+  { key: "control", label: "コントロール", low: "むずかしい", high: "扱いやすい" },
+  { key: "ballHold", label: "球持ち", low: "弾く", high: "球持ち良い" },
+  { key: "arc", label: "弧線", low: "直線的", high: "山なり" },
+  { key: "tackiness", label: "粘着", low: "弱い", high: "強い" },
+  { key: "hardness", label: "硬さ", low: "やわらかい", high: "かたい" },
 ];
 
 export default async function MapPage({
@@ -80,7 +80,7 @@ export default async function MapPage({
 
       <div className="mt-3 flex items-center justify-between text-xs text-tt-gray70">
         <span>
-          ← ひかえめ／
+          ← {axis.low}／
           <span className="font-bold text-tt-deep-green">{axis.high}</span> →
         </span>
         <span className="font-mono">比較 {map.totalComparisons} 件</span>
@@ -99,7 +99,6 @@ export default async function MapPage({
                 entry={e}
                 isGear
                 isCurrent={currentIds.has(e.id)}
-                axisLabel={axis.label}
               />
             ))}
           </div>
@@ -157,16 +156,14 @@ function PositionBar({
   rank,
   isGear,
   isCurrent,
-  axisLabel,
 }: {
   entry: import("@/lib/relative-map").MapEntry;
   rank?: number;
   isGear: boolean;
   isCurrent: boolean;
-  axisLabel: string;
 }) {
   const pct = Math.round(entry.score);
-  // 支持の薄さ = 信頼度の低さを点線とラベルで明示
+  // データの薄さ = 信頼度の低さをラベルで明示
   const lowConfidence = entry.comparisons < 3;
   return (
     <Link
@@ -204,9 +201,7 @@ function PositionBar({
           )}
         </span>
         <span className="shrink-0 font-mono text-xs text-tt-gray70">
-          {entry.bothComparisons > 0
-            ? `実${entry.bothComparisons}/全${entry.comparisons}件`
-            : `${entry.comparisons}件`}
+          {entry.comparisons}件
         </span>
       </div>
       {/* 相対位置バー */}
@@ -222,7 +217,7 @@ function PositionBar({
       </div>
       {lowConfidence && (
         <p className="mt-1 text-[10px] text-tt-gray70">
-          支持が少なく中央寄りの暫定位置（{axisLabel}）
+          データ少なめ（おおよその位置）
         </p>
       )}
     </Link>

@@ -28,7 +28,7 @@ const AXIS_SHORT: Record<string, string> = {
   overall: "好み",
   hardness: "硬さ",
   speed: "速さ",
-  spin: "回転",
+  spin: "スピン",
   ballHold: "球持ち",
 };
 
@@ -143,19 +143,18 @@ export default function GearPage() {
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">マイギア</h1>
       <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        使ったことのあるラバーの記録。ここに登録した用具同士の比較だけが
-        質問されるので、増えるほど答えやすい質問が増えます。
+        使ったことのあるラバーの記録です。登録した分だけ、答えやすい比較が出てきます。
       </p>
 
       {gear === null ? (
-        <p className="py-12 text-center text-sm text-tt-gray70">読み込み中...</p>
+        <p className="py-12 text-center text-sm text-tt-gray70">マイギアを読み込んでいます…</p>
       ) : (
         <>
           {gear.length >= 2 && (
             <p className="mt-4 rounded-xl bg-tt-soft-green p-3 text-sm text-tt-deep-green ring-1 ring-tt-green/20">
               {gear.length}本登録済み → 同じ面のペアで最大{" "}
               <span className="font-mono font-bold">{pairCount * 5}</span>{" "}
-              問の実体験比較に答えられます
+              問の比較に答えられます
             </p>
           )}
 
@@ -175,7 +174,7 @@ export default function GearPage() {
                 .map((side) => GEAR_SIDE_LABELS[side])
                 .join("面・")}
               面は1本だけなので、まだ比較質問を作れません。
-              同じ面で使ったことのあるラバーをもう1本追加すると、実体験比較が
+              同じ面で使ったことのあるラバーをもう1本追加すると、比較が
               <span className="font-mono font-bold text-tt-charcoal">+5問</span>
               ずつ増えます。
             </p>
@@ -294,7 +293,7 @@ export default function GearPage() {
                         {f.nameB}
                         {f.isGearBased && (
                           <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[10px] font-bold text-tt-deep-green">
-                            実体験
+                            両方使った
                           </span>
                         )}
                       </p>

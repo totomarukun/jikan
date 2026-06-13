@@ -122,7 +122,7 @@ export function MapExplorer({
             ランキング
           </FacetChip>
           <FacetChip active={sort === "near"} onClick={() => setSort("near")}>
-            現用に近い順
+            今のギアに近い順
           </FacetChip>
         </div>
       )}
@@ -257,7 +257,7 @@ function PositionBar({
                   : "bg-tt-gray30/30 text-tt-gray70"
             }`}
           >
-            現用比 {deltaVsCurrent > 0 ? "+" : ""}
+            今のギア比 {deltaVsCurrent > 0 ? "+" : ""}
             {deltaVsCurrent}
           </span>
         )}

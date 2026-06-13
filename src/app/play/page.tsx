@@ -35,10 +35,10 @@ function GearGate() {
       <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-black/5">
         <h1 className="text-xl font-bold">まず、使ったラバーを登録</h1>
         <p className="mt-3 text-sm leading-7 text-tt-gray70">
-          TacTap は<strong className="text-tt-charcoal">あなたが実際に使った</strong>
-          ラバー同士だけを質問します。
+          TacTapは、<strong className="text-tt-charcoal">あなたが実際に使った</strong>
+          ラバーだけを比べてもらいます。
           <strong className="text-tt-charcoal">同じ面で2本以上</strong>
-          登録すると、あなただけの実体験比較が始まります。
+          登録すると、あなただけの比較が始まります。
         </p>
         <Link
           href="/gear"
@@ -50,7 +50,7 @@ function GearGate() {
           href="/play?explore=1"
           className="mt-3 block text-xs text-tt-gray70 underline"
         >
-          まずはイメージ回答で試す（参考データになります）
+          まずは予想で答えて試す（参考データになります）
         </Link>
       </div>
     </div>

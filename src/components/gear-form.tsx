@@ -144,7 +144,7 @@ function SuggestRubber({
         </button>
       </div>
       <p className="text-xs text-tt-gray70">
-        ※追加された製品はみんなの検索にも表示されます。正式名称での登録にご協力ください。
+        ※追加した用具はみんなの検索にも出ます。正式な名前での登録にご協力ください。
       </p>
     </div>
   );

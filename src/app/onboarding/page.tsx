@@ -101,7 +101,7 @@ export default function OnboardingPage() {
     <div className="mx-auto max-w-md py-8">
       <div className="mb-6">
         <div className="mb-2 flex justify-between text-sm text-tt-gray70">
-          <span>{step < GEAR_STEP ? "前提質問" : "マイギア登録"}</span>
+          <span>{step < GEAR_STEP ? "かんたんな質問" : "マイギア登録"}</span>
           <span className="font-mono">
             {step + 1} / {TOTAL_STEPS}
           </span>
