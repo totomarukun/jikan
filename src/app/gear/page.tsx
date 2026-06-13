@@ -100,6 +100,25 @@ export default function GearPage() {
     await reload();
   }
 
+  // 既存ギアの貼った日・メモを更新 (同一 equipmentId×side は更新扱い)
+  async function saveDetails(
+    g: GearEntry,
+    patch: { note?: string; usageStartedAt?: string },
+  ) {
+    await fetch("/api/gear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        equipmentId: g.equipment.id,
+        side: g.side,
+        thickness: "UNKNOWN", // 既存の厚さを保持
+        note: patch.note,
+        usageStartedAt: patch.usageStartedAt,
+      }),
+    });
+    await reload();
+  }
+
   // 出題は同じ面で使ったペアのみ生成されるため、面別にペア数を数える
   const sideCounts = (() => {
     const counts: Record<GearSide, number> = { FH: 0, BH: 0 };
@@ -152,73 +171,51 @@ export default function GearPage() {
             </p>
           )}
 
-          <ul className="mt-4 space-y-2">
-            {gear.map((g) => (
-              <li
-                key={g.id}
-                className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <EquipmentVisual
-                    category={g.equipment.category}
-                    manufacturer={g.equipment.manufacturer}
-                    imageUrl={g.equipment.imageUrl}
-                    name={g.equipment.name}
-                    size={44}
-                  />
-                  <div className="min-w-0">
-                  <p className="font-bold">
-                    <Link
-                      href={`/equipment/${g.equipment.id}`}
-                      className="hover:underline"
-                    >
-                      {g.equipment.name}
-                    </Link>
-                    {g.isCurrent && (
-                      <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[10px] font-bold text-white">
-                        いま使用中
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-tt-gray70">
-                    {g.equipment.manufacturer} ・ {GEAR_SIDE_LABELS[g.side]}面・
-                    {THICKNESS_LABELS[g.thickness]}
-                    {g.blade && ` / ${g.blade.name}`}
-                  </p>
-                  {g.isCurrent &&
-                    (() => {
-                      const r = gearReminder(g.usageStartedAt);
-                      if (!r) return null;
-                      return (
-                        <p
-                          className={`mt-1 text-xs ${
-                            r.due
-                              ? "font-bold text-tt-deep-coral"
-                              : "text-tt-gray70"
-                          }`}
-                        >
-                          {r.due ? "⚠ " : "🏓 "}
-                          {r.elapsedLabel}
-                          {r.message ? ` — ${r.message}` : ""}
-                        </p>
-                      );
-                    })()}
-                  {g.note && (
-                    <p className="mt-1 text-xs italic text-tt-gray70">
-                      「{g.note}」
+          {(() => {
+            const current = gear.filter((g) => g.isCurrent);
+            const past = gear.filter((g) => !g.isCurrent);
+            return (
+              <>
+                {current.length > 0 && (
+                  <>
+                    <h2 className="mt-4 text-sm font-bold text-tt-deep-green">
+                      現在の構成
+                    </h2>
+                    <ul className="mt-2 space-y-2">
+                      {current.map((g) => (
+                        <GearRow
+                          key={g.id}
+                          g={g}
+                          onRemove={remove}
+                          onSave={saveDetails}
+                        />
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {past.length > 0 && (
+                  <>
+                    <h2 className="mt-5 text-sm font-bold text-tt-gray70">
+                      これまで使った用具（遍歴）
+                    </h2>
+                    <p className="text-xs text-tt-gray70">
+                      乗り換えの軌跡。メモを残すと、次の選択の精度が上がります。
                     </p>
-                  )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => remove(g.id)}
-                  className="ml-3 shrink-0 text-xs text-tt-gray70 underline"
-                >
-                  削除
-                </button>
-              </li>
-            ))}
-          </ul>
+                    <ul className="mt-2 space-y-2">
+                      {past.map((g) => (
+                        <GearRow
+                          key={g.id}
+                          g={g}
+                          onRemove={remove}
+                          onSave={saveDetails}
+                        />
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           {gear.length === 0 && !showForm && (
             <div className="mt-6 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
@@ -319,5 +316,135 @@ export default function GearPage() {
         </>
       )}
     </div>
+  );
+}
+
+// マイギア1行: 表示 + 貼った日・メモのインライン編集 (遍歴の質的記録)
+function GearRow({
+  g,
+  onRemove,
+  onSave,
+}: {
+  g: GearEntry;
+  onRemove: (id: string) => void;
+  onSave: (
+    g: GearEntry,
+    patch: { note?: string; usageStartedAt?: string },
+  ) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [note, setNote] = useState(g.note ?? "");
+  const [date, setDate] = useState(
+    g.usageStartedAt ? g.usageStartedAt.slice(0, 10) : "",
+  );
+  const [saving, setSaving] = useState(false);
+  const reminder = g.isCurrent ? gearReminder(g.usageStartedAt) : null;
+
+  async function save() {
+    setSaving(true);
+    await onSave(g, {
+      note,
+      usageStartedAt: date ? new Date(date).toISOString() : undefined,
+    });
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <li className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <div className="flex items-center justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <EquipmentVisual
+            category={g.equipment.category}
+            manufacturer={g.equipment.manufacturer}
+            imageUrl={g.equipment.imageUrl}
+            name={g.equipment.name}
+            size={44}
+          />
+          <div className="min-w-0">
+            <p className="font-bold">
+              <Link
+                href={`/equipment/${g.equipment.id}`}
+                className="hover:underline"
+              >
+                {g.equipment.name}
+              </Link>
+              {g.isCurrent && (
+                <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[10px] font-bold text-white">
+                  いま使用中
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-tt-gray70">
+              {g.equipment.manufacturer} ・ {GEAR_SIDE_LABELS[g.side]}面・
+              {THICKNESS_LABELS[g.thickness]}
+              {g.blade && ` / ${g.blade.name}`}
+            </p>
+            {reminder && (
+              <p
+                className={`mt-1 text-xs ${
+                  reminder.due
+                    ? "font-bold text-tt-deep-coral"
+                    : "text-tt-gray70"
+                }`}
+              >
+                {reminder.due ? "⚠ " : "🏓 "}
+                {reminder.elapsedLabel}
+                {reminder.message ? ` — ${reminder.message}` : ""}
+              </p>
+            )}
+            {!editing && g.note && (
+              <p className="mt-1 text-xs italic text-tt-gray70">「{g.note}」</p>
+            )}
+          </div>
+        </div>
+        <div className="ml-3 flex shrink-0 flex-col items-end gap-1">
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="text-xs text-tt-green underline"
+          >
+            {editing ? "閉じる" : "編集"}
+          </button>
+          <button
+            onClick={() => onRemove(g.id)}
+            className="text-xs text-tt-gray70 underline"
+          >
+            削除
+          </button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="mt-3 space-y-2 border-t border-tt-gray30/30 pt-3">
+          <label className="block text-xs font-medium text-tt-gray70">
+            貼った日（張り替え時期の目安に）
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-tt-gray30/50 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block text-xs font-medium text-tt-gray70">
+            メモ（乗り換え理由・感想など）
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="例: 前のラバーより球持ちが欲しくて乗り換え"
+              className="mt-1 block w-full rounded-lg border border-tt-gray30/50 px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="w-full rounded-full bg-tt-charcoal py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {saving ? "保存中…" : "保存"}
+          </button>
+        </div>
+      )}
+    </li>
   );
 }
