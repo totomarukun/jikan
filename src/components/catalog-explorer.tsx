@@ -55,6 +55,15 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
   const [band, setBand] = useState<number>(-1);
   const [hard, setHard] = useState<number>(-1);
   const [sort, setSort] = useState<Sort>("popular");
+  // 比較する2本の選択 (ブラウズ→対決作成の導線)
+  const [picked, setPicked] = useState<CatalogItem[]>([]);
+
+  const togglePick = (item: CatalogItem) =>
+    setPicked((cur) => {
+      if (cur.some((p) => p.id === item.id))
+        return cur.filter((p) => p.id !== item.id);
+      return [...cur, item].slice(-2); // 直近2本を保持
+    });
 
   const byKind = useMemo(
     () =>
@@ -140,6 +149,7 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
             onClick={() => {
               setKind(k);
               setCat(null);
+              setPicked([]);
             }}
           >
             {label}
@@ -248,37 +258,93 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
           該当する用具がありません。
         </div>
       ) : (
-        <ul className="mt-3 space-y-2">
-          {filtered.map((e) => (
-            <li key={e.id}>
-              <Link
-                href={`/equipment/${e.id}`}
-                className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
+        <ul className="mt-3 space-y-2 pb-20">
+          {filtered.map((e) => {
+            const isPicked = picked.some((p) => p.id === e.id);
+            return (
+              <li
+                key={e.id}
+                className={`flex items-center gap-2 rounded-xl bg-white p-3 shadow-sm ring-1 transition ${
+                  isPicked ? "ring-tt-green/60" : "ring-black/5"
+                }`}
               >
-                <EquipmentVisual
-                  category={e.category}
-                  manufacturer={e.manufacturer}
-                  imageUrl={e.imageUrl}
-                  bladeSubcategory={e.bladeSubcategory}
-                  name={e.name}
-                  size={36}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{e.name}</p>
-                  <p className="text-xs text-tt-gray70">
-                    {e.manufacturer} ・ {CAT_LABEL[e.category] ?? ""}
-                    {e.hardness != null && ` ・ ${e.hardness}°`}
-                  </p>
-                </div>
-                {e.price != null && (
-                  <span className="shrink-0 font-mono text-xs text-tt-gray70">
-                    ¥{e.price.toLocaleString()}
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
+                <Link
+                  href={`/equipment/${e.id}`}
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                >
+                  <EquipmentVisual
+                    category={e.category}
+                    manufacturer={e.manufacturer}
+                    imageUrl={e.imageUrl}
+                    bladeSubcategory={e.bladeSubcategory}
+                    name={e.name}
+                    size={36}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{e.name}</p>
+                    <p className="text-xs text-tt-gray70">
+                      {e.manufacturer} ・ {CAT_LABEL[e.category] ?? ""}
+                      {e.hardness != null && ` ・ ${e.hardness}°`}
+                      {e.price != null && ` ・ ¥${e.price.toLocaleString()}`}
+                    </p>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => togglePick(e)}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                    isPicked
+                      ? "bg-tt-deep-green text-white"
+                      : "bg-tt-offwhite text-tt-gray70 ring-1 ring-tt-gray30/50 hover:bg-tt-soft-green"
+                  }`}
+                >
+                  {isPicked ? "選択中" : "比較"}
+                </button>
+              </li>
+            );
+          })}
         </ul>
+      )}
+
+      {/* 比較バー: 2本選ぶと対決ページへ */}
+      {picked.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-tt-gray30/40 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
+            <div className="min-w-0 flex-1 truncate text-xs">
+              <span className="font-bold">{picked[0].name}</span>
+              {picked[1] && (
+                <>
+                  <span className="mx-1 text-tt-gray30">vs</span>
+                  <span className="font-bold">{picked[1].name}</span>
+                </>
+              )}
+              {picked.length < 2 && (
+                <span className="text-tt-gray70">
+                  {" "}
+                  ・ もう1本選ぶと比較できます
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setPicked([])}
+              className="shrink-0 text-xs text-tt-gray70 underline"
+            >
+              解除
+            </button>
+            {picked.length === 2 ? (
+              <Link
+                href={`/compare/${picked[0].id}/vs/${picked[1].id}`}
+                className="shrink-0 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-4 py-2 text-xs font-bold text-white"
+              >
+                比較する →
+              </Link>
+            ) : (
+              <span className="shrink-0 rounded-full bg-tt-gray30/40 px-4 py-2 text-xs font-bold text-tt-gray70">
+                比較する →
+              </span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
