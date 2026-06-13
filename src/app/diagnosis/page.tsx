@@ -7,7 +7,11 @@ import {
   getPopularPicksForSimilarUsers,
 } from "@/lib/data";
 import { diagnose, tendencyRows } from "@/lib/diagnosis";
-import { MIN_DIAGNOSIS_ANSWERS } from "@/lib/types";
+import {
+  MIN_DIAGNOSIS_ANSWERS,
+  PLAYSTYLE_LABELS,
+  type Playstyle,
+} from "@/lib/types";
 import { ShareButton } from "@/components/share-button";
 
 export const metadata = { title: "スタイル診断" };
@@ -52,14 +56,18 @@ export default async function DiagnosisPage() {
     });
   }
 
-  // 該当率: 診断済みセッション全体のうち同じスタイルの割合
+  // 該当率: 診断済みセッション全体のうち同じスタイルの割合。
+  // 母数が小さいうちの「全プレイヤーの100%」は信頼を毀損するため、
+  // 他の集計と同じく十分なデータが集まるまで割合は出さない
+  const MIN_SHARE_POPULATION = 10;
   const [total, same] = await Promise.all([
     prisma.sessionProgress.count({ where: { diagnosedStyle: { not: null } } }),
     prisma.sessionProgress.count({
       where: { diagnosedStyle: result.styleName },
     }),
   ]);
-  const sharePct = total > 0 ? Math.round((same / total) * 100) : null;
+  const sharePct =
+    total >= MIN_SHARE_POPULATION ? Math.round((same / total) * 100) : null;
 
   const userId = await getUserId();
 
@@ -90,7 +98,7 @@ export default async function DiagnosisPage() {
         <h1 className="mt-3 text-3xl font-bold leading-snug text-tt-deep-green">
           {result.styleName}
         </h1>
-        {sharePct !== null && (
+        {sharePct !== null ? (
           <p className="mt-3 inline-block rounded-full bg-white/80 px-4 py-1.5 text-sm text-tt-gray70 ring-1 ring-black/5">
             全プレイヤーの
             <span className="font-mono font-bold text-tt-deep-green">
@@ -98,29 +106,46 @@ export default async function DiagnosisPage() {
             </span>
             が該当
           </p>
+        ) : (
+          <p className="mt-3 inline-block rounded-full bg-white/80 px-4 py-1.5 text-xs text-tt-gray70 ring-1 ring-black/5">
+            全体での割合は診断者{MIN_SHARE_POPULATION}人以上で公開
+          </p>
         )}
       </div>
 
       <div className="animate-rise mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 [animation-delay:120ms]">
         <h2 className="mb-3 font-bold">傾向スコア</h2>
-        <div className="space-y-3">
-          {tendencyRows(result).map((row) => (
-            <div key={row.label}>
-              <div className="flex justify-between text-sm">
-                <span>{row.label}</span>
-                <span className="font-mono font-bold">
-                  +{row.value.toFixed(1)}
-                </span>
-              </div>
-              <div className="mt-1 h-2.5 rounded-full bg-tt-gray30/30">
-                <div
-                  className="bar-grow h-2.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
-                  style={{ width: `${Math.min(row.value * 33, 100)}%` }}
-                />
-              </div>
+        {/* +0.0 の行はノイズなので、傾向が出た軸だけ見せる */}
+        {(() => {
+          const rows = tendencyRows(result).filter((row) => row.value >= 0.1);
+          if (rows.length === 0) {
+            return (
+              <p className="text-sm text-tt-gray70">
+                まだはっきりした傾向は出ていません。回答が増えると精度が上がります。
+              </p>
+            );
+          }
+          return (
+            <div className="space-y-3">
+              {rows.map((row) => (
+                <div key={row.label}>
+                  <div className="flex justify-between text-sm">
+                    <span>{row.label}</span>
+                    <span className="font-mono font-bold">
+                      +{row.value.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2.5 rounded-full bg-tt-gray30/30">
+                    <div
+                      className="bar-grow h-2.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
+                      style={{ width: `${Math.min(row.value * 33, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
 
       {picks.length > 0 && (
@@ -184,6 +209,13 @@ export default async function DiagnosisPage() {
           </Link>
         )}
         <ShareButton styleName={result.styleName} sharePct={sharePct} />
+        <Link
+          href={`/catalog?style=${progress.playstyle}`}
+          className="block rounded-full border border-tt-gray30/50 bg-white px-8 py-3 text-sm font-bold transition hover:bg-tt-offwhite"
+        >
+          {PLAYSTYLE_LABELS[progress.playstyle as Playstyle] ?? "あなたの戦型"}
+          向けの用具をカタログで探す →
+        </Link>
         <Link href="/play" className="block text-sm text-tt-gray70 underline">
           登録せず続ける
         </Link>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateSessionId } from "@/lib/session";
+import { getOrCreateSessionId, getUserId } from "@/lib/session";
 import { onboardingSchema } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -20,5 +20,30 @@ export async function POST(request: Request) {
     update: { level, playstyle, bladeCategory },
   });
 
+  // ログイン済みならアカウント側のプロフィールも同期する。
+  // ここを怠ると /me がデフォルト値 (中級 等) を表示し続け、信頼を毀損する
+  const userId = await getUserId();
+  if (userId) {
+    await prisma.user
+      .update({
+        where: { id: userId },
+        data: { level, playstyle, bladeCategory },
+      })
+      .catch(() => null);
+  }
+
   return NextResponse.json({ ok: true });
+}
+
+// プロフィール編集時のプリフィル用に現在の回答を返す
+export async function GET() {
+  const sessionId = await getOrCreateSessionId();
+  const progress = await prisma.sessionProgress.findUnique({
+    where: { sessionId },
+  });
+  return NextResponse.json({
+    level: progress?.level ?? null,
+    playstyle: progress?.playstyle ?? null,
+    bladeCategory: progress?.bladeCategory ?? null,
+  });
 }

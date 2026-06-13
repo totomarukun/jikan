@@ -11,9 +11,11 @@ export const revalidate = 60;
 const MIN_N = 3;
 
 export default async function BattlesPage() {
+  // ランキングは「両方使った人」基準のみ集計する。匿名セッションの量産で
+  // 票を水増しできる「全データ」基準を看板に出すと、捏造的な100%対決が1位に立つ
   const [pairs, all] = await Promise.all([
-    aggregatePairs({ take: 30, minTotal: MIN_N }),
-    aggregatePairs({ take: 500 }),
+    aggregatePairs({ take: 30, minTotal: MIN_N, experiencedOnly: true }),
+    aggregatePairs({ take: 500, experiencedOnly: true }),
   ]);
   const pendingCount = all.filter((p) => p.total < MIN_N).length;
 

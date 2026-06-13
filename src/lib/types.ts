@@ -41,6 +41,8 @@ export const QUESTION_AXES = [
   "control",
   "hardness",
   "ballHold",
+  "arc",
+  "tackiness",
 ] as const;
 
 export type Playstyle = (typeof PLAYSTYLES)[number];
@@ -74,6 +76,8 @@ export const answerSchema = z.object({
   optionBEquipmentId: z.string().min(1),
   axis: z.enum(QUESTION_AXES),
   winner: winnerSchema,
+  // 体感のひとこと (任意)。両方使った人の言葉として表示される
+  comment: z.string().max(280).optional(),
 });
 
 export const gearSchema = z.object({
@@ -82,11 +86,21 @@ export const gearSchema = z.object({
   thickness: z.enum(THICKNESSES),
   bladeEquipmentId: z.string().min(1).optional(),
   isCurrent: z.boolean().optional(),
+  // 貼った日 (張り替えリマインドの起点)。未指定なら現用登録時に当日を既定。
+  usageStartedAt: z.string().datetime().optional(),
+  // 乗り換え理由・感想メモ
+  note: z.string().max(500).optional(),
 });
 
 export const signupSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(8).max(72),
   nickname: z.string().max(30).optional(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1).max(72),
 });
 
 // ---- 表示用ラベル ----

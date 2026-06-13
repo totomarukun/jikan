@@ -12,14 +12,15 @@ export default async function LandingPage() {
   // eslint-disable-next-line prefer-const
   let [featured, totalAnswers, equipmentCount, sessionId] =
     await Promise.all([
-      aggregatePairs({ take: 3, minTotal: 3 }),
-      prisma.comparison.count(),
+      aggregatePairs({ take: 3, minTotal: 3, experiencedOnly: true }),
+      // 看板数値は匿名セッション量産で水増しできない「実体験ベースの判定数」を出す
+      prisma.comparison.count({ where: { hasActualExperience: "BOTH" } }),
       prisma.equipment.count({ where: { isActive: true } }),
       getSessionId(),
     ]);
   if (featured.length === 0) {
     // コールドスタート時のみ少数サンプルでも見せる (正直に n を表示している)
-    featured = await aggregatePairs({ take: 3 });
+    featured = await aggregatePairs({ take: 3, experiencedOnly: true });
   }
   const hasSession = sessionId
     ? (await prisma.sessionProgress.findUnique({
@@ -36,38 +37,48 @@ export default async function LandingPage() {
           <LogoMark size={84} />
         </div>
         <h1 className="animate-rise mt-6 text-3xl font-bold leading-snug sm:text-4xl">
-          ラバー、結局
+          あの用具は、いまの自分と
           <br className="sm:hidden" />
-          どっちが自分に合う？
+          比べてどう違う？
         </h1>
         <p className="animate-rise mt-3 leading-7 text-tt-gray70 [animation-delay:80ms]">
           「硬い」「弾む」の感じ方は人それぞれ。
           <br />
           だからTacTapは、<strong className="text-tt-charcoal">両方使った人の比較</strong>
-          だけを集めて、
+          を1枚の地図に合成して、
           <br />
-          あなたのいまのラバー基準に翻訳します。
+          用具の特徴を<strong className="text-tt-charcoal">相対的に</strong>見られるようにしました。
         </p>
         <div className="animate-rise mt-8 [animation-delay:160ms]">
           <Link
-            href={hasSession ? "/play" : "/onboarding"}
+            href="/map"
             className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
-            {hasSession ? "比較を続ける" : "始める（無料）"}
+            用具マップを見る
           </Link>
-          <p className="mt-3 text-sm text-tt-gray70">登録なしで参加できます</p>
-          <Link
-            href="/switch"
-            className="mt-4 inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
-          >
-            いまのラバーからの乗り換えを検討する →
-          </Link>
+          <p className="mt-3 text-sm text-tt-gray70">登録なしで見られます</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/catalog"
+              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+            >
+              用具カタログを探す →
+            </Link>
+            <Link
+              href={hasSession ? "/switch" : "/onboarding"}
+              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+            >
+              {hasSession
+                ? "いまのラバー基準で見る →"
+                : "自分のギア基準で見る（無料登録）→"}
+            </Link>
+          </div>
         </div>
 
         {/* ライブ統計 */}
         <dl className="mt-8 grid grid-cols-2 gap-3 text-center">
           <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-            <dt className="text-xs text-tt-gray70">累計AB比較回答</dt>
+            <dt className="text-xs text-tt-gray70">両方使った人の判定</dt>
             <dd className="font-mono text-2xl font-bold text-tt-deep-green">
               {totalAnswers.toLocaleString()}
             </dd>
@@ -136,10 +147,10 @@ export default async function LandingPage() {
         <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
           <p className="font-mono text-2xl font-bold text-tt-deep-coral">02</p>
           <h2 className="mt-2 font-bold text-tt-deep-coral">
-            両方使った人だけの比較
+            「両方使った人」に絞れる比較
           </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            回答には経験フラグが付きます。実際に両方使った人の判定だけに絞った、試打に最も近いデータ。
+            すべての回答に経験フラグが付きます。イメージ回答も集めますが、ワンタップで「実際に両方使った人の判定だけ」に絞り込めます。
           </p>
         </div>
         <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
@@ -153,20 +164,20 @@ export default async function LandingPage() {
 
       {/* 流れ */}
       <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-        <h2 className="text-lg font-bold">遊び方</h2>
+        <h2 className="text-lg font-bold">使い方</h2>
         <ol className="mt-4 space-y-4">
           {[
             [
-              "使ってきたラバーを「マイギア」に登録",
-              "厚さ・フォア/バック・当時のラケットも一緒に記録",
+              "用具マップで特徴を相対的に見る",
+              "登録なしでOK。両方使った人の比較から、用具の位置関係が読める",
             ],
             [
-              "自分のギア同士のカンタン比較に1タップで回答",
-              "使ったことのある2本だから、記憶で答えられる",
+              "マイギアを登録して「自分基準」にする",
+              "いまのラバーを原点に、候補がどう違うかで読めるようになる",
             ],
             [
-              "みんなの実体験データで次の一本を選ぶ",
-              "「あなたのいまのラバーと比べてどうか」で読める",
+              "気になった所で、体感を1問だけ答える",
+              "答えるほど地図の解像度が上がる。記憶で答えられる軽さ",
             ],
           ].map(([title, desc], i) => (
             <li key={title} className="flex items-start gap-4">

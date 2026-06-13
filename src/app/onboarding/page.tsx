@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GearForm, type GearDraft } from "@/components/gear-form";
 import {
   BLADE_CATEGORY_LABELS,
@@ -41,6 +41,26 @@ export default function OnboardingPage() {
   const [gear, setGear] = useState<GearDraft[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // プロフィール編集での再訪時は前回の回答をプリフィルする
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/onboarding")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const prefilled: Record<string, string> = {};
+        for (const q of QUESTIONS) {
+          if (typeof d[q.key] === "string" && d[q.key]) prefilled[q.key] = d[q.key];
+        }
+        if (Object.keys(prefilled).length > 0) {
+          setAnswers((prev) => ({ ...prefilled, ...prev }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function select(value: string) {
     setAnswers({ ...answers, [QUESTIONS[step].key]: value });

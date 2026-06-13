@@ -115,6 +115,66 @@ export async function getPopularPicksForSimilarUsers(
   return [...wins.values()].sort((a, b) => b.wins - a.wins).slice(0, take);
 }
 
+/** 定番ラバー (登録実績が少ないうちのワンタップ候補のフォールバック) */
+const STAPLE_RUBBER_NAMES = [
+  "ロゼナ",
+  "テナジー05",
+  "ファスタークG-1",
+  "マークV",
+  "ラクザ7",
+  "ヴェガアジア",
+  "V>15エキストラ",
+  "エボリューションMX-P",
+];
+
+/**
+ * よく使われているラバーの上位を返す (マイギア登録数の多い順)。
+ * 登録がまだ少ないうちは定番ラバーで埋める。
+ */
+export async function getPopularRubbers(
+  take = 8,
+  excludeIds: string[] = [],
+): Promise<Array<{ id: string; name: string; manufacturer: string }>> {
+  const grouped = await prisma.gearItem.groupBy({
+    by: ["equipmentId"],
+    _count: { equipmentId: true },
+    orderBy: { _count: { equipmentId: "desc" } },
+    take: take * 3,
+  });
+  const byCount = grouped
+    .map((g) => g.equipmentId)
+    .filter((id) => !excludeIds.includes(id));
+  const fromGear = (
+    await prisma.equipment.findMany({
+      where: {
+        id: { in: byCount },
+        isActive: true,
+        category: { startsWith: "RUBBER_" },
+      },
+      select: { id: true, name: true, manufacturer: true },
+    })
+  ).sort((a, b) => byCount.indexOf(a.id) - byCount.indexOf(b.id));
+
+  const out = fromGear.slice(0, take);
+  if (out.length < take) {
+    const staples = await prisma.equipment.findMany({
+      where: {
+        name: { in: STAPLE_RUBBER_NAMES },
+        isActive: true,
+        category: { startsWith: "RUBBER_" },
+        id: { notIn: [...excludeIds, ...out.map((o) => o.id)] },
+      },
+      select: { id: true, name: true, manufacturer: true },
+    });
+    staples.sort(
+      (a, b) =>
+        STAPLE_RUBBER_NAMES.indexOf(a.name) - STAPLE_RUBBER_NAMES.indexOf(b.name),
+    );
+    out.push(...staples.slice(0, take - out.length));
+  }
+  return out;
+}
+
 export interface PairAggregate {
   aId: string;
   bId: string;
@@ -140,10 +200,17 @@ export async function aggregatePairs(options?: {
   excludePair?: [string, string];
   /** この回答数未満のペアを除外 (n=1 の100%表示は信頼性を毀損する) */
   minTotal?: number;
+  /**
+   * 両方使った人 (BOTH) の判定だけを数える。
+   * 看板・ランキング等の公開集計は、匿名セッションを量産した票の水増しに
+   * 汚染されうるため、サーバ計算で詐称不能な実体験フラグでガードする。
+   */
+  experiencedOnly?: boolean;
 }): Promise<PairAggregate[]> {
   const comparisons = await prisma.comparison.findMany({
     where: {
       winnerOverall: { in: ["A", "B", "SAME"] },
+      ...(options?.experiencedOnly ? { hasActualExperience: "BOTH" } : {}),
       ...(options?.involvingEquipmentId
         ? {
             OR: [
@@ -202,32 +269,98 @@ export async function aggregatePairs(options?: {
     .slice(0, options?.take ?? 20);
 }
 
-/** 特定ペアの「好み」即時集計 (M3 の回答後フィードバック用) */
+const TALLY_AXIS_COLUMN = {
+  overall: "winnerOverall",
+  speed: "winnerSpeed",
+  spin: "winnerSpin",
+  control: "winnerControl",
+  hardness: "winnerHardness",
+  ballHold: "winnerBallHold",
+  arc: "winnerArc",
+  tackiness: "winnerTackiness",
+} as const;
+
+/** 特定ペア・特定軸の即時集計 (M3 の回答後フィードバック用) */
 export async function tallyPair(
   aId: string,
   bId: string,
+  axis: keyof typeof TALLY_AXIS_COLUMN = "overall",
 ): Promise<{ a: number; b: number; same: number; total: number }> {
+  // 回答直後のフィードバックは「答えた軸」の集計を返す。
+  // overall 固定だと、スピン/球持ちを答えても好みの集計が出て誤解を招く。
+  const col = TALLY_AXIS_COLUMN[axis];
   const rows = await prisma.comparison.findMany({
     where: {
       OR: [
         { optionAEquipmentId: aId, optionBEquipmentId: bId },
         { optionAEquipmentId: bId, optionBEquipmentId: aId },
       ],
-      winnerOverall: { in: ["A", "B", "SAME"] },
+      [col]: { in: ["A", "B", "SAME"] },
     },
     select: {
       optionAEquipmentId: true,
-      winnerOverall: true,
+      [col]: true,
     },
   });
   const tally = { a: 0, b: 0, same: 0, total: rows.length };
   for (const r of rows) {
+    const winner = (r as Record<string, string | null>)[col];
     const flipped = r.optionAEquipmentId === bId;
-    if (r.winnerOverall === "SAME") tally.same++;
-    else if ((r.winnerOverall === "A") !== flipped) tally.a++;
+    if (winner === "SAME") tally.same++;
+    else if ((winner === "A") !== flipped) tally.a++;
     else tally.b++;
   }
   return tally;
+}
+
+export interface Voice {
+  comment: string;
+  /** この用具(対象)を指す側の相手用具名 */
+  otherName: string;
+  /** 両方使った人の言葉か */
+  both: boolean;
+  answeredAt: Date;
+}
+
+/**
+ * 用具個別ページ用: 「両方使った人の言葉」(体感コメント)。
+ * 対象用具を含む比較のうちコメントがあるものを、実体験を優先して返す。
+ */
+export async function getEquipmentVoices(
+  equipmentId: string,
+  take = 8,
+): Promise<Voice[]> {
+  const rows = await prisma.comparison.findMany({
+    where: {
+      comment: { not: null },
+      OR: [
+        { optionAEquipmentId: equipmentId },
+        { optionBEquipmentId: equipmentId },
+      ],
+    },
+    select: {
+      comment: true,
+      hasActualExperience: true,
+      answeredAt: true,
+      optionAEquipmentId: true,
+      optionA: { select: { name: true } },
+      optionB: { select: { name: true } },
+    },
+    orderBy: { answeredAt: "desc" },
+    take: take * 2,
+  });
+  const voices: Voice[] = rows.map((r) => {
+    const isA = r.optionAEquipmentId === equipmentId;
+    return {
+      comment: r.comment as string,
+      otherName: isA ? r.optionB.name : r.optionA.name,
+      both: r.hasActualExperience === "BOTH",
+      answeredAt: r.answeredAt,
+    };
+  });
+  // 実体験を上に
+  voices.sort((a, b) => Number(b.both) - Number(a.both));
+  return voices.slice(0, take);
 }
 
 /** 用具個別ページ用: 対象用具の勝敗サマリ */
@@ -244,6 +377,8 @@ export async function getEquipmentRecord(equipmentId: string): Promise<{
         { optionBEquipmentId: equipmentId },
       ],
       winnerOverall: { in: ["A", "B", "SAME"] },
+      // 公開する「好み勝率」も実体験基準に揃える (水増し票を排除)
+      hasActualExperience: "BOTH",
     },
     select: { optionAEquipmentId: true, winnerOverall: true },
   });

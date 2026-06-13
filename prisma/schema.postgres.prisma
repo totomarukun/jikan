@@ -19,6 +19,10 @@ model User {
   id                String       @id @default(cuid())
   email             String       @unique
   nickname          String?
+  // scrypt ハッシュ "salt:hex"。旧アカウント(パスワード未設定)は null
+  passwordHash      String?
+  // この ユーザーのデータ本体が紐づくセッション (ログイン時にcookieへ復元)
+  primarySessionId  String?
   // enum: DRIVE | QUICK_ATTACK | CUT | OTHER | UNDECIDED
   playstyle         String       @default("UNDECIDED")
   // enum: BEGINNER | INTERMEDIATE | ADVANCED | NON_PLAYER
@@ -81,6 +85,10 @@ model GearItem {
   blade            Equipment? @relation("GearBlade", fields: [bladeEquipmentId], references: [id])
   // いま使っているか
   isCurrent        Boolean    @default(false)
+  // このラバーを貼った日 (張り替え時期リマインドの起点。createdAt とは別概念)
+  usageStartedAt   DateTime?
+  // 乗り換え理由・感想などの自由メモ (遍歴の質的記録)
+  note             String?
   createdAt        DateTime   @default(now())
 
   @@index([sessionId])
@@ -110,6 +118,12 @@ model Comparison {
   winnerControl        String?
   winnerHardness       String?
   winnerBallHold       String?
+  // 弧線の高さ (高い=山なり / 低い=直線的)
+  winnerArc            String?
+  // 粘着の強さ (粘着ラバー vs テンション系の体感差)
+  winnerTackiness      String?
+  // 体感のひとこと (両方使った人の言葉。定性レビューの最小単位)
+  comment              String?
   // enum: BOTH | ONE | NEITHER (マイギアから自動判定)
   hasActualExperience  String?
   // 回答時に参照したギア (使用条件の追跡用)

@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
-import { aggregatePairs, tallyPair } from "@/lib/data";
+import { aggregatePairs, getPopularRubbers, tallyPair } from "@/lib/data";
 import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
-import { VersusBar } from "@/components/versus-bar";
+import {
+  buildSwitchCandidates,
+  type SwitchCandidate,
+} from "@/lib/relative-map";
+import { VersusBarOrPending } from "@/components/versus-bar";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import {
@@ -12,6 +16,7 @@ import {
   CandidatePicker,
   CurrentRubberSetter,
 } from "@/components/switch-picker";
+import { GEAR_SIDE_LABELS, type GearSide } from "@/lib/types";
 import type { Equipment } from "@prisma/client";
 
 export const metadata = { title: "乗り換え検討" };
@@ -28,11 +33,51 @@ export default async function SwitchPage({
   const progress = sessionId
     ? await prisma.sessionProgress.findUnique({ where: { sessionId } })
     : null;
-  const current = progress?.currentRubberId
-    ? await prisma.equipment.findUnique({
-        where: { id: progress.currentRubberId },
+
+  // 基準の切り替え: マイギアのラバーなら ?base= でFH/BHどちらの基準でも検討できる
+  // (フォアとバックで選定基準は別物 — 現用FH固定にしない)
+  const gearRubbers = sessionId
+    ? await prisma.gearItem.findMany({
+        where: { sessionId, equipment: { category: { startsWith: "RUBBER_" } } },
+        include: { equipment: { select: { id: true, name: true } } },
+        orderBy: [{ isCurrent: "desc" }, { createdAt: "asc" }],
       })
-    : null;
+    : [];
+  const baseOptions: Array<{
+    id: string;
+    name: string;
+    sides: string[];
+    isCurrent: boolean;
+  }> = [];
+  for (const g of gearRubbers) {
+    const found = baseOptions.find((o) => o.id === g.equipmentId);
+    const sideLabel = GEAR_SIDE_LABELS[g.side as GearSide] ?? g.side;
+    if (found) {
+      if (!found.sides.includes(sideLabel)) found.sides.push(sideLabel);
+      found.isCurrent = found.isCurrent || g.isCurrent;
+    } else {
+      baseOptions.push({
+        id: g.equipmentId,
+        name: g.equipment.name,
+        sides: [sideLabel],
+        isCurrent: g.isCurrent,
+      });
+    }
+  }
+
+  const baseId = typeof sp.base === "string" ? sp.base : null;
+  let current: Equipment | null = null;
+  if (baseId && baseOptions.some((o) => o.id === baseId)) {
+    current = await prisma.equipment.findUnique({ where: { id: baseId } });
+    if (current && (!current.isActive || !current.category.startsWith("RUBBER_"))) {
+      current = null;
+    }
+  }
+  if (!current && progress?.currentRubberId) {
+    current = await prisma.equipment.findUnique({
+      where: { id: progress.currentRubberId },
+    });
+  }
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -45,9 +90,145 @@ export default async function SwitchPage({
       {!current ? (
         <NoBaseSetup sessionId={sessionId} />
       ) : (
-        <SwitchBoard current={current} sp={sp} />
+        <SwitchBoard
+          current={current}
+          sp={sp}
+          baseOptions={baseOptions}
+          sessionId={sessionId}
+        />
       )}
     </div>
+  );
+}
+
+const SWITCH_AXIS_LABEL: Record<string, string> = {
+  overall: "好み",
+  speed: "スピード",
+  spin: "スピン",
+  control: "コントロール",
+  ballHold: "球持ち",
+  arc: "弧線",
+  tackiness: "粘着",
+  hardness: "硬さ",
+};
+
+// 相対マップ(推移律)から、基準に対する候補を軸別差分つきで出す。
+// 直接対決がなくても他の比較経由で「基準よりスピード上/球持ち同等」が出るため、
+// コールドスタートでも「集計中」で固まらず、必ず手応えのある候補が並ぶ。
+async function RelativeCandidates({
+  baseId,
+  baseName,
+}: {
+  baseId: string;
+  baseName: string;
+}) {
+  const { baseRanked, candidates } = await buildSwitchCandidates(baseId, 6);
+  if (!baseRanked || candidates.length === 0) {
+    return (
+      <section className="mt-4 rounded-2xl border border-dashed border-tt-gray30/50 bg-white p-4 text-sm text-tt-gray70">
+        <p className="font-bold text-tt-charcoal">相対マップから見た候補</p>
+        <p className="mt-1">
+          「{baseName}」を含む比較がまだありません。
+          <Link href="/play" className="font-bold text-tt-green underline">
+            ひと比較
+          </Link>
+          答えると、ここに{baseName}基準の候補が並び始めます（1票から育ちます）。
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <p className="font-bold">相対マップから見た候補</p>
+      <p className="mt-0.5 text-xs text-tt-gray70">
+        みんなの比較を合成した相対評価で、「{baseName}」と比べた各軸の違い。
+        直接対決がなくても、他の比較を経由して位置が決まります。
+      </p>
+      <ul className="mt-3 space-y-2">
+        {candidates.map((c) => (
+          <RelativeCandidateRow key={c.id} c={c} baseName={baseName} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function RelativeCandidateRow({
+  c,
+  baseName,
+}: {
+  c: SwitchCandidate;
+  baseName: string;
+}) {
+  const sym = (d: string) =>
+    d === "up" ? "▲" : d === "down" ? "▼" : "≈";
+  const color = (d: string) =>
+    d === "up"
+      ? "text-tt-deep-green"
+      : d === "down"
+        ? "text-tt-deep-coral"
+        : "text-tt-gray70";
+  // 支持が薄い軸は「量」を信用できない(疎データの飽和値)。確信度が乗るまで
+  // 数値を出さず方向のみ・グレーに縮約する。閾値=実比較3件。
+  const LOW = 3;
+  const provisional = c.axes.some((a) => a.comparisons < LOW);
+  return (
+    <li>
+      <Link
+        href={`/equipment/${c.id}`}
+        className="block rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5 transition hover:bg-tt-soft-green"
+      >
+        <div className="flex items-center gap-2">
+          <EquipmentVisual
+            category={c.category}
+            manufacturer={c.manufacturer}
+            imageUrl={c.imageUrl}
+            name={c.name}
+            size={28}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm font-bold">
+            {c.name}
+          </span>
+          <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
+            共通{c.sharedAxes}軸
+          </span>
+          {provisional && (
+            <span className="shrink-0 rounded-full bg-tt-gray30/40 px-1.5 py-0.5 text-[9px] font-bold text-tt-gray70">
+              参考程度
+            </span>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {c.axes.map((a) => {
+            const low = a.comparisons < LOW;
+            return (
+              <span
+                key={a.axis}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${
+                  low ? "bg-tt-gray30/20 text-tt-gray70" : `bg-white ${color(a.diff)}`
+                }`}
+              >
+                {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
+                {/* 量は支持が十分なときだけ出す。薄い根拠では方向のみ。 */}
+                {!low && a.diff !== "even" && a.scoreDelta !== 0 && (
+                  <span className="ml-0.5 font-mono">
+                    {a.scoreDelta > 0 ? "+" : ""}
+                    {a.scoreDelta}
+                  </span>
+                )}
+                <span className="ml-0.5 font-mono text-[9px] opacity-60">
+                  n{a.comparisons}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-[10px] text-tt-gray70">
+          {baseName}比 ・ 数値=相対位置の差(0-100) ・ n=支持本数 ・ 薄い根拠(グレー)は
+          方向のみ ▲高い ▼低い ≈同等
+        </p>
+      </Link>
+    </li>
   );
 }
 
@@ -81,13 +262,59 @@ async function NoBaseSetup({ sessionId }: { sessionId: string | null }) {
 async function SwitchBoard({
   current,
   sp,
+  baseOptions,
+  sessionId,
 }: {
   current: Equipment;
   sp: Record<string, string | string[] | undefined>;
+  baseOptions: Array<{
+    id: string;
+    name: string;
+    sides: string[];
+    isCurrent: boolean;
+  }>;
+  sessionId: string | null;
 }) {
-  const candidateIds = (typeof sp.c === "string" ? sp.c.split(",") : [])
+  let candidateIds = (typeof sp.c === "string" ? sp.c.split(",") : [])
     .filter((id) => id && id !== current.id)
     .slice(0, 3);
+
+  // 候補が未指定なら、自分が基準ラバーと比較回答済みのラバーを自動で候補にする。
+  // せっかく実体験を答えたのに乗り換え画面が空のまま、という分断を防ぐ。
+  let autoFilledFromMyAnswers = false;
+  if (candidateIds.length === 0 && sessionId) {
+    const myRows = await prisma.comparison.findMany({
+      where: {
+        sessionId,
+        OR: [
+          { optionAEquipmentId: current.id },
+          { optionBEquipmentId: current.id },
+        ],
+      },
+      orderBy: { answeredAt: "desc" },
+      select: { optionAEquipmentId: true, optionBEquipmentId: true },
+    });
+    const opp: string[] = [];
+    for (const r of myRows) {
+      const id =
+        r.optionAEquipmentId === current.id
+          ? r.optionBEquipmentId
+          : r.optionAEquipmentId;
+      if (id !== current.id && !opp.includes(id)) opp.push(id);
+    }
+    candidateIds = opp.slice(0, 3);
+    autoFilledFromMyAnswers = candidateIds.length > 0;
+  }
+
+  // 基準切り替え時も検討中の候補は引き継ぐ (新基準と同じ候補は表示側で除外される)
+  const keepCandidates =
+    typeof sp.c === "string" && sp.c ? `&c=${encodeURIComponent(sp.c)}` : "";
+  const currentBase = baseOptions.find((o) => o.id === current.id);
+  const baseLabel = currentBase
+    ? `あなたの基準 (${currentBase.sides.join("・")}面${
+        currentBase.isCurrent ? "・いま使用中" : "で使用歴あり"
+      })`
+    : "あなたの基準 (いま使用中)";
 
   // 検討フローはラバー基準のため、候補もラバーのみに限定する
   const candidates = (
@@ -111,7 +338,8 @@ async function SwitchBoard({
   ]);
 
   // ワンタップ候補: この用具と対決データがあるラバー (人気順)
-  const suggestions = (
+  let suggestionsLabel = "よく比較される:";
+  let suggestions = (
     await aggregatePairs({ involvingEquipmentId: current.id, take: 6 })
   )
     .map((p) => {
@@ -125,6 +353,13 @@ async function SwitchBoard({
       (s) => !candidateIds.includes(s.id) && s.id !== current.id,
     )
     .slice(0, 4);
+  // 対決データがまだない基準でも、検索ゼロで検討を始められるようにする
+  if (suggestions.length === 0) {
+    suggestionsLabel = "よく使われている:";
+    suggestions = (
+      await getPopularRubbers(4, [current.id, ...candidateIds])
+    ).map((p) => ({ id: p.id, name: p.name }));
+  }
 
   return (
     <>
@@ -141,7 +376,7 @@ async function SwitchBoard({
             />
             <div>
             <p className="text-xs font-bold text-tt-deep-green">
-              あなたの基準 (いま使用中)
+              {baseLabel}
             </p>
             <p className="mt-1 text-lg font-bold">{current.name}</p>
             <p className="text-xs text-tt-gray70">
@@ -161,6 +396,37 @@ async function SwitchBoard({
         </div>
       </div>
 
+      {/* 基準の切り替え: フォアとバックで選定基準は別物なので、
+          マイギアのラバーならどれでも基準にできる */}
+      {baseOptions.length > 1 && (
+        <div className="mt-3">
+          <p className="text-[11px] font-bold text-tt-gray70">基準を切り替え</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {baseOptions.map((o) =>
+              o.id === current.id ? (
+                <span
+                  key={o.id}
+                  className="rounded-full bg-tt-deep-green px-3 py-1.5 text-xs font-bold text-white"
+                >
+                  {o.name} ({o.sides.join("・")})
+                </span>
+              ) : (
+                <Link
+                  key={o.id}
+                  href={`/switch?base=${o.id}${keepCandidates}`}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs ring-1 ring-tt-gray30/50 transition hover:bg-tt-soft-green hover:ring-tt-green/40"
+                >
+                  {o.name} ({o.sides.join("・")})
+                </Link>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 相対マップから見た乗り換え候補 (推移律。疎データでも必ず何か返す) */}
+      <RelativeCandidates baseId={current.id} baseName={current.name} />
+
       {/* 候補追加 (追加中は「集計しています…」を必ず表示) */}
       <div className="mt-4">
         <CandidatePicker
@@ -169,6 +435,8 @@ async function SwitchBoard({
             equipmentId: s.id,
             name: s.name,
           }))}
+          suggestionsLabel={suggestionsLabel}
+          baseId={current.id}
         />
       </div>
 
@@ -181,6 +449,11 @@ async function SwitchBoard({
         </div>
       ) : (
         <div className="mt-6 space-y-4">
+          {autoFilledFromMyAnswers && (
+            <p className="rounded-xl bg-tt-soft-green p-3 text-xs text-tt-deep-green ring-1 ring-tt-green/20">
+              あなたが「{current.name}」と比較した候補を表示しています。
+            </p>
+          )}
           {candidates.map((cand, i) => (
             <CandidateCard
               key={cand.id}
@@ -194,6 +467,86 @@ async function SwitchBoard({
             />
           ))}
         </div>
+      )}
+
+      {/* 検討まとめ: 候補を並べた後の「で、どれにする？」に1表で答える */}
+      {candidates.length >= 2 && (
+        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <h2 className="font-bold">検討まとめ</h2>
+          <p className="mt-0.5 text-xs text-tt-gray70">
+            基準「{current.name}」に対する候補の比較一覧。
+          </p>
+          <table className="mt-3 w-full text-xs">
+            <thead>
+              <tr className="text-left text-[10px] text-tt-gray70">
+                <th className="pb-1.5 font-medium">候補</th>
+                <th className="pb-1.5 font-medium">みんなの好み</th>
+                <th className="pb-1.5 text-right font-medium">公称硬度差</th>
+                <th className="pb-1.5 text-right font-medium">価格差</th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map((cand, i) => {
+                const t = tallies[i];
+                const decidedPct =
+                  t.total >= 3 ? Math.round((t.b / t.total) * 100) : null;
+                const sameMaker = cand.manufacturer === current.manufacturer;
+                const hardnessDelta =
+                  sameMaker && cand.hardness != null && current.hardness != null
+                    ? cand.hardness - current.hardness
+                    : null;
+                const priceDelta =
+                  cand.price != null && current.price != null
+                    ? cand.price - current.price
+                    : null;
+                return (
+                  <tr key={cand.id} className="border-t border-tt-gray30/30">
+                    <td className="py-2 pr-2">
+                      <Link
+                        href={`/equipment/${cand.id}`}
+                        className="font-bold hover:underline"
+                      >
+                        {cand.name}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-2">
+                      {decidedPct != null ? (
+                        <span>
+                          <span className="font-mono font-bold text-tt-deep-green">
+                            {decidedPct}%
+                          </span>
+                          がこちら派
+                          <span className="font-mono text-tt-gray70">
+                            {" "}
+                            (n={t.total})
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-tt-gray70">
+                          集計中 (回答{t.total}件)
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right font-mono">
+                      {hardnessDelta == null
+                        ? "—"
+                        : `${hardnessDelta > 0 ? "+" : ""}${hardnessDelta}°`}
+                    </td>
+                    <td className="py-2 text-right font-mono">
+                      {priceDelta == null
+                        ? "—"
+                        : `${priceDelta > 0 ? "+" : ""}${priceDelta.toLocaleString()}円`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[10px] text-tt-gray70">
+            ※「好み」は判定3件以上のみ%表示。硬度差は同一メーカー間のみ
+            (各社基準が異なるため)。
+          </p>
+        </section>
       )}
 
       <div className="mt-8 rounded-2xl bg-tt-soft-coral p-4 text-sm ring-1 ring-tt-coral/15">
@@ -275,7 +628,11 @@ function CandidateCard({
           </div>
         </div>
         <Link
-          href={`/switch?c=${remainingIds.join(",")}`}
+          href={
+            remainingIds.length > 0
+              ? `/switch?base=${current.id}&c=${remainingIds.join(",")}`
+              : `/switch?base=${current.id}`
+          }
           className="shrink-0 text-xs text-tt-gray70 underline"
         >
           候補から外す
@@ -297,7 +654,8 @@ function CandidateCard({
           </p>
         ) : (
           <div className="mt-2">
-            <VersusBar
+            {/* n が少ないうちは % を断言しない (リスト類と同じルール) */}
+            <VersusBarOrPending
               votesA={tally.a}
               votesB={tally.b}
               votesSame={tally.same}

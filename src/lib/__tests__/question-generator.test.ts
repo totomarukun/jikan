@@ -46,7 +46,15 @@ const equipments = [
   makeEquipment("b0", "BLADE"),
 ];
 
-const AXES = ["overall", "hardness", "spin", "speed", "ballHold"];
+const AXES = [
+  "overall",
+  "hardness",
+  "spin",
+  "speed",
+  "ballHold",
+  "arc",
+  "tackiness",
+];
 
 describe("generateQuestion (マイギア中心)", () => {
   it("ギアが2本以上あればギア内ペアから出題し、使用条件を返す", () => {
@@ -66,17 +74,39 @@ describe("generateQuestion (マイギア中心)", () => {
   it("同一ペアでも軸が違えば出題し、(ペア×軸) を出し尽くすと explore に切り替わる", () => {
     const gear = [makeGear("r0"), makeGear("r1")];
     const key = pairKey("r0", "r1");
-    // 5軸のうち4軸を出題済みにすると、残り1軸が出る
-    const asked4 = AXES.slice(0, 4).map((axis) => ({ pairKey: key, axis }));
+    // 全6軸のうち5軸を出題済みにすると、残り1軸が出る
+    const askedAllButLast = AXES.slice(0, AXES.length - 1).map((axis) => ({
+      pairKey: key,
+      axis,
+    }));
     for (let i = 0; i < 20; i++) {
-      const q = generateQuestion(equipments, { gear, recentAsked: asked4 });
+      const q = generateQuestion(equipments, {
+        gear,
+        recentAsked: askedAllButLast,
+      });
       expect(q!.source).toBe("gear");
-      expect(q!.axis).toBe(AXES[4]);
+      expect(q!.axis).toBe(AXES[AXES.length - 1]);
     }
     // 全軸出題済みなら explore (ギア外との比較)
-    const asked5 = AXES.map((axis) => ({ pairKey: key, axis }));
-    const q = generateQuestion(equipments, { gear, recentAsked: asked5 });
+    const askedAll = AXES.map((axis) => ({ pairKey: key, axis }));
+    const q = generateQuestion(equipments, { gear, recentAsked: askedAll });
     expect(q!.source).toBe("explore");
+  });
+
+  it("axisWeights で薄い軸を優先出題できる (データ偏在の緩和)", () => {
+    const gear = [makeGear("r0"), makeGear("r1")];
+    let arc = 0;
+    const N = 300;
+    for (let i = 0; i < N; i++) {
+      const q = generateQuestion(equipments, {
+        gear,
+        recentAsked: [],
+        axisWeights: { arc: 1000 }, // arc を強く優先
+      })!;
+      if (q.axis === "arc") arc++;
+    }
+    // 基礎重み0.1の arc が、乗数で過半数を超えて選ばれる
+    expect(arc / N).toBeGreaterThan(0.7);
   });
 
   it("explore は現用ギアを基準にギア外のラバーと比較する", () => {
@@ -88,6 +118,29 @@ describe("generateQuestion (マイギア中心)", () => {
       expect(q!.optionB.id).not.toBe("r0");
       expect(q!.optionB.category).not.toBe("BLADE");
     }
+  });
+
+  it("フォア現用+バック1本でも、バック面ラバーが explore 基準として出題される (B3行き止まり解消)", () => {
+    // 同面ペアを作れない単独面のラバー(ロゼナ役 r1=BH)が永遠に出題されない問題
+    const gear = [
+      makeGear("r0", { side: "FH", isCurrent: true }), // 現用フォア
+      makeGear("r1", { side: "BH" }), // バック1本 = 本命
+    ];
+    // 回答するたび履歴を蓄積する実セッションを再現
+    const recentAsked: Array<{ pairKey: string; axis: string }> = [];
+    const baseIds = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const q = generateQuestion(equipments, { gear, recentAsked });
+      expect(q!.source).toBe("explore"); // 同面ペアがないので必ず explore
+      baseIds.add(q!.optionA.id); // optionA = 基準ラバー
+      expect(q!.optionB.id).not.toBe("r0"); // 所有ラバーは相手側に来ない
+      expect(q!.optionB.id).not.toBe("r1");
+      recentAsked.unshift({ pairKey: pairKey(q!.optionA.id, q!.optionB.id), axis: q!.axis });
+    }
+    // データが偏らないよう基準は巡回する。r0(現用フォア)だけでなく
+    // r1(バック面の本命)も基準として登場すること
+    expect(baseIds.has("r1")).toBe(true);
+    expect(baseIds.has("r0")).toBe(true);
   });
 
   it("ギアが空でもラバー同士の explore を出題できる", () => {

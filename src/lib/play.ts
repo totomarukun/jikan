@@ -4,7 +4,7 @@ import {
   type GearLite,
   type GeneratedQuestion,
 } from "./question-generator";
-import { GEAR_SIDE_LABELS, THICKNESS_LABELS } from "./types";
+import { GEAR_SIDE_LABELS, THICKNESS_LABELS, isRubberCategory } from "./types";
 import type { GearSide, Thickness } from "./types";
 
 export interface QuestionPayload {
@@ -16,6 +16,8 @@ export interface QuestionPayload {
   progress: {
     answerCount: number;
     gearCount: number;
+    /** 同じ面に2本以上ある = 実体験ペアを作れる組み合わせの数 */
+    gearPairCount: number;
     context: {
       level: string;
       playstyle: string;
@@ -54,7 +56,6 @@ export async function buildQuestionPayload(
     prisma.comparison.findMany({
       where: { sessionId },
       orderBy: { answeredAt: "desc" },
-      take: 20,
       select: {
         optionAEquipmentId: true,
         optionBEquipmentId: true,
@@ -63,6 +64,8 @@ export async function buildQuestionPayload(
         winnerSpin: true,
         winnerHardness: true,
         winnerBallHold: true,
+        winnerArc: true,
+        winnerTackiness: true,
       },
     }),
   ]);
@@ -76,21 +79,67 @@ export async function buildQuestionPayload(
     isCurrent: g.isCurrent,
   }));
 
-  const recentAsked = recent.map((r) => {
+  // 回答済みの (ペア×軸) をすべて展開して除外する。
+  // 1行 (=1ペア) に複数軸の回答が入るため、1行=1軸とみなすと
+  // 回答済みの質問が再出題されてしまう
+  const recentAsked: Array<{ pairKey: string; axis: string }> = [];
+  for (const r of recent) {
     const key = [r.optionAEquipmentId, r.optionBEquipmentId].sort().join("|");
-    const axis = r.winnerHardness
-      ? "hardness"
-      : r.winnerBallHold
-        ? "ballHold"
-        : r.winnerSpeed
-          ? "speed"
-          : r.winnerSpin
-            ? "spin"
-            : "overall";
-    return { pairKey: key, axis };
+    const answered: Array<[string, string | null]> = [
+      ["overall", r.winnerOverall],
+      ["speed", r.winnerSpeed],
+      ["spin", r.winnerSpin],
+      ["hardness", r.winnerHardness],
+      ["ballHold", r.winnerBallHold],
+      ["arc", r.winnerArc],
+      ["tackiness", r.winnerTackiness],
+    ];
+    for (const [axis, winner] of answered) {
+      if (winner) recentAsked.push({ pairKey: key, axis });
+    }
+  }
+
+  // 同じ面に2本以上あるラバー = 実体験ペアを作れる。これが 0 のときは
+  // 「出し尽くした」のではなく「まだ作れていない」ので、UI の文言を分ける。
+  const catById = new Map(equipments.map((e) => [e.id, e.category]));
+  const rubberIdsBySide = new Map<string, Set<string>>();
+  for (const g of gear) {
+    const cat = catById.get(g.equipmentId);
+    if (!cat || !isRubberCategory(cat)) continue;
+    if (!rubberIdsBySide.has(g.side)) rubberIdsBySide.set(g.side, new Set());
+    rubberIdsBySide.get(g.side)!.add(g.equipmentId);
+  }
+  let gearPairCount = 0;
+  for (const set of rubberIdsBySide.values()) {
+    gearPairCount += (set.size * (set.size - 1)) / 2;
+  }
+
+  // 軸別データ偏在の緩和: コミュニティ全体で薄い軸を優先出題する。
+  // 各軸のグローバル回答数の逆数(√で平滑化)を出題重みの乗数にする。
+  const axisCols = {
+    overall: "winnerOverall",
+    speed: "winnerSpeed",
+    spin: "winnerSpin",
+    hardness: "winnerHardness",
+    ballHold: "winnerBallHold",
+    arc: "winnerArc",
+    tackiness: "winnerTackiness",
+  } as const;
+  const axisCounts = await Promise.all(
+    Object.values(axisCols).map((col) =>
+      prisma.comparison.count({ where: { [col]: { not: null } } }),
+    ),
+  );
+  const axisWeights: Partial<Record<keyof typeof axisCols, number>> = {};
+  (Object.keys(axisCols) as Array<keyof typeof axisCols>).forEach((axis, i) => {
+    axisWeights[axis] = 1 / Math.sqrt(axisCounts[i] + 1);
   });
 
-  const question = generateQuestion(equipments, { gear, recentAsked });
+  const question = generateQuestion(equipments, {
+    gear,
+    recentAsked,
+    axisWeights,
+  });
   if (!question) return null;
 
   return {
@@ -102,6 +151,7 @@ export async function buildQuestionPayload(
     progress: {
       answerCount: progress.answerCount,
       gearCount: gear.length,
+      gearPairCount,
       context: {
         level: progress.level,
         playstyle: progress.playstyle,
