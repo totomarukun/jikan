@@ -145,6 +145,14 @@ export default async function EquipmentPage({
         </dl>
       </div>
 
+      {/* メーカー公称スペック (比較データが無くても見える基礎情報) */}
+      <MakerSpecSection
+        isRubber={isRubber}
+        speed={equipment.officialSpeed}
+        spin={equipment.officialSpin}
+        arc={equipment.officialArc}
+      />
+
       {/* 相対マップ上の位置 (この用具は他と比べてどんな特徴か) */}
       {isRubber && axisPositions.length > 0 && (
         <RelativePositionSection positions={axisPositions} />
@@ -358,6 +366,58 @@ export default async function EquipmentPage({
         </Link>
       </div>
     </div>
+  );
+}
+
+// メーカー公称スペック (0-100の自社基準値) を棒で表示。相対マップ(使った人の判定)とは
+// 別物であることを明示する。比較データが無い用具でも基礎情報が見える。
+function MakerSpecSection({
+  isRubber,
+  speed,
+  spin,
+  arc,
+}: {
+  isRubber: boolean;
+  speed: number | null;
+  spin: number | null;
+  arc: number | null;
+}) {
+  const rows: Array<[string, number | null]> = isRubber
+    ? [
+        ["スピード", speed],
+        ["スピン", spin],
+        ["弧線", arc],
+      ]
+    : [
+        ["スピード", speed],
+        ["コントロール", arc],
+      ];
+  if (rows.every(([, v]) => v == null)) return null;
+  return (
+    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+      <h2 className="font-bold">メーカー公称スペック</h2>
+      <p className="mt-0.5 text-xs text-tt-gray70">
+        各社の自社基準値（横並び比較はできません）。使った人の相対判定は下の「相対マップ上の位置」。
+      </p>
+      <ul className="mt-3 space-y-2">
+        {rows.map(([label, v]) =>
+          v == null ? null : (
+            <li key={label} className="flex items-center gap-2">
+              <span className="w-20 shrink-0 text-xs font-bold">{label}</span>
+              <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-tt-gray30/30">
+                <div
+                  className="h-2.5 rounded-full bg-gradient-to-r from-tt-green/70 to-tt-deep-green/70"
+                  style={{ width: `${Math.max(4, Math.min(100, v))}%` }}
+                />
+              </div>
+              <span className="w-8 shrink-0 text-right font-mono text-xs text-tt-gray70">
+                {v}
+              </span>
+            </li>
+          ),
+        )}
+      </ul>
+    </section>
   );
 }
 
