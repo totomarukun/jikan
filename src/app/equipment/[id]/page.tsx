@@ -10,6 +10,7 @@ import {
 import { feelStatements, getFeelProfile } from "@/lib/feel";
 import {
   getEquipmentAxisPositions,
+  findSimilarEquipment,
   type AxisPosition,
 } from "@/lib/relative-map";
 import {
@@ -58,7 +59,9 @@ export default async function EquipmentPage({
         : null,
       isRubber ? getEquipmentAxisPositions(id) : Promise.resolve([]),
     ]);
-  const voices = isRubber ? await getEquipmentVoices(id, 6) : [];
+  const [voices, similar] = isRubber
+    ? await Promise.all([getEquipmentVoices(id, 6), findSimilarEquipment(id, 4)])
+    : [[], []];
   const currentRubberId = progress?.currentRubberId ?? null;
   const isMyGear = gearEntry != null || currentRubberId === id;
 
@@ -226,6 +229,43 @@ export default async function EquipmentPage({
           </div>
         )}
       </section>
+
+      {/* これに似た用具 (相対プロフィールが近い) */}
+      {isRubber && similar.length > 0 && (
+        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <h2 className="font-bold">これに似た用具</h2>
+          <p className="mt-0.5 text-xs text-tt-gray70">
+            軸別の相対プロフィールが近い順（みんなの比較から推定）。次に試す候補に。
+          </p>
+          <ul className="mt-3 space-y-2">
+            {similar.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/equipment/${s.id}`}
+                  className="flex items-center gap-2 rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5 transition hover:bg-tt-soft-green"
+                >
+                  <EquipmentVisual
+                    category={s.category}
+                    manufacturer={s.manufacturer}
+                    imageUrl={s.imageUrl}
+                    name={s.name}
+                    size={28}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold">
+                    {s.name}
+                    <span className="ml-2 text-xs font-normal text-tt-gray70">
+                      {s.manufacturer}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
+                    {s.sharedAxes}軸で近い
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* 両方使った人の声 (定性レビュー) */}
       {isRubber && voices.length > 0 && (

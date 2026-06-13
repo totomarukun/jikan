@@ -270,10 +270,25 @@ export interface SwitchCandidates {
   candidates: SwitchCandidate[];
 }
 
-export async function buildSwitchCandidates(
-  baseId: string,
-  limit = 6,
-): Promise<SwitchCandidates> {
+interface RubberEquip {
+  id: string;
+  name: string;
+  manufacturer: string;
+  category: string;
+  imageUrl: string | null;
+  hardness: number | null;
+  price: number | null;
+}
+
+type AxisRatings = ReturnType<typeof computeAxisRatings>["ratings"];
+
+// 全ラバーの軸別 ratings を1回のDB取得で算出する共有ヘルパー
+// (乗り換え候補・似た用具の両方が使う)。
+async function loadRubberAxisRatings(): Promise<{
+  equipments: RubberEquip[];
+  byId: Map<string, RubberEquip>;
+  perAxis: Map<AxisKey, AxisRatings>;
+}> {
   const [equipments, rows] = await Promise.all([
     prisma.equipment.findMany({
       where: { isActive: true },
@@ -307,11 +322,7 @@ export async function buildSwitchCandidates(
     isRubberCategory(byId.get(a)?.category ?? "") &&
     isRubberCategory(byId.get(b)?.category ?? "");
 
-  // 軸ごとの ratings を計算
-  const perAxis = new Map<
-    AxisKey,
-    ReturnType<typeof computeAxisRatings>["ratings"]
-  >();
+  const perAxis = new Map<AxisKey, AxisRatings>();
   for (const axis of ALL_AXES) {
     const col = AXIS_COLUMN[axis];
     const inputs: PairwiseInput[] = [];
@@ -328,6 +339,14 @@ export async function buildSwitchCandidates(
     }
     perAxis.set(axis, computeAxisRatings(inputs).ratings);
   }
+  return { equipments, byId, perAxis };
+}
+
+export async function buildSwitchCandidates(
+  baseId: string,
+  limit = 6,
+): Promise<SwitchCandidates> {
+  const { equipments, perAxis } = await loadRubberAxisRatings();
 
   let baseRanked = false;
   const candidates: SwitchCandidate[] = [];
@@ -372,4 +391,59 @@ export async function buildSwitchCandidates(
   });
 
   return { baseRanked, candidates: candidates.slice(0, limit) };
+}
+
+export interface SimilarEquipment {
+  id: string;
+  name: string;
+  manufacturer: string;
+  category: string;
+  imageUrl: string | null;
+  /** 相対プロフィールの近さ (共通軸の平均二乗差の平方根。小さいほど似ている) */
+  distance: number;
+  sharedAxes: number;
+}
+
+/**
+ * 「これに似た用具」: 軸別の相対プロフィール(0-100スケール)が近いラバーを返す。
+ * 推移律で合成した相対位置のベクトル距離で測るため、直接対決がなくても近さが出る。
+ * 共通軸が少ない(=根拠が薄い)用具は除外し、誤った"似ている"を出さない。
+ */
+export async function findSimilarEquipment(
+  baseId: string,
+  limit = 4,
+  minSharedAxes = 2,
+): Promise<SimilarEquipment[]> {
+  const { equipments, perAxis } = await loadRubberAxisRatings();
+  const baseCat = equipments.find((e) => e.id === baseId)?.category;
+  if (!baseCat || !isRubberCategory(baseCat)) return [];
+
+  const out: SimilarEquipment[] = [];
+  for (const e of equipments) {
+    if (e.id === baseId || !isRubberCategory(e.category)) continue;
+    let sumSq = 0;
+    let shared = 0;
+    for (const axis of ALL_AXES) {
+      const ratings = perAxis.get(axis)!;
+      const base = ratings.get(baseId);
+      const cand = ratings.get(e.id);
+      if (!base || !cand) continue;
+      const d = cand.score - base.score; // 0-100スケール
+      sumSq += d * d;
+      shared++;
+    }
+    if (shared < minSharedAxes) continue;
+    out.push({
+      id: e.id,
+      name: e.name,
+      manufacturer: e.manufacturer,
+      category: e.category,
+      imageUrl: e.imageUrl,
+      distance: Math.sqrt(sumSq / shared),
+      sharedAxes: shared,
+    });
+  }
+  // 近い順。同距離なら共通軸が多い(根拠が厚い)方を上に
+  out.sort((a, b) => a.distance - b.distance || b.sharedAxes - a.sharedAxes);
+  return out.slice(0, limit);
 }
