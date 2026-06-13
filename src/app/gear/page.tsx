@@ -159,6 +159,16 @@ export default function GearPage() {
             </p>
           )}
 
+          {gear.some((g) => g.isCurrent) && (
+            <button
+              type="button"
+              onClick={() => shareGear(gear)}
+              className="mt-3 block w-full rounded-full border border-tt-gray30/50 bg-white py-2.5 text-center text-sm font-bold transition hover:bg-tt-offwhite active:scale-[0.98]"
+            >
+              ギア構成をシェア
+            </button>
+          )}
+
           {loneSides.length > 0 && (
             <p className="mt-2 rounded-xl bg-tt-offwhite p-3 text-xs leading-5 text-tt-gray70 ring-1 ring-black/5">
               {loneSides
@@ -316,6 +326,30 @@ export default function GearPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ギア構成をSNSシェア: 現用のFH/BHラバー+ラケットから公開カードURLを組み立て、
+// Web Share → X投稿。シェアされたURLには動的OGカード(/api/og/gear)が付く。
+function shareGear(gear: GearEntry[]) {
+  const cur = gear.filter((g) => g.isCurrent);
+  const fh = cur.find((g) => g.side === "FH")?.equipment.name ?? "";
+  const bh = cur.find((g) => g.side === "BH")?.equipment.name ?? "";
+  const blade = cur.find((g) => g.blade)?.blade?.name ?? "";
+  const q = new URLSearchParams();
+  if (blade) q.set("blade", blade);
+  if (fh) q.set("fh", fh);
+  if (bh) q.set("bh", bh);
+  const url = `${window.location.origin}/share/gear?${q.toString()}`;
+  const text = "私の卓球ギア構成 #TacTap";
+  if (typeof navigator !== "undefined" && navigator.share) {
+    navigator.share({ text, url }).catch(() => {});
+    return;
+  }
+  window.open(
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+    "_blank",
+    "noopener,noreferrer",
   );
 }
 
