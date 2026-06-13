@@ -119,6 +119,8 @@ model Comparison {
   winnerBallHold       String?
   // 弧線の高さ (高い=山なり / 低い=直線的)
   winnerArc            String?
+  // 体感のひとこと (両方使った人の言葉。定性レビューの最小単位)
+  comment              String?
   // enum: BOTH | ONE | NEITHER (マイギアから自動判定)
   hasActualExperience  String?
   // 回答時に参照したギア (使用条件の追跡用)

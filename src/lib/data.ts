@@ -312,6 +312,56 @@ export async function tallyPair(
   return tally;
 }
 
+export interface Voice {
+  comment: string;
+  /** この用具(対象)を指す側の相手用具名 */
+  otherName: string;
+  /** 両方使った人の言葉か */
+  both: boolean;
+  answeredAt: Date;
+}
+
+/**
+ * 用具個別ページ用: 「両方使った人の言葉」(体感コメント)。
+ * 対象用具を含む比較のうちコメントがあるものを、実体験を優先して返す。
+ */
+export async function getEquipmentVoices(
+  equipmentId: string,
+  take = 8,
+): Promise<Voice[]> {
+  const rows = await prisma.comparison.findMany({
+    where: {
+      comment: { not: null },
+      OR: [
+        { optionAEquipmentId: equipmentId },
+        { optionBEquipmentId: equipmentId },
+      ],
+    },
+    select: {
+      comment: true,
+      hasActualExperience: true,
+      answeredAt: true,
+      optionAEquipmentId: true,
+      optionA: { select: { name: true } },
+      optionB: { select: { name: true } },
+    },
+    orderBy: { answeredAt: "desc" },
+    take: take * 2,
+  });
+  const voices: Voice[] = rows.map((r) => {
+    const isA = r.optionAEquipmentId === equipmentId;
+    return {
+      comment: r.comment as string,
+      otherName: isA ? r.optionB.name : r.optionA.name,
+      both: r.hasActualExperience === "BOTH",
+      answeredAt: r.answeredAt,
+    };
+  });
+  // 実体験を上に
+  voices.sort((a, b) => Number(b.both) - Number(a.both));
+  return voices.slice(0, take);
+}
+
 /** 用具個別ページ用: 対象用具の勝敗サマリ */
 export async function getEquipmentRecord(equipmentId: string): Promise<{
   wins: number;

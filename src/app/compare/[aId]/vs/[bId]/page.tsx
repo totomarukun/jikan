@@ -16,6 +16,7 @@ import {
 } from "@/lib/types";
 import { VersusBarOrPending } from "@/components/versus-bar";
 import { EquipmentVisual } from "@/components/equipment-visual";
+import { PairCommentForm } from "@/components/pair-comment-form";
 
 export const metadata = { title: "用具対決" };
 
@@ -107,6 +108,26 @@ export default async function CompareViewPage({
         })
       : Promise.resolve([]),
   ]);
+
+  // このペアの「両方使った人の声」(体感コメント)。絞り込みに関係なく実体験優先で表示。
+  const pairVoiceRows = await prisma.comparison.findMany({
+    where: {
+      comment: { not: null },
+      OR: [
+        { optionAEquipmentId: aId, optionBEquipmentId: bId },
+        { optionAEquipmentId: bId, optionBEquipmentId: aId },
+      ],
+    },
+    select: { comment: true, hasActualExperience: true, answeredAt: true },
+    orderBy: { answeredAt: "desc" },
+    take: 12,
+  });
+  const pairVoices = pairVoiceRows
+    .map((r) => ({
+      comment: r.comment as string,
+      both: r.hasActualExperience === "BOTH",
+    }))
+    .sort((a, b) => Number(b.both) - Number(a.both));
 
   // 自分の軸別判定 (勝者の equipmentId を equipA/equipB 名に解決)。
   const myExperienced = myComparisons.some(
@@ -387,6 +408,41 @@ export default async function CompareViewPage({
           </>
         )}
       </div>
+
+      {/* 両方使った人の声 (定性レビュー) + 投稿 */}
+      <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <h2 className="font-bold">両方使った人の声</h2>
+        <p className="mt-0.5 text-xs text-tt-gray70">
+          数値でなく言葉で。勝率より、乗り換え判断に効くことがあります。
+        </p>
+        {pairVoices.length > 0 ? (
+          <ul className="mt-3 space-y-2">
+            {pairVoices.map((v, i) => (
+              <li
+                key={i}
+                className="rounded-xl bg-tt-offwhite p-3 text-sm ring-1 ring-black/5"
+              >
+                <p className="leading-6">「{v.comment}」</p>
+                <p className="mt-1 text-[10px] text-tt-gray70">
+                  {v.both ? "両方使った人" : "イメージ"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-tt-gray70">
+            まだ声がありません。最初のひとことを残しませんか？
+          </p>
+        )}
+        <div className="mt-4 border-t border-tt-gray30/30 pt-4">
+          <PairCommentForm
+            aId={aId}
+            bId={bId}
+            nameA={equipA.name}
+            nameB={equipB.name}
+          />
+        </div>
+      </section>
 
       {/* 公称スペック比較 */}
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">

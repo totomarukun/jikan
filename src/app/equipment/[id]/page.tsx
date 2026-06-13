@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
-import { aggregatePairs, getEquipmentRecord } from "@/lib/data";
+import {
+  aggregatePairs,
+  getEquipmentRecord,
+  getEquipmentVoices,
+} from "@/lib/data";
 import { feelStatements, getFeelProfile } from "@/lib/feel";
 import {
   getEquipmentAxisPositions,
@@ -54,6 +58,7 @@ export default async function EquipmentPage({
         : null,
       isRubber ? getEquipmentAxisPositions(id) : Promise.resolve([]),
     ]);
+  const voices = isRubber ? await getEquipmentVoices(id, 6) : [];
   const currentRubberId = progress?.currentRubberId ?? null;
   const isMyGear = gearEntry != null || currentRubberId === id;
 
@@ -221,6 +226,29 @@ export default async function EquipmentPage({
           </div>
         )}
       </section>
+
+      {/* 両方使った人の声 (定性レビュー) */}
+      {isRubber && voices.length > 0 && (
+        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <h2 className="font-bold">両方使った人の声</h2>
+          <p className="mt-0.5 text-xs text-tt-gray70">
+            この用具を含む比較に添えられた、使った人の言葉。
+          </p>
+          <ul className="mt-3 space-y-2">
+            {voices.map((v, i) => (
+              <li
+                key={i}
+                className="rounded-xl bg-tt-offwhite p-3 text-sm ring-1 ring-black/5"
+              >
+                <p className="leading-6">「{v.comment}」</p>
+                <p className="mt-1 text-[10px] text-tt-gray70">
+                  {v.otherName} と比較 ・{v.both ? "両方使った人" : "イメージ"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* レビュー動画・購入導線 */}
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">

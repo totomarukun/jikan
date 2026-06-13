@@ -21,7 +21,9 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
   }
-  const { optionAEquipmentId, optionBEquipmentId, axis, winner } = parsed.data;
+  const { optionAEquipmentId, optionBEquipmentId, axis, winner, comment } =
+    parsed.data;
+  const trimmedComment = comment?.trim() || null;
 
   const [optionA, optionB, gearItems] = await Promise.all([
     prisma.equipment.findUnique({ where: { id: optionAEquipmentId } }),
@@ -91,6 +93,8 @@ export async function POST(request: Request) {
         [axisColumn]: storedWinner,
         answeredAt: new Date(),
         userId: existing.userId ?? userId,
+        // コメントは送られたときだけ上書き (空送信で既存の言葉を消さない)
+        ...(trimmedComment ? { comment: trimmedComment } : {}),
       },
     });
     revised = true;
@@ -109,6 +113,7 @@ export async function POST(request: Request) {
           contextBladeCategory: progress.bladeCategory,
           contextGrip: progress.grip,
           [axisColumn]: winner,
+          comment: trimmedComment,
           hasActualExperience,
           optionAGearItemId: gearA?.id ?? null,
           optionBGearItemId: gearB?.id ?? null,

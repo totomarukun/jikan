@@ -75,6 +75,8 @@ export const answerSchema = z.object({
   optionBEquipmentId: z.string().min(1),
   axis: z.enum(QUESTION_AXES),
   winner: winnerSchema,
+  // 体感のひとこと (任意)。両方使った人の言葉として表示される
+  comment: z.string().max(280).optional(),
 });
 
 export const gearSchema = z.object({
