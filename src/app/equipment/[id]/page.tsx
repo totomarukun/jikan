@@ -14,6 +14,7 @@ import {
   youtubeSearchUrl,
 } from "@/lib/links";
 import { FeelProfileCard } from "@/components/feel-profile";
+import { ShareLinkButton } from "@/components/share-link-button";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import { VersusBarOrPending } from "@/components/versus-bar";
 import {
@@ -280,6 +281,10 @@ export default async function EquipmentPage({
         >
           この用具で対決を作る
         </Link>
+        <ShareLinkButton
+          text={`${equipment.name} (${equipment.manufacturer}) の相対マップ上の位置 #TacTap`}
+          label="この用具カードをシェア"
+        />
         <Link href="/battles" className="block text-sm text-tt-gray70 underline">
           人気の対決を見る
         </Link>

@@ -20,12 +20,17 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // OGカードの絶対URL解決に必要。本番URLは環境変数で上書き。
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
   title: {
     default: "TacTap | 卓球用具のAB比較",
     template: "%s | TacTap",
   },
   description:
-    "3秒のAB比較で、あなたに合う卓球用具がわかる。データで、用具選びの後悔を減らす。",
+    "両方使った人の比較から、卓球用具の特徴を相対的に。データで、用具選びの後悔を減らす。",
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({
