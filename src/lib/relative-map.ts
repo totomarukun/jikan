@@ -234,3 +234,131 @@ export async function getEquipmentAxisPositions(
   }
   return positions;
 }
+
+// 乗り換え検討用: 基準ラバーに対する全ラバーの軸別の相対差分を、推移律で算出する。
+// 直接対決していなくても、他の比較経由で「基準よりスピードが上/球持ちは同等」が出る。
+// コールドスタートでも、基準と1本でも経路がつながれば候補が出る(集計中で固まらない)。
+
+const DIFF_EPS = 0.2; // logStrength 差がこれ未満なら「同等(≈)」
+
+export type AxisDiff = "up" | "down" | "even";
+
+export interface SwitchCandidate {
+  id: string;
+  name: string;
+  manufacturer: string;
+  category: string;
+  imageUrl: string | null;
+  hardness: number | null;
+  price: number | null;
+  /** 基準と共通でランク付けされた軸の差分 */
+  axes: Array<{ axis: AxisKey; diff: AxisDiff; comparisons: number }>;
+  /** 共通軸数 (基準との経路のつながりの強さ) */
+  sharedAxes: number;
+  /** overall の相対スコア (なければ null) */
+  overallLog: number | null;
+}
+
+export interface SwitchCandidates {
+  baseRanked: boolean; // 基準に1軸でも実比較があるか
+  candidates: SwitchCandidate[];
+}
+
+export async function buildSwitchCandidates(
+  baseId: string,
+  limit = 6,
+): Promise<SwitchCandidates> {
+  const [equipments, rows] = await Promise.all([
+    prisma.equipment.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        manufacturer: true,
+        category: true,
+        imageUrl: true,
+        hardness: true,
+        price: true,
+      },
+    }),
+    prisma.comparison.findMany({
+      select: {
+        optionAEquipmentId: true,
+        optionBEquipmentId: true,
+        hasActualExperience: true,
+        winnerOverall: true,
+        winnerSpeed: true,
+        winnerSpin: true,
+        winnerControl: true,
+        winnerHardness: true,
+        winnerBallHold: true,
+        winnerArc: true,
+      },
+    }),
+  ]);
+  const byId = new Map(equipments.map((e) => [e.id, e]));
+  const isRubberPair = (a: string, b: string) =>
+    isRubberCategory(byId.get(a)?.category ?? "") &&
+    isRubberCategory(byId.get(b)?.category ?? "");
+
+  // 軸ごとの ratings を計算
+  const perAxis = new Map<
+    AxisKey,
+    ReturnType<typeof computeAxisRatings>["ratings"]
+  >();
+  for (const axis of ALL_AXES) {
+    const col = AXIS_COLUMN[axis];
+    const inputs: PairwiseInput[] = [];
+    for (const r of rows as ComparisonAxisRow[]) {
+      const winner = r[col];
+      if (winner !== "A" && winner !== "B" && winner !== "SAME") continue;
+      if (!isRubberPair(r.optionAEquipmentId, r.optionBEquipmentId)) continue;
+      inputs.push({
+        aId: r.optionAEquipmentId,
+        bId: r.optionBEquipmentId,
+        winner,
+        weight: experienceWeight(r.hasActualExperience),
+      });
+    }
+    perAxis.set(axis, computeAxisRatings(inputs).ratings);
+  }
+
+  let baseRanked = false;
+  const candidates: SwitchCandidate[] = [];
+  for (const e of equipments) {
+    if (e.id === baseId) continue;
+    if (!isRubberCategory(e.category)) continue;
+    const axes: SwitchCandidate["axes"] = [];
+    for (const axis of ALL_AXES) {
+      const ratings = perAxis.get(axis)!;
+      const base = ratings.get(baseId);
+      const cand = ratings.get(e.id);
+      if (!base || !cand) continue;
+      baseRanked = true;
+      const d = cand.logStrength - base.logStrength;
+      const diff: AxisDiff =
+        d > DIFF_EPS ? "up" : d < -DIFF_EPS ? "down" : "even";
+      axes.push({ axis, diff, comparisons: cand.comparisons });
+    }
+    if (axes.length === 0) continue;
+    candidates.push({
+      id: e.id,
+      name: e.name,
+      manufacturer: e.manufacturer,
+      category: e.category,
+      imageUrl: e.imageUrl,
+      hardness: e.hardness,
+      price: e.price,
+      axes,
+      sharedAxes: axes.length,
+      overallLog: perAxis.get("overall")!.get(e.id)?.logStrength ?? null,
+    });
+  }
+
+  candidates.sort((a, b) => {
+    if (b.sharedAxes !== a.sharedAxes) return b.sharedAxes - a.sharedAxes;
+    return (b.overallLog ?? -99) - (a.overallLog ?? -99);
+  });
+
+  return { baseRanked, candidates: candidates.slice(0, limit) };
+}

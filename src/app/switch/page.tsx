@@ -4,6 +4,10 @@ import { getSessionId } from "@/lib/session";
 import { aggregatePairs, getPopularRubbers, tallyPair } from "@/lib/data";
 import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
+import {
+  buildSwitchCandidates,
+  type SwitchCandidate,
+} from "@/lib/relative-map";
 import { VersusBarOrPending } from "@/components/versus-bar";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
@@ -94,6 +98,113 @@ export default async function SwitchPage({
         />
       )}
     </div>
+  );
+}
+
+const SWITCH_AXIS_LABEL: Record<string, string> = {
+  overall: "好み",
+  speed: "スピード",
+  spin: "スピン",
+  control: "コントロール",
+  ballHold: "球持ち",
+  arc: "弧線",
+  hardness: "硬さ",
+};
+
+// 相対マップ(推移律)から、基準に対する候補を軸別差分つきで出す。
+// 直接対決がなくても他の比較経由で「基準よりスピード上/球持ち同等」が出るため、
+// コールドスタートでも「集計中」で固まらず、必ず手応えのある候補が並ぶ。
+async function RelativeCandidates({
+  baseId,
+  baseName,
+}: {
+  baseId: string;
+  baseName: string;
+}) {
+  const { baseRanked, candidates } = await buildSwitchCandidates(baseId, 6);
+  if (!baseRanked || candidates.length === 0) {
+    return (
+      <section className="mt-4 rounded-2xl border border-dashed border-tt-gray30/50 bg-white p-4 text-sm text-tt-gray70">
+        <p className="font-bold text-tt-charcoal">相対マップから見た候補</p>
+        <p className="mt-1">
+          「{baseName}」を含む比較がまだありません。
+          <Link href="/play" className="font-bold text-tt-green underline">
+            ひと比較
+          </Link>
+          答えると、ここに{baseName}基準の候補が並び始めます（1票から育ちます）。
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <p className="font-bold">相対マップから見た候補</p>
+      <p className="mt-0.5 text-xs text-tt-gray70">
+        みんなの比較を合成した相対評価で、「{baseName}」と比べた各軸の違い。
+        直接対決がなくても、他の比較を経由して位置が決まります。
+      </p>
+      <ul className="mt-3 space-y-2">
+        {candidates.map((c) => (
+          <RelativeCandidateRow key={c.id} c={c} baseName={baseName} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function RelativeCandidateRow({
+  c,
+  baseName,
+}: {
+  c: SwitchCandidate;
+  baseName: string;
+}) {
+  const sym = (d: string) =>
+    d === "up" ? "▲" : d === "down" ? "▼" : "≈";
+  const color = (d: string) =>
+    d === "up"
+      ? "text-tt-deep-green"
+      : d === "down"
+        ? "text-tt-deep-coral"
+        : "text-tt-gray70";
+  return (
+    <li>
+      <Link
+        href={`/equipment/${c.id}`}
+        className="block rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5 transition hover:bg-tt-soft-green"
+      >
+        <div className="flex items-center gap-2">
+          <EquipmentVisual
+            category={c.category}
+            manufacturer={c.manufacturer}
+            imageUrl={c.imageUrl}
+            name={c.name}
+            size={28}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm font-bold">
+            {c.name}
+          </span>
+          <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
+            共通{c.sharedAxes}軸
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {c.axes.map((a) => (
+            <span
+              key={a.axis}
+              className={`rounded-full bg-white px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${color(
+                a.diff,
+              )}`}
+            >
+              {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
+            </span>
+          ))}
+        </div>
+        <p className="mt-1 text-[10px] text-tt-gray70">
+          {baseName}比 ▲=高い ▼=低い ≈=同等
+        </p>
+      </Link>
+    </li>
   );
 }
 
@@ -288,6 +399,9 @@ async function SwitchBoard({
           </div>
         </div>
       )}
+
+      {/* 相対マップから見た乗り換え候補 (推移律。疎データでも必ず何か返す) */}
+      <RelativeCandidates baseId={current.id} baseName={current.name} />
 
       {/* 候補追加 (追加中は「集計しています…」を必ず表示) */}
       <div className="mt-4">
