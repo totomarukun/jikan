@@ -85,6 +85,22 @@ describe("generateQuestion (マイギア中心)", () => {
     expect(q!.source).toBe("explore");
   });
 
+  it("axisWeights で薄い軸を優先出題できる (データ偏在の緩和)", () => {
+    const gear = [makeGear("r0"), makeGear("r1")];
+    let arc = 0;
+    const N = 300;
+    for (let i = 0; i < N; i++) {
+      const q = generateQuestion(equipments, {
+        gear,
+        recentAsked: [],
+        axisWeights: { arc: 1000 }, // arc を強く優先
+      })!;
+      if (q.axis === "arc") arc++;
+    }
+    // 基礎重み0.1の arc が、乗数で過半数を超えて選ばれる
+    expect(arc / N).toBeGreaterThan(0.7);
+  });
+
   it("explore は現用ギアを基準にギア外のラバーと比較する", () => {
     const gear = [makeGear("r0", { isCurrent: true })];
     for (let i = 0; i < 30; i++) {

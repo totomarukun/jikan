@@ -112,7 +112,31 @@ export async function buildQuestionPayload(
     gearPairCount += (set.size * (set.size - 1)) / 2;
   }
 
-  const question = generateQuestion(equipments, { gear, recentAsked });
+  // 軸別データ偏在の緩和: コミュニティ全体で薄い軸を優先出題する。
+  // 各軸のグローバル回答数の逆数(√で平滑化)を出題重みの乗数にする。
+  const axisCols = {
+    overall: "winnerOverall",
+    speed: "winnerSpeed",
+    spin: "winnerSpin",
+    hardness: "winnerHardness",
+    ballHold: "winnerBallHold",
+    arc: "winnerArc",
+  } as const;
+  const axisCounts = await Promise.all(
+    Object.values(axisCols).map((col) =>
+      prisma.comparison.count({ where: { [col]: { not: null } } }),
+    ),
+  );
+  const axisWeights: Partial<Record<keyof typeof axisCols, number>> = {};
+  (Object.keys(axisCols) as Array<keyof typeof axisCols>).forEach((axis, i) => {
+    axisWeights[axis] = 1 / Math.sqrt(axisCounts[i] + 1);
+  });
+
+  const question = generateQuestion(equipments, {
+    gear,
+    recentAsked,
+    axisWeights,
+  });
   if (!question) return null;
 
   return {

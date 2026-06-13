@@ -41,6 +41,11 @@ export interface GeneratorContext {
   /** 回答済みの (ペア×軸)。新しい順。再出題しないよう恒久的に除外する */
   recentAsked: AskedRecord[];
   random?: () => number;
+  /**
+   * 軸ごとの出題重み乗数 (既定1)。データが薄い軸を優先出題して偏在を緩和するため、
+   * 呼び出し側がグローバルな軸別データ量から算出して渡す。
+   */
+  axisWeights?: Partial<Record<QuestionAxis, number>>;
 }
 
 export interface GeneratedQuestion {
@@ -94,8 +99,11 @@ function pickRandom<T>(items: T[], random: () => number): T {
 function pickAxis(
   available: QuestionAxis[],
   random: () => number,
+  axisWeights?: Partial<Record<QuestionAxis, number>>,
 ): QuestionAxis {
-  const candidates = FEEL_AXES.filter((a) => available.includes(a.axis));
+  const candidates = FEEL_AXES.filter((a) => available.includes(a.axis)).map(
+    (a) => ({ axis: a.axis, weight: a.weight * (axisWeights?.[a.axis] ?? 1) }),
+  );
   const total = candidates.reduce((s, a) => s + a.weight, 0);
   let r = random() * total;
   for (const c of candidates) {
@@ -162,7 +170,7 @@ export function generateQuestion(
       const fresh = candidates.filter((c) => c.key !== lastPair);
       const pool = fresh.length > 0 ? fresh : candidates;
       const picked = pickRandom(pool, random);
-      const axis = pickAxis(picked.axes, random);
+      const axis = pickAxis(picked.axes, random, context.axisWeights);
       const optionA = byId.get(picked.a.equipmentId)!;
       const optionB = byId.get(picked.b.equipmentId)!;
       return {
@@ -233,7 +241,7 @@ export function generateQuestion(
         (axis) => !askedKeys.has(`${key}#${axis}`),
       );
       if (axes.length === 0) continue;
-      const axis = pickAxis(axes, random);
+      const axis = pickAxis(axes, random, context.axisWeights);
       return {
         id: key,
         optionA,
