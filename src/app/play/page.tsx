@@ -4,7 +4,7 @@ import { getSessionId } from "@/lib/session";
 import { buildQuestionPayload } from "@/lib/play";
 import { PlayClient } from "@/components/play-client";
 
-export const metadata = { title: "AB比較" };
+export const metadata = { title: "比較に答える" };
 
 // M3: AB比較カード (コア体験)。初回の1問はサーバーで生成して即表示する。
 export default async function PlayPage({

@@ -68,13 +68,13 @@ export default function RootLayout({
         </main>
         <footer className="border-t border-tt-gray30/30 bg-white">
           <div className="mx-auto w-full max-w-3xl px-4 py-8">
-            <p className="text-sm font-bold">TacTap — 卓球用具のAB比較。</p>
+            <p className="text-sm font-bold">TacTap — 卓球用具を、比較で選ぶ。</p>
             <p className="mt-1 text-xs text-tt-gray70">
               データで、用具選びの後悔を減らす。
             </p>
             <nav className="mt-4 flex flex-wrap gap-4 text-xs text-tt-gray70">
               <Link href="/play" className="hover:text-tt-green">
-                AB比較に答える
+                比較に答える
               </Link>
               <Link href="/catalog" className="hover:text-tt-green">
                 用具を探す

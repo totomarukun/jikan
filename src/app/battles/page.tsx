@@ -35,7 +35,7 @@ export default async function BattlesPage() {
             href="/onboarding"
             className="mt-4 inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
           >
-            AB比較に答える
+            比較に答える
           </Link>
         </div>
       ) : (

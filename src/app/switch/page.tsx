@@ -546,13 +546,13 @@ async function SwitchBoard({
           データが足りない対決があります？
         </p>
         <p className="mt-1 leading-6 text-tt-gray70">
-          AB比較に答えるほど、あなたの「{current.name}」基準のデータが増えます。
+          比較に答えるほど、「{current.name}」基準のデータが増えます。
         </p>
         <Link
           href="/play"
           className="mt-3 inline-block rounded-full bg-gradient-to-r from-tt-deep-coral to-tt-coral px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
         >
-          AB比較に答えてデータを増やす
+          比較に答えてデータを増やす
         </Link>
       </div>
     </>

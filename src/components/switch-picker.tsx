@@ -54,7 +54,7 @@ export function CandidatePicker({
       <div className="rounded-xl bg-tt-soft-green p-4 text-center text-sm ring-1 ring-tt-green/20">
         <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-tt-green border-t-transparent align-middle" />
         <span className="ml-2 align-middle font-bold text-tt-deep-green">
-          両方使った人の声を集めています…
+          読み込み中…
         </span>
       </div>
     );

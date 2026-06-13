@@ -9,7 +9,7 @@ export default function SwitchLoading() {
       <div className="mt-4 h-12 animate-pulse rounded-xl bg-tt-gray30/20" />
       <div className="mt-6 h-64 animate-pulse rounded-2xl bg-tt-gray30/20" />
       <p className="mt-4 text-center text-xs text-tt-gray70">
-        両方使った人の声を集めています…
+        読み込み中…
       </p>
     </div>
   );

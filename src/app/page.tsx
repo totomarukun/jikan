@@ -139,10 +139,10 @@ export default async function LandingPage() {
         <div className="rounded-2xl bg-tt-soft-green p-5 ring-1 ring-tt-green/10">
           <p className="font-mono text-2xl font-bold text-tt-deep-green">01</p>
           <h2 className="mt-2 font-bold text-tt-deep-green">
-            あなたの感覚に翻訳
+            「硬い」を自分基準に
           </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            レビューの「硬い」はその人の感覚。TacTapは、あなたが使ったことのあるラバーを基準に「それより硬いと感じた人が68%」という形で示します。
+            あなたが使ったラバーを基準に「それより硬いと感じた人が68%」と表示します。
           </p>
         </div>
         <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
