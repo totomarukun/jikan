@@ -108,6 +108,7 @@ const SWITCH_AXIS_LABEL: Record<string, string> = {
   control: "コントロール",
   ballHold: "球持ち",
   arc: "弧線",
+  tackiness: "粘着",
   hardness: "硬さ",
 };
 

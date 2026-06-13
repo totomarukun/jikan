@@ -120,6 +120,8 @@ model Comparison {
   winnerBallHold       String?
   // 弧線の高さ (高い=山なり / 低い=直線的)
   winnerArc            String?
+  // 粘着の強さ (粘着ラバー vs テンション系の体感差)
+  winnerTackiness      String?
   // 体感のひとこと (両方使った人の言葉。定性レビューの最小単位)
   comment              String?
   // enum: BOTH | ONE | NEITHER (マイギアから自動判定)

@@ -368,6 +368,7 @@ const AXIS_META: Record<string, { label: string; high: string }> = {
   control: { label: "コントロール", high: "扱いやすい" },
   ballHold: { label: "球持ち", high: "球持ち" },
   arc: { label: "弧線", high: "弧線が高い" },
+  tackiness: { label: "粘着", high: "粘着が強い" },
   hardness: { label: "硬さ", high: "硬い" },
 };
 

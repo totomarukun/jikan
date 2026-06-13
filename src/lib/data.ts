@@ -277,6 +277,7 @@ const TALLY_AXIS_COLUMN = {
   hardness: "winnerHardness",
   ballHold: "winnerBallHold",
   arc: "winnerArc",
+  tackiness: "winnerTackiness",
 } as const;
 
 /** 特定ペア・特定軸の即時集計 (M3 の回答後フィードバック用) */

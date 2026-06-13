@@ -20,7 +20,8 @@ export type AxisKey =
   | "control"
   | "hardness"
   | "ballHold"
-  | "arc";
+  | "arc"
+  | "tackiness";
 
 export interface PairwiseInput {
   aId: string;

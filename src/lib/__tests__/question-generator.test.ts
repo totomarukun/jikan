@@ -46,7 +46,15 @@ const equipments = [
   makeEquipment("b0", "BLADE"),
 ];
 
-const AXES = ["overall", "hardness", "spin", "speed", "ballHold", "arc"];
+const AXES = [
+  "overall",
+  "hardness",
+  "spin",
+  "speed",
+  "ballHold",
+  "arc",
+  "tackiness",
+];
 
 describe("generateQuestion (マイギア中心)", () => {
   it("ギアが2本以上あればギア内ペアから出題し、使用条件を返す", () => {

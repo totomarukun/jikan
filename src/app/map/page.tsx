@@ -19,6 +19,7 @@ const AXES: Array<{ key: AxisKey; label: string; high: string }> = [
   { key: "control", label: "コントロール", high: "扱いやすい" },
   { key: "ballHold", label: "球持ち", high: "球持ち良い" },
   { key: "arc", label: "弧線", high: "弧線が高い" },
+  { key: "tackiness", label: "粘着", high: "粘着が強い" },
   { key: "hardness", label: "硬さ", high: "硬い" },
 ];
 

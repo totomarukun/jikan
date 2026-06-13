@@ -72,6 +72,7 @@ const FEEL_AXES: Array<{ axis: QuestionAxis; weight: number }> = [
   { axis: "speed", weight: 0.14 },
   { axis: "ballHold", weight: 0.12 },
   { axis: "arc", weight: 0.1 },
+  { axis: "tackiness", weight: 0.08 },
 ];
 
 const GEAR_PROMPTS: Record<string, string> = {
@@ -81,6 +82,7 @@ const GEAR_PROMPTS: Record<string, string> = {
   speed: "スピードが出たのはどちら？",
   ballHold: "球持ちが良かったのはどちら？",
   arc: "弧線が高かった (山なりだった) のはどちら？",
+  tackiness: "粘着が強かった (ひっかかった) のはどちら？",
 };
 
 const EXPLORE_PROMPTS: Record<string, string> = {
@@ -90,6 +92,7 @@ const EXPLORE_PROMPTS: Record<string, string> = {
   speed: "イメージでOK: 速そうなのはどちら？",
   ballHold: "イメージでOK: 球持ちが良さそうなのは？",
   arc: "イメージでOK: 弧線が高そう (山なり) なのは？",
+  tackiness: "イメージでOK: 粘着が強そうなのは？",
 };
 
 function pickRandom<T>(items: T[], random: () => number): T {

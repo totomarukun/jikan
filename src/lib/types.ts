@@ -42,6 +42,7 @@ export const QUESTION_AXES = [
   "hardness",
   "ballHold",
   "arc",
+  "tackiness",
 ] as const;
 
 export type Playstyle = (typeof PLAYSTYLES)[number];

@@ -79,6 +79,7 @@ export default async function MyPage() {
     { key: "winnerHardness", label: "硬さ" },
     { key: "winnerBallHold", label: "球持ち" },
     { key: "winnerArc", label: "弧線" },
+    { key: "winnerTackiness", label: "粘着" },
   ];
 
   return (

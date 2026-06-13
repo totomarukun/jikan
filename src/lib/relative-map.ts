@@ -13,6 +13,7 @@ const AXIS_COLUMN: Record<AxisKey, keyof ComparisonAxisRow> = {
   hardness: "winnerHardness",
   ballHold: "winnerBallHold",
   arc: "winnerArc",
+  tackiness: "winnerTackiness",
 };
 
 interface ComparisonAxisRow {
@@ -26,6 +27,7 @@ interface ComparisonAxisRow {
   winnerHardness: string | null;
   winnerBallHold: string | null;
   winnerArc: string | null;
+  winnerTackiness: string | null;
 }
 
 // 実体験ほど信頼できるので重み付け (イメージ回答も地図には薄く効かせる)
@@ -86,6 +88,7 @@ export async function buildRelativeMap(axis: AxisKey): Promise<RelativeMap> {
         winnerHardness: true,
         winnerBallHold: true,
         winnerArc: true,
+        winnerTackiness: true,
       },
     }),
   ]);
@@ -163,6 +166,7 @@ const ALL_AXES: AxisKey[] = [
   "control",
   "ballHold",
   "arc",
+  "tackiness",
   "hardness",
 ];
 
@@ -186,6 +190,7 @@ export async function getEquipmentAxisPositions(
         winnerHardness: true,
         winnerBallHold: true,
         winnerArc: true,
+        winnerTackiness: true,
       },
     }),
   ]);
@@ -314,6 +319,7 @@ async function loadRubberAxisRatings(): Promise<{
         winnerHardness: true,
         winnerBallHold: true,
         winnerArc: true,
+        winnerTackiness: true,
       },
     }),
   ]);
