@@ -43,11 +43,9 @@ export default async function EquipmentPage({
   const [record, battles, progress, gearEntry, axisPositions] =
     await Promise.all([
       getEquipmentRecord(id),
-      aggregatePairs({
-        involvingEquipmentId: id,
-        take: 5,
-        experiencedOnly: true,
-      }),
+      // 詳細の「この用具が登場する対決」は、貢献(回答)を必ず可視化するため
+      // 経験フラグで絞らない。少数票は VersusBarOrPending が「集計中」と正直表示する。
+      aggregatePairs({ involvingEquipmentId: id, take: 5 }),
       sessionId
         ? prisma.sessionProgress.findUnique({ where: { sessionId } })
         : null,
@@ -59,14 +57,19 @@ export default async function EquipmentPage({
         : null,
       isRubber ? getEquipmentAxisPositions(id) : Promise.resolve([]),
     ]);
-  const [voices, similar] = isRubber
-    ? await Promise.all([getEquipmentVoices(id, 6), findSimilarEquipment(id, 4)])
-    : [[], []];
+  const [voices, similar, altPairs] = isRubber
+    ? await Promise.all([
+        getEquipmentVoices(id, 6),
+        findSimilarEquipment(id, 4),
+        // 乗り換え候補は信頼のため「両方使った人」の判定だけから導く
+        aggregatePairs({ involvingEquipmentId: id, take: 6, experiencedOnly: true }),
+      ])
+    : [[], [], []];
   const currentRubberId = progress?.currentRubberId ?? null;
   const isMyGear = gearEntry != null || currentRubberId === id;
 
-  // 乗り換え先候補: この用具との対決で勝ち越している相手 (n>=2)
-  const alternatives = battles
+  // 乗り換え先候補: この用具との対決で勝ち越している相手 (両方使った人, n>=2)
+  const alternatives = altPairs
     .map((p) => {
       const isA = p.aId === id;
       const oppVotes = isA ? p.votesB : p.votesA;
