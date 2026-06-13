@@ -85,14 +85,56 @@ export default async function CompareViewPage({
     ...(filters.blade ? { contextBladeCategory: filters.blade } : {}),
     ...(filters.expOnly ? { hasActualExperience: "BOTH" } : {}),
   };
-  const [comparisons, related] = await Promise.all([
+  const [comparisons, related, myComparisons] = await Promise.all([
     prisma.comparison.findMany({ where }),
     aggregatePairs({
       involvingEquipmentId: aId,
       take: 3,
       excludePair: [aId, bId],
     }),
+    // 自分自身の判定は公開閾値・絞り込みに関係なく常に本人へ返す。
+    // 「両方使った人の比較」を求めて自分で全軸答えたのに、n<3 で
+    // 結果が隠れて自分の回答すら見えない、という行き止まりを防ぐ (回答=資産)。
+    sessionId
+      ? prisma.comparison.findMany({
+          where: {
+            sessionId,
+            OR: [
+              { optionAEquipmentId: aId, optionBEquipmentId: bId },
+              { optionAEquipmentId: bId, optionBEquipmentId: aId },
+            ],
+          },
+        })
+      : Promise.resolve([]),
   ]);
+
+  // 自分の軸別判定 (勝者の equipmentId を equipA/equipB 名に解決)。
+  const myExperienced = myComparisons.some(
+    (c) => c.hasActualExperience === "BOTH",
+  );
+  const myPick = (
+    col:
+      | "winnerOverall"
+      | "winnerSpeed"
+      | "winnerSpin"
+      | "winnerHardness"
+      | "winnerBallHold",
+  ): { name: string } | "SAME" | null => {
+    const row = myComparisons.find((c) => c[col] != null);
+    if (!row) return null;
+    const w = row[col];
+    if (w === "SAME") return "SAME";
+    const pickedId = w === "A" ? row.optionAEquipmentId : row.optionBEquipmentId;
+    return { name: pickedId === aId ? equipA.name : equipB.name };
+  };
+  const myByAxis = {
+    overall: myPick("winnerOverall"),
+    speed: myPick("winnerSpeed"),
+    spin: myPick("winnerSpin"),
+    hardness: myPick("winnerHardness"),
+    ballHold: myPick("winnerBallHold"),
+  };
+  const hasMine = myComparisons.length > 0;
 
   // A/B を equipA / equipB 基準に正規化して集計
   const tally = {
@@ -125,6 +167,9 @@ export default async function CompareViewPage({
     add(tally.ballHold, c.winnerBallHold);
   }
   const total = comparisons.length;
+  // 公開母数は「行数」ではなく「実際に答えた人数」で数える。
+  // 1人が軸別に答えると行が増えるため、行数だと n が水増しに見える。
+  const voterCount = new Set(comparisons.map((c) => c.sessionId)).size;
 
   const insight = buildInsight(equipA.name, equipB.name, tally.overall);
 
@@ -268,11 +313,52 @@ export default async function CompareViewPage({
         </div>
       </form>
 
-      {/* 集計結果 */}
+      {/* あなたの判定 (公開閾値・絞り込みに関係なく常に表示) */}
+      {hasMine && (
+        <div className="mt-6 rounded-2xl bg-tt-soft-green p-4 ring-1 ring-tt-green/25">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-tt-deep-green">あなたの判定</p>
+            {myExperienced && (
+              <span className="rounded-full bg-tt-green px-2 py-0.5 text-[10px] font-bold text-white">
+                両方使用
+              </span>
+            )}
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+            {(
+              [
+                ["好み", myByAxis.overall],
+                ["スピード", myByAxis.speed],
+                ["スピン", myByAxis.spin],
+                ["硬く感じる", myByAxis.hardness],
+                ["球持ち", myByAxis.ballHold],
+              ] as const
+            )
+              .filter(([, pick]) => pick != null)
+              .map(([label, pick]) => (
+                <div key={label} className="flex items-baseline justify-between gap-2">
+                  <dt className="text-xs text-tt-gray70">{label}</dt>
+                  <dd className="truncate text-right font-bold text-tt-charcoal">
+                    {pick === "SAME" ? "互角" : pick!.name}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+          <p className="mt-2 text-xs text-tt-gray70">
+            これはあなた自身の記録です。下の集計は他の人の回答が集まると公開されます。
+          </p>
+        </div>
+      )}
+
+      {/* 集計結果 (みんなの回答) */}
       <div className="mt-6 space-y-4">
         {total === 0 ? (
           <div className="rounded-2xl bg-white p-6 text-center text-sm text-tt-gray70 shadow-sm ring-1 ring-black/5">
-            <p>このフィルタでは結果がありません。</p>
+            <p>
+              {hasMine
+                ? "他の人の回答はまだありません。集まると比較が公開されます。"
+                : "このフィルタでは結果がありません。"}
+            </p>
             {(filters.playstyle || filters.level || filters.blade) && (
               <Link
                 href={`/compare/${aId}/vs/${bId}?mode=all`}
@@ -284,9 +370,9 @@ export default async function CompareViewPage({
           </div>
         ) : (
           <>
-            {total < 20 && (
+            {voterCount < 20 && (
               <p className="rounded-xl bg-tt-soft-coral p-3 text-xs text-tt-deep-coral">
-                データが少ないため参考程度に（n={total}）
+                データが少ないため参考程度に（回答者{voterCount}人）
               </p>
             )}
             <AxisCard label="好み" bucket={tally.overall} nameA={equipA.name} nameB={equipB.name} />
