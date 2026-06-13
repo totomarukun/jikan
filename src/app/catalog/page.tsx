@@ -4,7 +4,14 @@ import { CatalogExplorer } from "@/components/catalog-explorer";
 export const metadata = { title: "用具カタログ" };
 
 // 用具カタログ: 全用具を比較データ無しでもブラウズできる「探す」入口。
-export default async function CatalogPage() {
+export default async function CatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const initialStyle =
+    typeof sp.style === "string" ? sp.style : null;
   const rows = await prisma.equipment.findMany({
     where: { isActive: true },
     select: {
@@ -29,6 +36,7 @@ export default async function CatalogPage() {
   });
   const items = rows.map(({ _count, ...e }) => ({
     ...e,
+    comparisons: _count.comparisonsAsA + _count.comparisonsAsB,
     popularity:
       _count.comparisonsAsA + _count.comparisonsAsB + _count.gearEntries,
   }));
@@ -41,7 +49,7 @@ export default async function CatalogPage() {
         英語・ローマ字OK）。気になる用具の詳細・相対位置・両方使った人の声へ。
       </p>
       <div className="mt-4">
-        <CatalogExplorer items={items} />
+        <CatalogExplorer items={items} initialStyle={initialStyle} />
       </div>
     </div>
   );

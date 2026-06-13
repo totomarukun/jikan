@@ -17,8 +17,26 @@ export interface CatalogItem {
   price: number | null;
   imageUrl: string | null;
   bladeSubcategory: string | null;
+  comparisons: number;
   popularity: number;
 }
+
+// 戦型 → よく使われるラバー種類 (一般的な対応。種類フィルタのショートカット)
+const STYLE_CATS: Record<string, { label: string; cats: string[] }> = {
+  DRIVE: { label: "ドライブ主戦", cats: ["RUBBER_INVERTED", "RUBBER_STICKY"] },
+  QUICK_ATTACK: {
+    label: "前陣速攻",
+    cats: ["RUBBER_PIMPLE_OUT", "RUBBER_INVERTED"],
+  },
+  CUT: {
+    label: "カット",
+    cats: ["RUBBER_PIMPLE_LONG", "RUBBER_ANTI", "RUBBER_INVERTED"],
+  },
+  OTHER: {
+    label: "異質",
+    cats: ["RUBBER_PIMPLE_OUT", "RUBBER_PIMPLE_LONG", "RUBBER_ANTI"],
+  },
+};
 
 const CAT_LABEL: Record<string, string> = {
   RUBBER_INVERTED: "裏ソフト",
@@ -47,9 +65,18 @@ const HARDNESS_BANDS: Array<{ label: string; min: number; max: number }> = [
 type Kind = "all" | "rubber" | "blade";
 type Sort = "popular" | "name" | "priceAsc" | "priceDesc" | "hardness";
 
-export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
+export function CatalogExplorer({
+  items,
+  initialStyle = null,
+}: {
+  items: CatalogItem[];
+  initialStyle?: string | null;
+}) {
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
+  const [style, setStyle] = useState<string | null>(
+    initialStyle && STYLE_CATS[initialStyle] ? initialStyle : null,
+  );
   const [cat, setCat] = useState<string | null>(null);
   const [mfr, setMfr] = useState("");
   const [band, setBand] = useState<number>(-1);
@@ -94,6 +121,8 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
 
   const filtered = useMemo(() => {
     let list = byKind;
+    if (style && STYLE_CATS[style])
+      list = list.filter((e) => STYLE_CATS[style].cats.includes(e.category));
     if (cat) list = list.filter((e) => e.category === cat);
     if (mfr) list = list.filter((e) => e.manufacturer === mfr);
     if (band >= 0) {
@@ -126,10 +155,10 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
       return byName(a, b);
     });
     return sorted;
-  }, [byKind, cat, mfr, band, hard, query, sort]);
+  }, [byKind, style, cat, mfr, band, hard, query, sort]);
 
   const hasFilter = Boolean(
-    query.trim() || cat || mfr || band >= 0 || hard >= 0,
+    query.trim() || style || cat || mfr || band >= 0 || hard >= 0,
   );
 
   return (
@@ -150,6 +179,7 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
               setKind(k);
               setCat(null);
               setPicked([]);
+              if (k === "blade") setStyle(null);
             }}
           >
             {label}
@@ -164,6 +194,32 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
         placeholder="用具名で検索（ひらがな・英語・ローマ字OK 例: rozena / dignics）"
         className="mt-3 block w-full rounded-full border border-tt-gray30/50 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-tt-green focus:outline-none"
       />
+
+      {/* 戦型から探す (種類のショートカット。ラバーのみ) */}
+      {kind === "rubber" && (
+        <div className="mt-3">
+          <p className="mb-1 text-[11px] font-bold text-tt-gray70">
+            戦型から探す
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            <Chip active={style === null} onClick={() => setStyle(null)}>
+              指定なし
+            </Chip>
+            {Object.entries(STYLE_CATS).map(([k, v]) => (
+              <Chip
+                key={k}
+                active={style === k}
+                onClick={() => {
+                  setStyle(style === k ? null : k);
+                  setCat(null);
+                }}
+              >
+                {v.label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      )}
 
       {cats.length > 1 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -241,6 +297,7 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
           <button
             onClick={() => {
               setQuery("");
+              setStyle(null);
               setCat(null);
               setMfr("");
               setBand(-1);
@@ -281,7 +338,14 @@ export function CatalogExplorer({ items }: { items: CatalogItem[] }) {
                     size={36}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{e.name}</p>
+                    <p className="flex items-center gap-1.5 truncate text-sm font-bold">
+                      <span className="truncate">{e.name}</span>
+                      {e.comparisons > 0 && (
+                        <span className="shrink-0 rounded-full bg-tt-soft-green px-1.5 py-0.5 text-[9px] font-bold text-tt-deep-green">
+                          比較{e.comparisons}
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-tt-gray70">
                       {e.manufacturer} ・ {CAT_LABEL[e.category] ?? ""}
                       {e.hardness != null && ` ・ ${e.hardness}°`}

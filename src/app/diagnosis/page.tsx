@@ -7,7 +7,11 @@ import {
   getPopularPicksForSimilarUsers,
 } from "@/lib/data";
 import { diagnose, tendencyRows } from "@/lib/diagnosis";
-import { MIN_DIAGNOSIS_ANSWERS } from "@/lib/types";
+import {
+  MIN_DIAGNOSIS_ANSWERS,
+  PLAYSTYLE_LABELS,
+  type Playstyle,
+} from "@/lib/types";
 import { ShareButton } from "@/components/share-button";
 
 export const metadata = { title: "スタイル診断" };
@@ -205,6 +209,13 @@ export default async function DiagnosisPage() {
           </Link>
         )}
         <ShareButton styleName={result.styleName} sharePct={sharePct} />
+        <Link
+          href={`/catalog?style=${progress.playstyle}`}
+          className="block rounded-full border border-tt-gray30/50 bg-white px-8 py-3 text-sm font-bold transition hover:bg-tt-offwhite"
+        >
+          {PLAYSTYLE_LABELS[progress.playstyle as Playstyle] ?? "あなたの戦型"}
+          向けの用具をカタログで探す →
+        </Link>
         <Link href="/play" className="block text-sm text-tt-gray70 underline">
           登録せず続ける
         </Link>
