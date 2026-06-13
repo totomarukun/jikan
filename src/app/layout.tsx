@@ -43,8 +43,8 @@ export default function RootLayout({
           <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
             <LogoHorizontal />
             <nav className="flex items-center gap-4 text-sm font-medium text-tt-gray70">
-              <Link href="/battles" className="transition hover:text-tt-green">
-                人気の対決
+              <Link href="/map" className="transition hover:text-tt-green">
+                用具マップ
               </Link>
               <Link href="/switch" className="transition hover:text-tt-green">
                 乗り換え検討
@@ -67,6 +67,9 @@ export default function RootLayout({
             <nav className="mt-4 flex flex-wrap gap-4 text-xs text-tt-gray70">
               <Link href="/play" className="hover:text-tt-green">
                 AB比較に答える
+              </Link>
+              <Link href="/map" className="hover:text-tt-green">
+                用具マップ
               </Link>
               <Link href="/battles" className="hover:text-tt-green">
                 人気の対決
