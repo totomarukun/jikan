@@ -40,8 +40,16 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
   }
-  const { equipmentId, side, thickness, bladeEquipmentId, isCurrent } =
-    parsed.data;
+  const {
+    equipmentId,
+    side,
+    thickness,
+    bladeEquipmentId,
+    isCurrent,
+    usageStartedAt,
+    note,
+  } = parsed.data;
+  const usageStartedDate = usageStartedAt ? new Date(usageStartedAt) : null;
 
   const equipment = await prisma.equipment.findUnique({
     where: { id: equipmentId },
@@ -81,6 +89,15 @@ export async function POST(request: Request) {
     });
   }
 
+  const willBeCurrent = existing
+    ? (isCurrent ?? existing.isCurrent)
+    : (isCurrent ?? false);
+  // 現用になるのに貼付日が無ければ、当日を既定にする (ワンタップ登録の摩擦ゼロで
+  // リマインドを成立させる)。明示指定があればそれを優先。
+  const resolvedUsageStart =
+    usageStartedDate ??
+    (willBeCurrent && !existing?.usageStartedAt ? new Date() : null);
+
   const item = existing
     ? await prisma.gearItem.update({
         where: { id: existing.id },
@@ -89,6 +106,8 @@ export async function POST(request: Request) {
           thickness: thickness === "UNKNOWN" ? existing.thickness : thickness,
           bladeEquipmentId: bladeEquipmentId ?? existing.bladeEquipmentId,
           isCurrent: isCurrent ?? existing.isCurrent,
+          usageStartedAt: resolvedUsageStart ?? existing.usageStartedAt,
+          note: note ?? existing.note,
         },
       })
     : await prisma.gearItem.create({
@@ -101,6 +120,8 @@ export async function POST(request: Request) {
           thickness,
           bladeEquipmentId: bladeEquipmentId ?? null,
           isCurrent: isCurrent ?? false,
+          usageStartedAt: resolvedUsageStart,
+          note: note ?? null,
         },
       });
 

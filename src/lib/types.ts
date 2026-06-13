@@ -82,6 +82,10 @@ export const gearSchema = z.object({
   thickness: z.enum(THICKNESSES),
   bladeEquipmentId: z.string().min(1).optional(),
   isCurrent: z.boolean().optional(),
+  // 貼った日 (張り替えリマインドの起点)。未指定なら現用登録時に当日を既定。
+  usageStartedAt: z.string().datetime().optional(),
+  // 乗り換え理由・感想メモ
+  note: z.string().max(500).optional(),
 });
 
 export const signupSchema = z.object({

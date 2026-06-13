@@ -10,6 +10,7 @@ import {
   type GearSide,
   type Thickness,
 } from "@/lib/types";
+import { gearReminder } from "@/lib/gear-reminder";
 
 // マイギア: このサービスの土台。使ったことのあるラバーの記録 (使用条件つき)。
 // ここに登録された用具同士から出題が生成される。
@@ -36,6 +37,8 @@ interface GearEntry {
   side: GearSide;
   thickness: Thickness;
   isCurrent: boolean;
+  usageStartedAt: string | null;
+  note: string | null;
   equipment: {
     id: string;
     name: string;
@@ -182,6 +185,29 @@ export default function GearPage() {
                     {THICKNESS_LABELS[g.thickness]}
                     {g.blade && ` / ${g.blade.name}`}
                   </p>
+                  {g.isCurrent &&
+                    (() => {
+                      const r = gearReminder(g.usageStartedAt);
+                      if (!r) return null;
+                      return (
+                        <p
+                          className={`mt-1 text-xs ${
+                            r.due
+                              ? "font-bold text-tt-deep-coral"
+                              : "text-tt-gray70"
+                          }`}
+                        >
+                          {r.due ? "⚠ " : "🏓 "}
+                          {r.elapsedLabel}
+                          {r.message ? ` — ${r.message}` : ""}
+                        </p>
+                      );
+                    })()}
+                  {g.note && (
+                    <p className="mt-1 text-xs italic text-tt-gray70">
+                      「{g.note}」
+                    </p>
+                  )}
                   </div>
                 </div>
                 <button

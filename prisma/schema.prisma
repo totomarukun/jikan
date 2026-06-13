@@ -84,6 +84,10 @@ model GearItem {
   blade            Equipment? @relation("GearBlade", fields: [bladeEquipmentId], references: [id])
   // いま使っているか
   isCurrent        Boolean    @default(false)
+  // このラバーを貼った日 (張り替え時期リマインドの起点。createdAt とは別概念)
+  usageStartedAt   DateTime?
+  // 乗り換え理由・感想などの自由メモ (遍歴の質的記録)
+  note             String?
   createdAt        DateTime   @default(now())
 
   @@index([sessionId])
