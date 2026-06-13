@@ -142,3 +142,90 @@ export async function buildRelativeMap(axis: AxisKey): Promise<RelativeMap> {
   entries.sort((x, y) => y.logStrength - x.logStrength);
   return { axis, entries, totalComparisons };
 }
+
+// 用具詳細ページ用: 1つの用具の全軸の相対位置を1回のDB取得で算出する。
+export interface AxisPosition {
+  axis: AxisKey;
+  score: number; // 0-100
+  comparisons: number;
+  bothComparisons: number;
+  rank: number; // 1-based (logStrength 降順)
+  totalRanked: number;
+}
+
+const ALL_AXES: AxisKey[] = [
+  "overall",
+  "speed",
+  "spin",
+  "control",
+  "ballHold",
+  "hardness",
+];
+
+export async function getEquipmentAxisPositions(
+  equipmentId: string,
+): Promise<AxisPosition[]> {
+  const [equipments, rows] = await Promise.all([
+    prisma.equipment.findMany({
+      where: { isActive: true },
+      select: { id: true, category: true },
+    }),
+    prisma.comparison.findMany({
+      select: {
+        optionAEquipmentId: true,
+        optionBEquipmentId: true,
+        hasActualExperience: true,
+        winnerOverall: true,
+        winnerSpeed: true,
+        winnerSpin: true,
+        winnerControl: true,
+        winnerHardness: true,
+        winnerBallHold: true,
+      },
+    }),
+  ]);
+  const cat = new Map(equipments.map((e) => [e.id, e.category]));
+  const isRubberPair = (a: string, b: string) =>
+    isRubberCategory(cat.get(a) ?? "") && isRubberCategory(cat.get(b) ?? "");
+
+  const positions: AxisPosition[] = [];
+  for (const axis of ALL_AXES) {
+    const col = AXIS_COLUMN[axis];
+    const inputs: PairwiseInput[] = [];
+    let both = 0;
+    for (const r of rows as ComparisonAxisRow[]) {
+      const winner = r[col];
+      if (winner !== "A" && winner !== "B" && winner !== "SAME") continue;
+      if (!isRubberPair(r.optionAEquipmentId, r.optionBEquipmentId)) continue;
+      inputs.push({
+        aId: r.optionAEquipmentId,
+        bId: r.optionBEquipmentId,
+        winner,
+        weight: experienceWeight(r.hasActualExperience),
+      });
+      if (
+        r.hasActualExperience === "BOTH" &&
+        (r.optionAEquipmentId === equipmentId ||
+          r.optionBEquipmentId === equipmentId)
+      ) {
+        both++;
+      }
+    }
+    const { ratings } = computeAxisRatings(inputs);
+    const mine = ratings.get(equipmentId);
+    if (!mine) continue;
+    const ranked = [...ratings.values()].sort(
+      (a, b) => b.logStrength - a.logStrength,
+    );
+    const rank = ranked.findIndex((r) => r.id === equipmentId) + 1;
+    positions.push({
+      axis,
+      score: mine.score,
+      comparisons: mine.comparisons,
+      bothComparisons: both,
+      rank,
+      totalRanked: ranked.length,
+    });
+  }
+  return positions;
+}

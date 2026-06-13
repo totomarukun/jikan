@@ -4,7 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 import { aggregatePairs, getEquipmentRecord } from "@/lib/data";
 import { feelStatements, getFeelProfile } from "@/lib/feel";
-import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
+import {
+  getEquipmentAxisPositions,
+  type AxisPosition,
+} from "@/lib/relative-map";
+import {
+  amazonSearchUrl,
+  rakutenSearchUrl,
+  youtubeSearchUrl,
+} from "@/lib/links";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import { VersusBarOrPending } from "@/components/versus-bar";
@@ -24,20 +32,27 @@ export default async function EquipmentPage({
   const equipment = await prisma.equipment.findUnique({ where: { id } });
   if (!equipment || !equipment.isActive) notFound();
 
+  const isRubber = isRubberCategory(equipment.category);
   const sessionId = await getSessionId();
-  const [record, battles, progress, gearEntry] = await Promise.all([
-    getEquipmentRecord(id),
-    aggregatePairs({ involvingEquipmentId: id, take: 5, experiencedOnly: true }),
-    sessionId
-      ? prisma.sessionProgress.findUnique({ where: { sessionId } })
-      : null,
-    sessionId
-      ? prisma.gearItem.findFirst({
-          where: { sessionId, equipmentId: id },
-          select: { id: true },
-        })
-      : null,
-  ]);
+  const [record, battles, progress, gearEntry, axisPositions] =
+    await Promise.all([
+      getEquipmentRecord(id),
+      aggregatePairs({
+        involvingEquipmentId: id,
+        take: 5,
+        experiencedOnly: true,
+      }),
+      sessionId
+        ? prisma.sessionProgress.findUnique({ where: { sessionId } })
+        : null,
+      sessionId
+        ? prisma.gearItem.findFirst({
+            where: { sessionId, equipmentId: id },
+            select: { id: true },
+          })
+        : null,
+      isRubber ? getEquipmentAxisPositions(id) : Promise.resolve([]),
+    ]);
   const currentRubberId = progress?.currentRubberId ?? null;
   const isMyGear = gearEntry != null || currentRubberId === id;
 
@@ -121,6 +136,11 @@ export default async function EquipmentPage({
         </dl>
       </div>
 
+      {/* 相対マップ上の位置 (この用具は他と比べてどんな特徴か) */}
+      {isRubber && axisPositions.length > 0 && (
+        <RelativePositionSection positions={axisPositions} />
+      )}
+
       {/* あなたの基準への体感翻訳 */}
       {currentRubberId &&
         currentRubberId !== id &&
@@ -201,9 +221,18 @@ export default async function EquipmentPage({
         )}
       </section>
 
-      {/* 購入導線 */}
+      {/* レビュー動画・購入導線 */}
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-        <h2 className="font-bold">この用具を探す</h2>
+        <h2 className="font-bold">もっと知る・探す</h2>
+        <a
+          href={youtubeSearchUrl(equipment.manufacturer, equipment.name)}
+          target="_blank"
+          rel="noreferrer nofollow"
+          className="mt-3 flex items-center justify-between rounded-xl border border-tt-gray30/50 px-4 py-3 text-sm font-bold transition hover:bg-tt-offwhite active:scale-[0.98]"
+        >
+          <span>試打レビュー動画を探す</span>
+          <span className="text-tt-gray70">YouTube ↗</span>
+        </a>
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
           <a
             href={amazonSearchUrl(equipment.manufacturer, equipment.name)}
@@ -223,7 +252,7 @@ export default async function EquipmentPage({
           </a>
         </div>
         <p className="mt-2 text-xs text-tt-gray70">
-          ※外部ECの検索結果へ移動します。価格・在庫は移動先でご確認ください。
+          ※外部サイトの検索結果へ移動します。価格・在庫は移動先でご確認ください。
         </p>
       </section>
 
@@ -256,6 +285,68 @@ export default async function EquipmentPage({
         </Link>
       </div>
     </div>
+  );
+}
+
+const AXIS_META: Record<string, { label: string; high: string }> = {
+  overall: { label: "好み", high: "好まれる" },
+  speed: { label: "スピード", high: "速い" },
+  spin: { label: "スピン", high: "かかる" },
+  control: { label: "コントロール", high: "扱いやすい" },
+  ballHold: { label: "球持ち", high: "球持ち" },
+  hardness: { label: "硬さ", high: "硬い" },
+};
+
+// 相対マップ上の位置: みんなのA/B比較を合成した相対評価で、この用具が
+// 各軸でどのあたりに位置するか。3票ゲートでなく推定位置+支持本数を出す。
+function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
+  return (
+    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+      <h2 className="font-bold">相対マップ上の位置</h2>
+      <p className="mt-0.5 text-xs text-tt-gray70">
+        みんなのA/B比較を合成した相対評価。全ラバー中での位置と、支えている比較本数。
+      </p>
+      <ul className="mt-3 space-y-2.5">
+        {positions.map((p) => {
+          const meta = AXIS_META[p.axis] ?? { label: p.axis, high: "" };
+          const pct = Math.round(p.score);
+          const low = p.comparisons < 3;
+          return (
+            <li key={p.axis}>
+              <Link href={`/map?axis=${p.axis}`} className="block">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold">{meta.label}</span>
+                  <span className="font-mono text-tt-gray70">
+                    {p.totalRanked}本中 {p.rank}位 ・{" "}
+                    {p.bothComparisons > 0
+                      ? `実${p.bothComparisons}/全${p.comparisons}件`
+                      : `${p.comparisons}件`}
+                  </span>
+                </div>
+                <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-tt-gray30/30">
+                  <div
+                    className={`h-2.5 rounded-full ${
+                      low
+                        ? "bg-tt-gray30"
+                        : "bg-gradient-to-r from-tt-green to-tt-deep-green"
+                    }`}
+                    style={{ width: `${Math.max(4, pct)}%` }}
+                  />
+                </div>
+                {low && (
+                  <p className="mt-0.5 text-[10px] text-tt-gray70">
+                    支持が少なく中央寄りの暫定位置
+                  </p>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-[11px] leading-5 text-tt-gray70">
+        ※「{AXIS_META.hardness.high}」ほど右。メーカー公称でなく、使った人の相対判定に基づきます。
+      </p>
+    </section>
   );
 }
 

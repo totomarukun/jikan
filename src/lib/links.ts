@@ -8,3 +8,9 @@ export function amazonSearchUrl(manufacturer: string, name: string): string {
 export function rakutenSearchUrl(manufacturer: string, name: string): string {
   return `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(`${manufacturer} ${name} 卓球`)}/`;
 }
+
+// レビュー動画導線: 試打レビューは用具選びで実際に参照される情報源。
+// 中立性のため特定チャンネルを推さず、検索結果へ送る。
+export function youtubeSearchUrl(manufacturer: string, name: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${name} ${manufacturer} 卓球 レビュー`)}`;
+}
