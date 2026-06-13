@@ -397,7 +397,7 @@ function MakerSpecSection({
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
       <h2 className="font-bold">メーカー公称スペック</h2>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        各社の自社基準値（横並び比較はできません）。使った人の相対判定は下の「相対マップ上の位置」。
+        各社の自社基準値（横並び比較はできません）。使った人の相対判定は、みんなのA/B比較から推定する相対マップで。
       </p>
       <ul className="mt-3 space-y-2">
         {rows.map(([label, v]) =>
