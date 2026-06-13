@@ -197,11 +197,17 @@ function RelativeCandidateRow({
               )}`}
             >
               {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
+              {a.diff !== "even" && a.scoreDelta !== 0 && (
+                <span className="ml-0.5 font-mono">
+                  {a.scoreDelta > 0 ? "+" : ""}
+                  {a.scoreDelta}
+                </span>
+              )}
             </span>
           ))}
         </div>
         <p className="mt-1 text-[10px] text-tt-gray70">
-          {baseName}比 ▲=高い ▼=低い ≈=同等
+          {baseName}比 ・ 数値=相対位置の差(0-100スケール) ▲高い ▼低い ≈同等
         </p>
       </Link>
     </li>

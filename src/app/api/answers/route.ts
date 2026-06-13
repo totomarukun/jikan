@@ -93,6 +93,10 @@ export async function POST(request: Request) {
         [axisColumn]: storedWinner,
         answeredAt: new Date(),
         userId: existing.userId ?? userId,
+        // 経験フラグは現在のマイギアで毎回再判定する。
+        // 後からギア登録した後の再回答が「イメージ」のまま固定され、
+        // 「両方使った人の声」が実体験を反映しないバグを防ぐ。
+        hasActualExperience,
         // コメントは送られたときだけ上書き (空送信で既存の言葉を消さない)
         ...(trimmedComment ? { comment: trimmedComment } : {}),
       },

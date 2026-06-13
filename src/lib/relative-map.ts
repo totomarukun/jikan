@@ -252,7 +252,13 @@ export interface SwitchCandidate {
   hardness: number | null;
   price: number | null;
   /** 基準と共通でランク付けされた軸の差分 */
-  axes: Array<{ axis: AxisKey; diff: AxisDiff; comparisons: number }>;
+  axes: Array<{
+    axis: AxisKey;
+    diff: AxisDiff;
+    /** 基準に対する相対位置の差 (0-100スケール。正=基準より高い) */
+    scoreDelta: number;
+    comparisons: number;
+  }>;
   /** 共通軸数 (基準との経路のつながりの強さ) */
   sharedAxes: number;
   /** overall の相対スコア (なければ null) */
@@ -338,7 +344,12 @@ export async function buildSwitchCandidates(
       const d = cand.logStrength - base.logStrength;
       const diff: AxisDiff =
         d > DIFF_EPS ? "up" : d < -DIFF_EPS ? "down" : "even";
-      axes.push({ axis, diff, comparisons: cand.comparisons });
+      axes.push({
+        axis,
+        diff,
+        scoreDelta: Math.round(cand.score - base.score),
+        comparisons: cand.comparisons,
+      });
     }
     if (axes.length === 0) continue;
     candidates.push({
