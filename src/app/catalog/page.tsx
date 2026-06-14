@@ -46,7 +46,12 @@ export default async function CatalogPage({
             sessionId,
             equipment: { category: { startsWith: "RUBBER_" } },
           },
-          select: { equipmentId: true, isCurrent: true },
+          select: {
+            equipmentId: true,
+            isCurrent: true,
+            equipment: { select: { name: true } },
+          },
+          orderBy: [{ isCurrent: "desc" }, { createdAt: "asc" }],
         })
       : Promise.resolve([]),
   ]);
@@ -61,6 +66,19 @@ export default async function CatalogPage({
   const currentIds = gearItems
     .filter((g) => g.isCurrent)
     .map((g) => g.equipmentId);
+  // 基準ピッカー用: マイギアのラバー(重複排除)。現用が先頭。
+  const gearRubbers: Array<{ id: string; name: string }> = [];
+  const seenGear = new Set<string>();
+  for (const g of gearItems) {
+    if (seenGear.has(g.equipmentId)) continue;
+    seenGear.add(g.equipmentId);
+    gearRubbers.push({ id: g.equipmentId, name: g.equipment.name });
+  }
+  // 基準ラバー: ?base= 優先、なければ現用。これで分布/くらべる/一覧が自分基準になる。
+  const initialBaseId =
+    typeof sp.base === "string" && items.some((e) => e.id === sp.base)
+      ? sp.base
+      : (currentIds[0] ?? null);
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -69,6 +87,8 @@ export default async function CatalogPage({
         <CatalogExplorer
           items={items}
           currentIds={currentIds}
+          gearRubbers={gearRubbers}
+          initialBaseId={initialBaseId}
           initialView={initialView}
         />
       </div>
