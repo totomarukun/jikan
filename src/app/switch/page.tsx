@@ -64,12 +64,14 @@ export default async function SwitchPage({
     }
   }
 
+  // 基準はマイギアに限らず、任意のアクティブなラバーを受け付ける
+  // (ダッシュボードの基準モードから任意のラバーで乗り換え検討に入れる)。
   const baseId = typeof sp.base === "string" ? sp.base : null;
   let current: Equipment | null = null;
-  if (baseId && baseOptions.some((o) => o.id === baseId)) {
-    current = await prisma.equipment.findUnique({ where: { id: baseId } });
-    if (current && (!current.isActive || !current.category.startsWith("RUBBER_"))) {
-      current = null;
+  if (baseId) {
+    const eq = await prisma.equipment.findUnique({ where: { id: baseId } });
+    if (eq && eq.isActive && eq.category.startsWith("RUBBER_")) {
+      current = eq;
     }
   }
   if (!current && progress?.currentRubberId) {

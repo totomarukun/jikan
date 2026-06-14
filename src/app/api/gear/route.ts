@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     usageStartedAt,
     note,
     weightGrams,
+    bladeWeightGrams,
   } = parsed.data;
   const usageStartedDate = usageStartedAt ? new Date(usageStartedAt) : null;
 
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
           usageStartedAt: resolvedUsageStart ?? existing.usageStartedAt,
           note: note ?? existing.note,
           weightGrams: weightGrams ?? existing.weightGrams,
+          bladeWeightGrams: bladeWeightGrams ?? existing.bladeWeightGrams,
         },
       })
     : await prisma.gearItem.create({
@@ -125,6 +127,7 @@ export async function POST(request: Request) {
           usageStartedAt: resolvedUsageStart,
           note: note ?? null,
           weightGrams: weightGrams ?? null,
+          bladeWeightGrams: bladeWeightGrams ?? null,
         },
       });
 

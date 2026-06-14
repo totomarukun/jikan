@@ -151,3 +151,34 @@ export function IconSplit({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+// 使い方ステップ用の小アイコン (相対位置を見る / 基準を置く / 答えて育てる)
+export function IconMap({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+      <rect x="5" y="9" width="14" height="3.5" rx="1.75" fill="#1a8917" />
+      <rect x="5" y="15" width="22" height="3.5" rx="1.75" fill="#bfe9d8" />
+      <rect x="5" y="21" width="9" height="3.5" rx="1.75" fill="#0f6e56" />
+    </svg>
+  );
+}
+
+export function IconTarget({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+      <circle cx="16" cy="16" r="11" fill="none" stroke="#0f6e56" strokeWidth="2.4" />
+      <circle cx="16" cy="16" r="5.5" fill="none" stroke="#1a8917" strokeWidth="2.4" />
+      <circle cx="16" cy="16" r="1.8" fill="#d85a30" />
+    </svg>
+  );
+}
+
+export function IconNote({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+      <rect x="6" y="5" width="16" height="22" rx="3" fill="#e1f5ee" stroke="#0f6e56" strokeWidth="2" />
+      <path d="M10 12h8M10 17h8M10 22h5" stroke="#1a8917" strokeWidth="2" strokeLinecap="round" />
+      <path d="M20 24l3 3 5-6" stroke="#d85a30" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
