@@ -1,5 +1,5 @@
 import type { QuestionAxis } from "./types";
-import { isRubberCategory } from "./types";
+import { isRubberCategory, sameRubberGroup } from "./types";
 import { RUBBER_AXES, axesForPair } from "./axes";
 
 // マイギア中心の出題 (サービス再設計の核):
@@ -216,8 +216,13 @@ export function generateQuestion(
       if (base) {
         optionA = byId.get(base.equipmentId)!;
         gearA = base;
+        // 同じ比較可能グループ(表は表・裏系は裏系)のラバーのみと組む。
+        // 種類を跨いだ「スピンは?」等は構造上比較にならないため除外する。
         const others = rubberPool.filter(
-          (e) => e.id !== optionA.id && !seen.has(e.id),
+          (e) =>
+            e.id !== optionA.id &&
+            !seen.has(e.id) &&
+            sameRubberGroup(optionA.category, e.category),
         );
         if (others.length === 0) break; // この基準は出し尽くし → 次の基準へ
         optionB = pickRandom(others, random);
@@ -225,7 +230,7 @@ export function generateQuestion(
         optionA = pickRandom(rubberPool, random);
         optionB = pickRandom(rubberPool, random);
         if (optionA.id === optionB.id) continue;
-        if (optionA.category !== optionB.category) continue;
+        if (!sameRubberGroup(optionA.category, optionB.category)) continue;
       }
       const key = pairKey(optionA.id, optionB.id);
       const allowed = axesForPair(optionA.category, optionB.category).map(

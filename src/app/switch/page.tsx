@@ -15,7 +15,12 @@ import {
   CandidatePicker,
   CurrentRubberSetter,
 } from "@/components/switch-picker";
-import { GEAR_SIDE_LABELS, type GearSide } from "@/lib/types";
+import {
+  GEAR_SIDE_LABELS,
+  rubberGroupCategories,
+  sameRubberGroup,
+  type GearSide,
+} from "@/lib/types";
 import type { Equipment } from "@prisma/client";
 
 export const metadata = { title: "乗り換え検討" };
@@ -322,10 +327,12 @@ async function SwitchBoard({
   // 基準に対する候補の軸別差分 (相対マップ。推移律で疎データでも出る)
   const diffMap = new Map(relCandidates.candidates.map((r) => [r.id, r.axes]));
 
-  // ワンタップ候補: この用具と対決データがあるラバー (人気順)
+  // ワンタップ候補: この用具と対決データがあるラバー (人気順)。
+  // 乗り換え候補は同じ種類のラバーのみ(表ソフト基準に裏ソフトを勧めない)。
+  const sameGroupCats = rubberGroupCategories(current.category);
   let suggestionsLabel = "よく比較される:";
-  let suggestions = (
-    await aggregatePairs({ involvingEquipmentId: current.id, take: 6 })
+  const rawPairs = (
+    await aggregatePairs({ involvingEquipmentId: current.id, take: 12 })
   )
     .map((p) => {
       const opponentSide = p.aId === current.id ? "B" : "A";
@@ -334,15 +341,24 @@ async function SwitchBoard({
         name: opponentSide === "A" ? p.nameA : p.nameB,
       };
     })
-    .filter(
-      (s) => !candidateIds.includes(s.id) && s.id !== current.id,
-    )
+    .filter((s) => !candidateIds.includes(s.id) && s.id !== current.id);
+  // 対決相手のカテゴリを引いて、同じ種類のラバーだけに絞る
+  const oppCats = new Map(
+    (
+      await prisma.equipment.findMany({
+        where: { id: { in: rawPairs.map((s) => s.id) } },
+        select: { id: true, category: true },
+      })
+    ).map((e) => [e.id, e.category]),
+  );
+  let suggestions = rawPairs
+    .filter((s) => sameRubberGroup(current.category, oppCats.get(s.id) ?? ""))
     .slice(0, 4);
   // 対決データがまだない基準でも、検索ゼロで検討を始められるようにする
   if (suggestions.length === 0) {
     suggestionsLabel = "よく使われている:";
     suggestions = (
-      await getPopularRubbers(4, [current.id, ...candidateIds])
+      await getPopularRubbers(4, [current.id, ...candidateIds], sameGroupCats)
     ).map((p) => ({ id: p.id, name: p.name }));
   }
 

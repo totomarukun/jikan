@@ -419,7 +419,7 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
       <h2 className="font-bold">用具マップ上の位置</h2>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        使った人の比較から推定した、全ラバー中での位置です。
+        使った人の比較から推定した、同じ種類のラバー（裏/表/粒高など）の中での位置です。
       </p>
       <ul className="mt-3 space-y-2.5">
         {positions.map((p) => {

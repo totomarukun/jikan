@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { isRubberCategory } from "./types";
+import { isRubberCategory, rubberGroup, sameRubberGroup } from "./types";
 import { RUBBER_AXIS_KEYS } from "./axes";
 import { computeAxisRatings, type AxisKey, type PairwiseInput } from "./ranking";
 
@@ -197,8 +197,13 @@ export async function getEquipmentAxisPositions(
     }),
   ]);
   const cat = new Map(equipments.map((e) => [e.id, e.category]));
-  const isRubberPair = (a: string, b: string) =>
-    isRubberCategory(cat.get(a) ?? "") && isRubberCategory(cat.get(b) ?? "");
+  const targetCat = cat.get(equipmentId) ?? "";
+  if (!isRubberCategory(targetCat)) return [];
+  // 順位は「同じ種類のラバーの中での位置」。表ソフトを裏ソフトと混ぜて順位付け
+  // しない(混ぜると表ソフトが弧線で全ラバー中2位、のような嘘くさい順位が出る)。
+  const inGroupPair = (a: string, b: string) =>
+    sameRubberGroup(cat.get(a) ?? "", targetCat) &&
+    sameRubberGroup(cat.get(b) ?? "", targetCat);
 
   const positions: AxisPosition[] = [];
   for (const axis of ALL_AXES) {
@@ -208,7 +213,7 @@ export async function getEquipmentAxisPositions(
     for (const r of rows as ComparisonAxisRow[]) {
       const winner = r[col];
       if (winner !== "A" && winner !== "B" && winner !== "SAME") continue;
-      if (!isRubberPair(r.optionAEquipmentId, r.optionBEquipmentId)) continue;
+      if (!inGroupPair(r.optionAEquipmentId, r.optionBEquipmentId)) continue;
       inputs.push({
         aId: r.optionAEquipmentId,
         bId: r.optionBEquipmentId,
@@ -326,26 +331,39 @@ async function loadRubberAxisRatings(): Promise<{
     }),
   ]);
   const byId = new Map(equipments.map((e) => [e.id, e]));
-  const isRubberPair = (a: string, b: string) =>
-    isRubberCategory(byId.get(a)?.category ?? "") &&
-    isRubberCategory(byId.get(b)?.category ?? "");
+  const catOf = (id: string) => byId.get(id)?.category ?? "";
 
   const perAxis = new Map<AxisKey, AxisRatings>();
   for (const axis of ALL_AXES) {
     const col = AXIS_COLUMN[axis];
-    const inputs: PairwiseInput[] = [];
+    // 比較可能グループ(表/裏系/粒高/アンチ)ごとに別々の入力に振り分け、
+    // グループごとに独立して順位推定・正規化する。種類を跨いだ比較は地図に
+    // 混ぜない(混ぜると表ソフトが裏ソフトと同じ弧線スケールで順位付けされる)。
+    const byGroup = new Map<string, PairwiseInput[]>();
     for (const r of rows as ComparisonAxisRow[]) {
       const winner = r[col];
       if (winner !== "A" && winner !== "B" && winner !== "SAME") continue;
-      if (!isRubberPair(r.optionAEquipmentId, r.optionBEquipmentId)) continue;
-      inputs.push({
+      const ca = catOf(r.optionAEquipmentId);
+      const cb = catOf(r.optionBEquipmentId);
+      if (!sameRubberGroup(ca, cb)) continue;
+      const g = rubberGroup(ca)!;
+      const list = byGroup.get(g) ?? [];
+      list.push({
         aId: r.optionAEquipmentId,
         bId: r.optionBEquipmentId,
         winner,
         weight: experienceWeight(r.hasActualExperience),
       });
+      byGroup.set(g, list);
     }
-    perAxis.set(axis, computeAxisRatings(inputs).ratings);
+    // 各グループの ratings を統合(グループは互いに素なのでIDは衝突しない)
+    const merged: AxisRatings = new Map();
+    for (const inputs of byGroup.values()) {
+      for (const [id, rt] of computeAxisRatings(inputs).ratings) {
+        merged.set(id, rt);
+      }
+    }
+    perAxis.set(axis, merged);
   }
   return { equipments, byId, perAxis };
 }
@@ -354,13 +372,16 @@ export async function buildSwitchCandidates(
   baseId: string,
   limit = 6,
 ): Promise<SwitchCandidates> {
-  const { equipments, perAxis } = await loadRubberAxisRatings();
+  const { equipments, byId, perAxis } = await loadRubberAxisRatings();
+  const baseCat = byId.get(baseId)?.category ?? "";
+  if (!isRubberCategory(baseCat)) return { baseRanked: false, candidates: [] };
 
   let baseRanked = false;
   const candidates: SwitchCandidate[] = [];
   for (const e of equipments) {
     if (e.id === baseId) continue;
-    if (!isRubberCategory(e.category)) continue;
+    // 乗り換え候補は同じ種類のラバーのみ(表ソフト基準に裏ソフトを勧めない)
+    if (!sameRubberGroup(baseCat, e.category)) continue;
     const axes: SwitchCandidate["axes"] = [];
     for (const axis of ALL_AXES) {
       const ratings = perAxis.get(axis)!;
@@ -457,7 +478,9 @@ export async function findSimilarEquipment(
 
   const out: SimilarEquipment[] = [];
   for (const e of equipments) {
-    if (e.id === baseId || !isRubberCategory(e.category)) continue;
+    if (e.id === baseId) continue;
+    // 似た用具も同じ種類のラバーの中から(表ソフトに裏ソフトを「似てる」と出さない)
+    if (!sameRubberGroup(baseCat, e.category)) continue;
     let sumSq = 0;
     let shared = 0;
     let support = Infinity;

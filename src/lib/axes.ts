@@ -1,4 +1,5 @@
 import type { AxisKey } from "./ranking";
+import { sameRubberGroup } from "./types";
 
 // ラバー軸モデルの単一の真実 (Single Source of Truth)。
 // マップ・用具詳細・比較・乗り換え・出題の全てがここから軸を引く。
@@ -104,8 +105,14 @@ export function isTackyCategory(category: string): boolean {
   return category === "RUBBER_STICKY";
 }
 
-/** このペアで出題・表示してよい軸 (粘着は粘着系同士のときだけ) */
+/**
+ * このペアで出題・表示してよい軸。
+ * - 種類(表/裏/粒高/アンチ)が違うラバー同士は打球構造が別物で、どの軸も横並び
+ *   比較が成立しないため空を返す(=出題・順位付けの対象にしない)。
+ * - 粘着軸は粘着系ラバー同士のときだけ。
+ */
 export function axesForPair(catA: string, catB: string): RubberAxisMeta[] {
+  if (!sameRubberGroup(catA, catB)) return [];
   const bothTacky = isTackyCategory(catA) && isTackyCategory(catB);
   return RUBBER_AXES.filter((a) => !a.tackyOnly || bothTacky);
 }

@@ -168,3 +168,37 @@ export const MIN_DIAGNOSIS_ANSWERS = 10;
 export function isRubberCategory(category: string): boolean {
   return category.startsWith("RUBBER_");
 }
+
+// ラバーの「比較可能グループ」。打球構造が違う種類(表/裏/粒高/アンチ)を横並びで
+// 「スピンがかかるのは?」と比べても無意味(表ソフトは構造上スピン・弧線が出ない)。
+// 相対マップ・乗り換え候補・順位・出題は、必ず同一グループ内に限定する。
+// 裏ソフトと粘着は同じ裏面構造で、テンション⇔粘着の乗り換え・比較が実際に
+// 一般的なため同一グループ(裏ソフト系)として扱う。
+export function rubberGroup(category: string): string | null {
+  switch (category) {
+    case "RUBBER_INVERTED":
+    case "RUBBER_STICKY":
+      return "INVERTED"; // 裏ソフト系 (裏・粘着)
+    case "RUBBER_PIMPLE_OUT":
+      return "PIMPLE_OUT"; // 表ソフト
+    case "RUBBER_PIMPLE_LONG":
+      return "PIMPLE_LONG"; // 粒高
+    case "RUBBER_ANTI":
+      return "ANTI"; // アンチ
+    default:
+      return null; // ラバー以外
+  }
+}
+
+/** 2つのカテゴリが同じ比較可能グループ(=横並び比較が成立する)か */
+export function sameRubberGroup(catA: string, catB: string): boolean {
+  const ga = rubberGroup(catA);
+  return ga !== null && ga === rubberGroup(catB);
+}
+
+/** 指定カテゴリと同じ比較可能グループに属する全ラバーカテゴリ */
+export function rubberGroupCategories(category: string): string[] {
+  const g = rubberGroup(category);
+  if (!g) return [];
+  return EQUIPMENT_CATEGORIES.filter((c) => rubberGroup(c) === g);
+}

@@ -134,7 +134,14 @@ const STAPLE_RUBBER_NAMES = [
 export async function getPopularRubbers(
   take = 8,
   excludeIds: string[] = [],
+  // 指定時はこのカテゴリ群のラバーだけに絞る (種類を跨いだ候補を出さないため)
+  categories?: string[],
 ): Promise<Array<{ id: string; name: string; manufacturer: string }>> {
+  // categories 指定時はそのカテゴリ群、無指定時は全ラバー
+  const catFilter =
+    categories && categories.length > 0
+      ? { category: { in: categories } }
+      : { category: { startsWith: "RUBBER_" } };
   const grouped = await prisma.gearItem.groupBy({
     by: ["equipmentId"],
     _count: { equipmentId: true },
@@ -149,7 +156,7 @@ export async function getPopularRubbers(
       where: {
         id: { in: byCount },
         isActive: true,
-        category: { startsWith: "RUBBER_" },
+        ...catFilter,
       },
       select: { id: true, name: true, manufacturer: true },
     })
@@ -161,7 +168,7 @@ export async function getPopularRubbers(
       where: {
         name: { in: STAPLE_RUBBER_NAMES },
         isActive: true,
-        category: { startsWith: "RUBBER_" },
+        ...catFilter,
         id: { notIn: [...excludeIds, ...out.map((o) => o.id)] },
       },
       select: { id: true, name: true, manufacturer: true },

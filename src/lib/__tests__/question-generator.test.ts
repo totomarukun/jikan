@@ -166,4 +166,40 @@ describe("generateQuestion (マイギア中心)", () => {
     });
     expect(q).toBeNull();
   });
+
+  it("種類を跨いだ出題はしない: 表ソフト基準は表ソフトとだけ組む", () => {
+    const pool = [
+      makeEquipment("po-base", "RUBBER_PIMPLE_OUT"),
+      makeEquipment("po-1", "RUBBER_PIMPLE_OUT"),
+      makeEquipment("po-2", "RUBBER_PIMPLE_OUT"),
+      ...Array.from({ length: 8 }, (_, i) =>
+        makeEquipment(`inv-${i}`, "RUBBER_INVERTED"),
+      ),
+    ];
+    const gear = [makeGear("po-base", { side: "FH", isCurrent: true })];
+    for (let i = 0; i < 200; i++) {
+      const q = generateQuestion(pool, { gear, recentAsked: [] });
+      if (!q) continue;
+      // 出たペアは必ず両方とも表ソフト(裏ソフトが混ざらない)
+      expect(q.optionA.category).toBe("RUBBER_PIMPLE_OUT");
+      expect(q.optionB.category).toBe("RUBBER_PIMPLE_OUT");
+    }
+  });
+
+  it("裏ソフトと粘着は同じグループとして出題されうる", () => {
+    const pool = [
+      makeEquipment("inv-base", "RUBBER_INVERTED"),
+      makeEquipment("sticky-1", "RUBBER_STICKY"),
+    ];
+    const gear = [makeGear("inv-base", { side: "FH", isCurrent: true })];
+    let paired = false;
+    for (let i = 0; i < 100; i++) {
+      const q = generateQuestion(pool, { gear, recentAsked: [] });
+      if (q && (q.optionA.id === "sticky-1" || q.optionB.id === "sticky-1")) {
+        paired = true;
+        break;
+      }
+    }
+    expect(paired).toBe(true);
+  });
 });
