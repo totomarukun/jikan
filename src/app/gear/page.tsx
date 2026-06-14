@@ -419,7 +419,12 @@ function GearRow({
   onRemove: (id: string) => void;
   onSave: (
     g: GearEntry,
-    patch: { note?: string; usageStartedAt?: string; weightGrams?: number },
+    patch: {
+      note?: string;
+      usageStartedAt?: string;
+      weightGrams?: number;
+      bladeWeightGrams?: number;
+    },
   ) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
