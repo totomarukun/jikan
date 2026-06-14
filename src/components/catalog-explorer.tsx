@@ -67,16 +67,22 @@ type View = "list" | "map" | "compare";
 export function CatalogExplorer({
   items,
   currentIds = [],
+  gearRubbers = [],
+  initialBaseId = null,
   initialView = "list",
 }: {
   items: CatalogItem[];
   currentIds?: string[];
+  gearRubbers?: Array<{ id: string; name: string }>;
+  initialBaseId?: string | null;
   initialView?: View;
 }) {
   const [view, setView] = useState<View>(initialView);
   const [mapAxis, setMapAxis] = useState<string>("speed");
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
+  const [baseId, setBaseId] = useState<string | null>(initialBaseId);
+  const [basePickerOpen, setBasePickerOpen] = useState(false);
   const [cat, setCat] = useState<string | null>(null);
   const [mfr, setMfr] = useState("");
   const [band, setBand] = useState<number>(-1);
@@ -89,11 +95,13 @@ export function CatalogExplorer({
   const [picked, setPicked] = useState<CatalogItem[]>([]);
 
   const currentSet = useMemo(() => new Set(currentIds), [currentIds]);
-  // 現用ラバー(基準)の軸スコア。あれば「現用に近い順」と差分表示に使う。
-  const baseline = useMemo(() => {
-    const base = items.find((e) => currentSet.has(e.id));
-    return base?.scores ?? null;
-  }, [items, currentSet]);
+  // 基準ラバー: これを置くと一覧/分布/くらべるが「自分基準(差分・近い順)」になる。
+  const baseItem = useMemo(
+    () => items.find((e) => e.id === baseId) ?? null,
+    [items, baseId],
+  );
+  const baseline = baseItem?.scores ?? null;
+  const baseIsGear = baseId != null && gearRubbers.some((g) => g.id === baseId);
 
   const togglePick = (item: CatalogItem) =>
     setPicked((cur) => {
@@ -279,6 +287,23 @@ export function CatalogExplorer({
         </div>
       )}
 
+      {/* 基準ピッカー: 基準を置くと全ビューが自分基準(差分・近い順)になる */}
+      {kind !== "blade" && (
+        <BasePicker
+          baseItem={baseItem}
+          baseIsGear={baseIsGear}
+          gearRubbers={gearRubbers}
+          items={items}
+          open={basePickerOpen}
+          setOpen={setBasePickerOpen}
+          onSet={(id) => {
+            setBaseId(id);
+            setBasePickerOpen(false);
+          }}
+          onClear={() => setBaseId(null)}
+        />
+      )}
+
       {view !== "compare" && (
         <>
       {/* 検索 + サジェスト (タイプして候補から直接ジャンプ) */}
@@ -359,7 +384,7 @@ export function CatalogExplorer({
               <option value="priceAsc">価格が安い順</option>
               <option value="priceDesc">価格が高い順</option>
               <option value="hardness">硬度が高い順</option>
-              {baseline && <option value="near">現用に近い順</option>}
+              {baseline && <option value="near">基準に近い順</option>}
             </optgroup>
             {kind !== "blade" && (
               <optgroup label="特徴スコアが高い順">
@@ -501,7 +526,10 @@ export function CatalogExplorer({
 
       {showScores && baseline && (
         <p className="mt-2 text-[11px] leading-5 text-tt-gray70">
-          スコアの数字は<span className="font-bold text-tt-charcoal">現用ラバー</span>
+          スコアの数字は
+          <span className="font-bold text-tt-charcoal">
+            基準「{baseItem?.name}」
+          </span>
           との差（<span className="font-bold text-tt-deep-green">+</span>が上 /{" "}
           <span className="font-bold text-tt-deep-coral">−</span>が下）。
         </p>
@@ -515,13 +543,14 @@ export function CatalogExplorer({
         <ul className="mt-3 space-y-2 pb-20">
           {filtered.map((e) => {
             const isPicked = picked.some((p) => p.id === e.id);
-            const isCurrentBase = currentSet.has(e.id);
+            const isBase = e.id === baseId;
+            const isCurrent = currentSet.has(e.id);
             return (
               <li
                 key={e.id}
                 className={`rounded-xl bg-white p-3 shadow-sm ring-1 transition ${
-                  isCurrentBase
-                    ? "ring-tt-green/70"
+                  isBase
+                    ? "ring-2 ring-tt-green"
                     : isPicked
                       ? "ring-tt-green/60"
                       : "ring-black/5"
@@ -543,10 +572,16 @@ export function CatalogExplorer({
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 truncate text-sm font-bold">
                         <span className="truncate">{e.name}</span>
-                        {isCurrentBase && (
-                          <span className="shrink-0 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[9px] font-bold text-white">
-                            現用
+                        {isBase ? (
+                          <span className="shrink-0 rounded-full bg-tt-deep-green px-1.5 py-0.5 text-[9px] font-bold text-white">
+                            基準
                           </span>
+                        ) : (
+                          isCurrent && (
+                            <span className="shrink-0 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[9px] font-bold text-white">
+                              現用
+                            </span>
+                          )
                         )}
                         {e.comparisons > 0 && (
                           <span className="shrink-0 rounded-full bg-tt-soft-green px-1.5 py-0.5 text-[9px] font-bold text-tt-deep-green">
@@ -561,22 +596,34 @@ export function CatalogExplorer({
                       </p>
                     </div>
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => togglePick(e)}
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                      isPicked
-                        ? "bg-tt-deep-green text-white"
-                        : "bg-tt-offwhite text-tt-gray70 ring-1 ring-tt-gray30/50 hover:bg-tt-soft-green"
-                    }`}
-                  >
-                    {isPicked ? "選択中" : "比較"}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {!isBase && e.category.startsWith("RUBBER_") && (
+                      <button
+                        type="button"
+                        onClick={() => setBaseId(e.id)}
+                        title="このラバーを基準にする"
+                        className="rounded-full px-2 py-1 text-[11px] font-bold text-tt-gray70 ring-1 ring-tt-gray30/50 transition hover:bg-tt-soft-green hover:text-tt-deep-green"
+                      >
+                        基準に
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => togglePick(e)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                        isPicked
+                          ? "bg-tt-deep-green text-white"
+                          : "bg-tt-offwhite text-tt-gray70 ring-1 ring-tt-gray30/50 hover:bg-tt-soft-green"
+                      }`}
+                    >
+                      {isPicked ? "選択中" : "比較"}
+                    </button>
+                  </div>
                 </div>
                 {showScores && e.category.startsWith("RUBBER_") && (
                   <ScoreStrip
                     scores={e.scores}
-                    baseline={baseline && !isCurrentBase ? baseline : null}
+                    baseline={baseline && !isBase ? baseline : null}
                   />
                 )}
               </li>
@@ -587,9 +634,14 @@ export function CatalogExplorer({
         </>
       )}
 
-      {/* 分布 (マップ): 選んだ軸でラバーを相対位置に並べる。現用を基準表示 */}
+      {/* 分布 (マップ): 選んだ軸でラバーを相対位置に並べる。基準ラバーを強調 */}
       {view === "map" && (
-        <MapBars items={filtered} axisKey={mapAxis} currentSet={currentSet} />
+        <MapBars
+          items={filtered}
+          axisKey={mapAxis}
+          baseId={baseId}
+          currentSet={currentSet}
+        />
       )}
 
       {/* くらべる: 選んだ2本を軸ごとに見比べる */}
@@ -700,14 +752,149 @@ function ScoreStrip({
   );
 }
 
-// 分布(マップ)ビュー: 選んだ軸でラバーを相対位置(0-100)に並べる。現用は太枠で基準表示。
+// 基準ピッカー: 基準ラバーを置く/変える/外す。基準ありで全ビューが自分基準になる。
+// マイギアからワンタップ、または検索で任意のラバーを基準にできる。
+function BasePicker({
+  baseItem,
+  baseIsGear,
+  gearRubbers,
+  items,
+  open,
+  setOpen,
+  onSet,
+  onClear,
+}: {
+  baseItem: CatalogItem | null;
+  baseIsGear: boolean;
+  gearRubbers: Array<{ id: string; name: string }>;
+  items: CatalogItem[];
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  onSet: (id: string) => void;
+  onClear: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const results =
+    q.trim().length >= 1
+      ? searchEquipment(
+          items.filter((e) => e.category.startsWith("RUBBER_")),
+          q,
+          { limit: 6 },
+        )
+      : [];
+  return (
+    <div className="mt-3 rounded-2xl bg-tt-soft-green/50 p-2.5 ring-1 ring-tt-green/20">
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 text-[11px] font-bold text-tt-deep-green">
+          基準
+        </span>
+        {baseItem ? (
+          <span className="min-w-0 flex-1 truncate text-sm font-bold">
+            {baseItem.name}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 text-sm text-tt-gray70">
+            未設定（全体スコアで表示）
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-bold text-tt-deep-green ring-1 ring-tt-green/30"
+        >
+          {baseItem ? "変える" : "基準を選ぶ"}
+        </button>
+        {baseItem && (
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="基準を解除"
+            className="shrink-0 px-1 text-tt-gray70"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {baseItem && (
+        <p className="mt-1 text-[11px] leading-5 text-tt-gray70">
+          一覧・分布・くらべるが「{baseItem.name}」基準（差分・近い順）に。
+          {baseIsGear && (
+            <Link
+              href={`/switch?base=${baseItem.id}`}
+              className="ml-1 font-bold text-tt-deep-green underline"
+            >
+              乗り換えをじっくり検討 →
+            </Link>
+          )}
+        </p>
+      )}
+
+      {open && (
+        <div className="mt-2 rounded-xl bg-white p-2.5 ring-1 ring-black/5">
+          {gearRubbers.length > 0 && (
+            <div className="mb-2">
+              <p className="mb-1 text-[10px] font-bold text-tt-gray70">
+                マイギアから
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {gearRubbers.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => onSet(g.id)}
+                    className="rounded-full bg-tt-offwhite px-2.5 py-1 text-xs font-bold text-tt-charcoal ring-1 ring-tt-gray30/50 transition hover:bg-tt-soft-green"
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="基準にするラバーを検索"
+            className="block w-full rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm focus:border-tt-green focus:outline-none"
+          />
+          {results.length > 0 && (
+            <ul className="mt-1.5 space-y-1">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSet(r.id);
+                      setQ("");
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-tt-soft-green"
+                  >
+                    <span className="truncate font-bold">{r.name}</span>
+                    <span className="ml-auto shrink-0 text-[11px] text-tt-gray70">
+                      {r.manufacturer}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 分布(マップ)ビュー: 選んだ軸でラバーを相対位置(0-100)に並べる。基準は太枠で強調。
 function MapBars({
   items,
   axisKey,
+  baseId,
   currentSet,
 }: {
   items: CatalogItem[];
   axisKey: string;
+  baseId: string | null;
   currentSet: Set<string>;
 }) {
   const meta = STRIP_AXES.find((a) => a.key === axisKey);
@@ -737,6 +924,7 @@ function MapBars({
       <ul className="space-y-2">
         {ranked.map(({ e, v }) => {
           const pct = Math.round(v);
+          const isBase = e.id === baseId;
           const isCur = currentSet.has(e.id);
           const low = e.comparisons < 3;
           return (
@@ -744,7 +932,7 @@ function MapBars({
               <Link
                 href={`/equipment/${e.id}`}
                 className={`block rounded-xl bg-white p-2.5 shadow-sm ring-1 transition hover:-translate-y-0.5 hover:shadow-md ${
-                  isCur ? "ring-2 ring-tt-green" : "ring-black/5"
+                  isBase ? "ring-2 ring-tt-green" : "ring-black/5"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -758,10 +946,16 @@ function MapBars({
                   />
                   <span className="min-w-0 flex-1 truncate text-sm font-bold">
                     {e.name}
-                    {isCur && (
-                      <span className="ml-1.5 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[9px] font-bold text-white">
-                        現用
+                    {isBase ? (
+                      <span className="ml-1.5 rounded-full bg-tt-deep-green px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        基準
                       </span>
+                    ) : (
+                      isCur && (
+                        <span className="ml-1.5 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[9px] font-bold text-white">
+                          現用
+                        </span>
+                      )
                     )}
                   </span>
                   <span className="shrink-0 font-mono text-xs text-tt-gray70">
