@@ -2,11 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
-import {
-  aggregatePairs,
-  getEquipmentRecord,
-  getEquipmentVoices,
-} from "@/lib/data";
+import { aggregatePairs, getEquipmentVoices } from "@/lib/data";
 import { feelStatements, getFeelProfile } from "@/lib/feel";
 import {
   getEquipmentAxisPositions,
@@ -40,9 +36,8 @@ export default async function EquipmentPage({
 
   const isRubber = isRubberCategory(equipment.category);
   const sessionId = await getSessionId();
-  const [record, battles, progress, gearEntry, axisPositions] =
+  const [battles, progress, gearEntry, axisPositions] =
     await Promise.all([
-      getEquipmentRecord(id),
       // 詳細の「この用具が登場する対決」は、貢献(回答)を必ず可視化するため
       // 経験フラグで絞らない。少数票は VersusBarOrPending が「集計中」と正直表示する。
       aggregatePairs({ involvingEquipmentId: id, take: 5 }),
@@ -85,9 +80,6 @@ export default async function EquipmentPage({
     })
     .filter((o) => o.total >= 2 && o.oppVotes > o.myVotes)
     .slice(0, 3);
-  // 判定数が少ないうちは % を断言しない (リスト側の「集計中」ルールと統一)
-  const decided = record.wins + record.losses;
-  const winRate = decided >= 5 ? Math.round((record.wins / decided) * 100) : null;
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -124,22 +116,6 @@ export default async function EquipmentPage({
               <span className="text-tt-gray70">公称硬度 </span>
               <span className="font-mono font-bold">{equipment.hardness}°</span>
               <span className="text-tt-gray70"> (自社基準)</span>
-            </div>
-          )}
-          {winRate != null ? (
-            <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
-              <span className="text-tt-gray70">「好み」勝率 </span>
-              <span className="font-mono font-bold text-tt-deep-green">
-                {winRate}%
-              </span>
-              <span className="font-mono text-tt-gray70">
-                ({record.wins}勝{record.losses}敗)
-              </span>
-            </div>
-          ) : (
-            <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
-              <span className="text-tt-gray70">みんなの「好み」 </span>
-              <span className="font-mono font-bold">まだ{decided}件</span>
             </div>
           )}
         </dl>
