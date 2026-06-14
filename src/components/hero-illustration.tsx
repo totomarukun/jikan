@@ -5,78 +5,95 @@
 const GREEN = "#1a8917";
 const DEEP_GREEN = "#0f6e56";
 const CORAL = "#d85a30";
-const GRAY = "#b4b2a9";
 
 export function HeroCompareIllustration({
   className = "",
 }: {
   className?: string;
 }) {
-  // 3本の比較バー: 緑の帯=みんなの比較で決まった位置、珊瑚の丸=もう片方の用具
-  const bars = [
-    { y: 122, green: 168, coral: 232 },
-    { y: 150, green: 96, coral: 150 },
-    { y: 178, green: 210, coral: 120 },
+  // 実プロダクト(用具マップ)を模したミニ画面: 使った人の比較で並んだラバーと、
+  // 現用ラバーを基準にした相対スコア。「比較で特徴が分かる」を1枚で伝える。
+  const rows = [
+    { color: GREEN, label: 92, score: 96, you: false },
+    { color: CORAL, label: 74, score: 70, you: true },
+    { color: "#3b6fd4", label: 86, score: 52, you: false },
+    { color: DEEP_GREEN, label: 60, score: 34, you: false },
   ];
   return (
     <svg
-      viewBox="0 0 320 210"
+      viewBox="0 0 320 244"
       className={className}
       role="img"
-      aria-label="2本のラバーを比較して特徴を相対的に見るイメージ"
+      aria-label="用具マップで、使った人の比較から用具の特徴が相対的に分かるイメージ"
     >
-      {/* 左ラバー (緑) */}
-      <g>
-        <rect x="86" y="78" width="8" height="26" rx="4" fill={GRAY} />
-        <circle cx="90" cy="50" r="34" fill="#e1f5ee" />
-        <circle cx="90" cy="50" r="26" fill={GREEN} />
-        <circle cx="90" cy="50" r="26" fill="url(#dots)" opacity="0.25" />
-      </g>
-      {/* 右ラバー (珊瑚) */}
-      <g>
-        <rect x="226" y="78" width="8" height="26" rx="4" fill={GRAY} />
-        <circle cx="230" cy="50" r="34" fill="#faece7" />
-        <circle cx="230" cy="50" r="26" fill={CORAL} />
-        <circle cx="230" cy="50" r="26" fill="url(#dots)" opacity="0.25" />
-      </g>
-      {/* VS */}
-      <circle cx="160" cy="50" r="16" fill="#1a1a1a" />
-      <text
-        x="160"
-        y="55"
-        textAnchor="middle"
-        fontSize="13"
-        fontWeight="700"
+      {/* アプリ画面のカード */}
+      <rect
+        x="14"
+        y="12"
+        width="292"
+        height="220"
+        rx="22"
         fill="#ffffff"
+        stroke="#ece9e1"
+        strokeWidth="2"
+      />
+      {/* ヘッダー: タイトル + 軸タブ */}
+      <rect x="34" y="34" width="86" height="11" rx="5.5" fill="#1a1a1a" opacity="0.82" />
+      <rect x="206" y="31" width="80" height="18" rx="9" fill="#e1f5ee" />
+      <text
+        x="246"
+        y="44"
+        textAnchor="middle"
+        fontSize="10"
+        fontWeight="700"
+        fill="#0f6e56"
         fontFamily="sans-serif"
       >
-        VS
+        スピード
       </text>
 
-      {/* 比較バー */}
-      {bars.map((b, i) => (
-        <g key={i}>
-          <rect x="40" y={b.y} width="240" height="10" rx="5" fill="#ece9e1" />
-          <rect
-            x="40"
-            y={b.y}
-            width={b.green}
-            height="10"
-            rx="5"
-            fill={i === 1 ? DEEP_GREEN : GREEN}
-          />
-          <circle cx={40 + b.coral} cy={b.y + 5} r="8" fill={CORAL} />
-          <circle cx={40 + b.coral} cy={b.y + 5} r="8" fill="#ffffff" opacity="0.15" />
-        </g>
-      ))}
+      {rows.map((r, i) => {
+        const y = 80 + i * 38;
+        return (
+          <g key={i}>
+            {r.you && (
+              <rect x="22" y={y - 16} width="276" height="32" rx="12" fill="#e1f5ee" />
+            )}
+            <circle cx="42" cy={y} r="11" fill={r.color} />
+            <circle cx="42" cy={y} r="11" fill="url(#hdots)" opacity="0.25" />
+            <rect x="62" y={y - 5} width={r.label} height="9" rx="4.5" fill="#e7e4dc" />
+            {r.you && (
+              <>
+                <rect x={62 + r.label + 6} y={y - 8} width="32" height="15" rx="7.5" fill="#1a1a1a" />
+                <text
+                  x={62 + r.label + 22}
+                  y={y + 3}
+                  textAnchor="middle"
+                  fontSize="9"
+                  fontWeight="700"
+                  fill="#ffffff"
+                  fontFamily="sans-serif"
+                >
+                  現用
+                </text>
+              </>
+            )}
+            {/* 相対スコアのバー */}
+            <rect x="196" y={y - 5} width="92" height="10" rx="5" fill="#ece9e1" />
+            <rect
+              x="196"
+              y={y - 5}
+              width={(92 * r.score) / 100}
+              height="10"
+              rx="5"
+              fill={r.you ? CORAL : GREEN}
+            />
+          </g>
+        );
+      })}
 
       <defs>
-        <pattern
-          id="dots"
-          width="7"
-          height="7"
-          patternUnits="userSpaceOnUse"
-        >
+        <pattern id="hdots" width="7" height="7" patternUnits="userSpaceOnUse">
           <circle cx="1.5" cy="1.5" r="1.1" fill="#ffffff" />
         </pattern>
       </defs>

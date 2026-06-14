@@ -44,7 +44,7 @@ export default async function LandingPage() {
           気になる用具の特徴が、いまの自分の用具と比べて
           <strong className="text-tt-charcoal">ひと目で分かります</strong>。
         </p>
-        <HeroCompareIllustration className="animate-rise mx-auto mt-6 w-full max-w-[280px] [animation-delay:120ms]" />
+        <HeroCompareIllustration className="animate-rise mx-auto mt-7 w-full max-w-[330px] drop-shadow-[0_12px_28px_rgba(15,110,86,0.16)] [animation-delay:120ms]" />
         <div className="animate-rise mt-6 [animation-delay:160ms]">
           <Link
             href="/catalog?view=map"
