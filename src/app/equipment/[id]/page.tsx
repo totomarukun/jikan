@@ -423,7 +423,7 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
           const low = p.comparisons < 3;
           return (
             <li key={p.axis}>
-              <Link href={`/map?axis=${p.axis}`} className="block">
+              <Link href="/catalog?view=map" className="block">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold">{meta.label}</span>
                   <span className="font-mono text-tt-gray70">
