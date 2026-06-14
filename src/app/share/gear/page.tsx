@@ -39,10 +39,13 @@ export default async function ShareGearPage({
 }) {
   const sp = await searchParams;
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : null);
+  const withThick = (name: string | null, th: string | null) =>
+    name ? (th ? `${name}（${th}）` : name) : null;
+  const totalWeight = get("tw");
   const rows: Array<[string, string | null]> = [
     ["ラケット", get("blade")],
-    ["フォア", get("fh")],
-    ["バック", get("bh")],
+    ["フォア", withThick(get("fh"), get("ft"))],
+    ["バック", withThick(get("bh"), get("bt"))],
   ];
 
   return (
@@ -60,6 +63,14 @@ export default async function ShareGearPage({
             <span className="text-lg font-bold">{value || "—"}</span>
           </div>
         ))}
+        {totalWeight && (
+          <div className="mt-1 flex items-baseline gap-3 border-t border-tt-gray30/30 pt-2">
+            <span className="w-16 shrink-0 text-xs font-bold text-tt-deep-green">
+              合計重量
+            </span>
+            <span className="font-mono text-lg font-bold">{totalWeight}g</span>
+          </div>
+        )}
       </div>
       <p className="mt-6 leading-7 text-tt-gray70">
         TacTapは、両方使った人のAB比較から用具の特徴を相対的に見られるサービス。

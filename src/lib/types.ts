@@ -94,6 +94,8 @@ export const gearSchema = z.object({
   note: z.string().max(500).optional(),
   // カット後の実測重量(g)。任意 (合計重量計算用)
   weightGrams: z.number().int().positive().max(150).optional(),
+  // ラケット単体の重量(g)。任意 (合計ラケット重量の計算用)
+  bladeWeightGrams: z.number().int().positive().max(200).optional(),
 });
 
 export const signupSchema = z.object({

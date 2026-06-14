@@ -27,9 +27,14 @@ function row(label: string, value: string | null) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const clip = (s: string | null) => (s ? s.slice(0, 30) : null);
+  const thick = (s: string | null) => (s ? s.slice(0, 6) : null);
+  const withTh = (name: string | null, th: string | null) =>
+    name ? (th ? `${name}（${th}）` : name) : null;
   const blade = clip(searchParams.get("blade"));
-  const fh = clip(searchParams.get("fh"));
-  const bh = clip(searchParams.get("bh"));
+  const fh = withTh(clip(searchParams.get("fh")), thick(searchParams.get("ft")));
+  const bh = withTh(clip(searchParams.get("bh")), thick(searchParams.get("bt")));
+  const tw = searchParams.get("tw");
+  const totalWeight = tw && /^\d{2,3}$/.test(tw) ? `合計 ${tw}g` : null;
 
   return new ImageResponse(
     (
@@ -72,6 +77,19 @@ export async function GET(request: Request) {
           {row("ラケット", blade)}
           {row("フォア", fh)}
           {row("バック", bh)}
+          {totalWeight ? (
+            <div style={{ display: "flex", marginTop: "8px" }}>
+              <div
+                style={{
+                  fontSize: "30px",
+                  fontWeight: 700,
+                  color: "#d85a30",
+                }}
+              >
+                {totalWeight}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div

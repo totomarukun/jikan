@@ -101,7 +101,6 @@ export function CatalogExplorer({
     [items, baseId],
   );
   const baseline = baseItem?.scores ?? null;
-  const baseIsGear = baseId != null && gearRubbers.some((g) => g.id === baseId);
 
   const togglePick = (item: CatalogItem) =>
     setPicked((cur) => {
@@ -291,7 +290,6 @@ export function CatalogExplorer({
       {kind !== "blade" && (
         <BasePicker
           baseItem={baseItem}
-          baseIsGear={baseIsGear}
           gearRubbers={gearRubbers}
           items={items}
           open={basePickerOpen}
@@ -756,7 +754,6 @@ function ScoreStrip({
 // マイギアからワンタップ、または検索で任意のラバーを基準にできる。
 function BasePicker({
   baseItem,
-  baseIsGear,
   gearRubbers,
   items,
   open,
@@ -765,7 +762,6 @@ function BasePicker({
   onClear,
 }: {
   baseItem: CatalogItem | null;
-  baseIsGear: boolean;
   gearRubbers: Array<{ id: string; name: string }>;
   items: CatalogItem[];
   open: boolean;
@@ -819,14 +815,12 @@ function BasePicker({
       {baseItem && (
         <p className="mt-1 text-[11px] leading-5 text-tt-gray70">
           一覧・分布・くらべるが「{baseItem.name}」基準（差分・近い順）に。
-          {baseIsGear && (
-            <Link
-              href={`/switch?base=${baseItem.id}`}
-              className="ml-1 font-bold text-tt-deep-green underline"
-            >
-              乗り換えをじっくり検討 →
-            </Link>
-          )}
+          <Link
+            href={`/switch?base=${baseItem.id}`}
+            className="ml-1 font-bold text-tt-deep-green underline"
+          >
+            乗り換えをじっくり検討 →
+          </Link>
         </p>
       )}
 

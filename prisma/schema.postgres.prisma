@@ -91,6 +91,8 @@ model GearItem {
   note             String?
   // カット後の実測重量(g)。任意。合計重量(ラケット+ラバー)計算に使う
   weightGrams      Int?
+  // ラケット(ブレード)単体の重量(g)。任意。合計ラケット重量の計算に使う
+  bladeWeightGrams Int?
   createdAt        DateTime   @default(now())
 
   @@index([sessionId])

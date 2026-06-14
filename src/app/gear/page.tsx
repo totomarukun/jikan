@@ -40,6 +40,7 @@ interface GearEntry {
   usageStartedAt: string | null;
   note: string | null;
   weightGrams: number | null;
+  bladeWeightGrams: number | null;
   equipment: {
     id: string;
     name: string;
@@ -105,7 +106,12 @@ export default function GearPage() {
   // 既存ギアの貼った日・メモを更新 (同一 equipmentId×side は更新扱い)
   async function saveDetails(
     g: GearEntry,
-    patch: { note?: string; usageStartedAt?: string; weightGrams?: number },
+    patch: {
+      note?: string;
+      usageStartedAt?: string;
+      weightGrams?: number;
+      bladeWeightGrams?: number;
+    },
   ) {
     await fetch("/api/gear", {
       method: "POST",
@@ -117,6 +123,7 @@ export default function GearPage() {
         note: patch.note,
         usageStartedAt: patch.usageStartedAt,
         weightGrams: patch.weightGrams,
+        bladeWeightGrams: patch.bladeWeightGrams,
       }),
     });
     await reload();
@@ -196,17 +203,36 @@ export default function GearPage() {
                           (g) => g.weightGrams != null,
                         );
                         if (weighed.length === 0) return null;
-                        const sum = weighed.reduce(
+                        const rubberSum = weighed.reduce(
                           (s, g) => s + (g.weightGrams ?? 0),
                           0,
                         );
+                        // ラケット重量は1本だけ加算 (FH/BHで同じブレードを共有するため)
+                        const bladeW =
+                          current.find((g) => g.bladeWeightGrams != null)
+                            ?.bladeWeightGrams ?? null;
+                        const partial = weighed.length < current.length;
                         return (
-                          <span className="text-xs text-tt-gray70">
-                            ラバー計{" "}
-                            <span className="font-mono font-bold text-tt-charcoal">
-                              {sum}g
-                            </span>
-                            {weighed.length < current.length && "（記録分）"}
+                          <span className="text-right text-xs text-tt-gray70">
+                            {bladeW != null ? (
+                              <>
+                                合計{" "}
+                                <span className="font-mono font-bold text-tt-charcoal">
+                                  {rubberSum + bladeW}g
+                                </span>
+                                <span className="text-[10px]">
+                                  （ラケット込）
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                ラバー計{" "}
+                                <span className="font-mono font-bold text-tt-charcoal">
+                                  {rubberSum}g
+                                </span>
+                                {partial && "（記録分）"}
+                              </>
+                            )}
                           </span>
                         );
                       })()}
@@ -353,13 +379,23 @@ export default function GearPage() {
 // Web Share → X投稿。シェアされたURLには動的OGカード(/api/og/gear)が付く。
 function shareGear(gear: GearEntry[]) {
   const cur = gear.filter((g) => g.isCurrent);
-  const fh = cur.find((g) => g.side === "FH")?.equipment.name ?? "";
-  const bh = cur.find((g) => g.side === "BH")?.equipment.name ?? "";
+  const fhItem = cur.find((g) => g.side === "FH");
+  const bhItem = cur.find((g) => g.side === "BH");
+  const fh = fhItem?.equipment.name ?? "";
+  const bh = bhItem?.equipment.name ?? "";
   const blade = cur.find((g) => g.blade)?.blade?.name ?? "";
   const q = new URLSearchParams();
   if (blade) q.set("blade", blade);
   if (fh) q.set("fh", fh);
   if (bh) q.set("bh", bh);
+  if (fhItem && fhItem.thickness !== "UNKNOWN")
+    q.set("ft", THICKNESS_LABELS[fhItem.thickness]);
+  if (bhItem && bhItem.thickness !== "UNKNOWN")
+    q.set("bt", THICKNESS_LABELS[bhItem.thickness]);
+  // 合計重量(ラバー + ラケット)が記録されていれば載せる
+  const rubberSum = cur.reduce((s, g) => s + (g.weightGrams ?? 0), 0);
+  const bladeW = cur.find((g) => g.bladeWeightGrams != null)?.bladeWeightGrams;
+  if (rubberSum > 0) q.set("tw", String(rubberSum + (bladeW ?? 0)));
   const url = `${window.location.origin}/share/gear?${q.toString()}`;
   const text = "私の卓球ギア構成 #TacTap";
   if (typeof navigator !== "undefined" && navigator.share) {
@@ -394,16 +430,22 @@ function GearRow({
   const [weight, setWeight] = useState(
     g.weightGrams != null ? String(g.weightGrams) : "",
   );
+  const [bladeWeight, setBladeWeight] = useState(
+    g.bladeWeightGrams != null ? String(g.bladeWeightGrams) : "",
+  );
   const [saving, setSaving] = useState(false);
   const reminder = g.isCurrent ? gearReminder(g.usageStartedAt) : null;
 
   async function save() {
     setSaving(true);
     const w = weight.trim() ? Number(weight) : NaN;
+    const bw = bladeWeight.trim() ? Number(bladeWeight) : NaN;
     await onSave(g, {
       note,
       usageStartedAt: date ? new Date(date).toISOString() : undefined,
       weightGrams: Number.isFinite(w) && w > 0 ? Math.round(w) : undefined,
+      bladeWeightGrams:
+        Number.isFinite(bw) && bw > 0 ? Math.round(bw) : undefined,
     });
     setSaving(false);
     setEditing(false);
@@ -500,6 +542,21 @@ function GearRow({
               />
             </label>
           </div>
+          {g.blade && (
+            <label className="block text-xs font-medium text-tt-gray70">
+              ラケット「{g.blade.name}」の重さ（g・任意）
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={200}
+                value={bladeWeight}
+                onChange={(e) => setBladeWeight(e.target.value)}
+                placeholder="例: 88（合計ラケット重量の計算に）"
+                className="mt-1 block w-full rounded-lg border border-tt-gray30/50 px-3 py-2 text-sm"
+              />
+            </label>
+          )}
           <label className="block text-xs font-medium text-tt-gray70">
             メモ（乗り換え理由・感想など）
             <textarea

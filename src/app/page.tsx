@@ -5,6 +5,9 @@ import {
   IconRuler,
   IconBothUsed,
   IconSplit,
+  IconMap,
+  IconTarget,
+  IconNote,
 } from "@/components/hero-illustration";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
@@ -125,28 +128,37 @@ export default async function LandingPage() {
       {/* 流れ */}
       <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
         <h2 className="text-lg font-bold">使い方</h2>
-        <ol className="mt-4 space-y-4">
+        <ol className="mt-4 space-y-3">
           {[
-            [
-              "用具マップで特徴を相対的に見る",
-              "登録なしでOK。両方使った人の比較から、用具の位置関係が読める",
-            ],
-            [
-              "マイギアを登録して「自分基準」にする",
-              "いまのラバーを原点に、候補がどう違うかで読めるようになる",
-            ],
-            [
-              "気になった所で、体感を1問だけ答える",
-              "答えるほど地図がくわしくなります。うろ覚えでも答えてOK",
-            ],
-          ].map(([title, desc], i) => (
-            <li key={title} className="flex items-start gap-4">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-tt-green font-mono text-sm font-bold text-white">
-                {i + 1}
+            {
+              Icon: IconMap,
+              title: "「用具をみる」で特徴を相対的に",
+              desc: "登録なしでOK。使った人の比較から、用具の位置関係がわかる。",
+            },
+            {
+              Icon: IconTarget,
+              title: "気になるラバーを「基準」に置く",
+              desc: "いまの自分の用具を原点に、候補がどう違うか（差分・近い順）で読める。",
+            },
+            {
+              Icon: IconNote,
+              title: "マイギアを育てる・体感を答える",
+              desc: "重さや張替も管理。使った2本を答えると、あなたの体感が比較の資産になる。",
+            },
+          ].map(({ Icon, title, desc }, i) => (
+            <li
+              key={title}
+              className="flex items-start gap-3 rounded-2xl bg-tt-offwhite p-3 ring-1 ring-black/5"
+            >
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-tt-green/20">
+                <Icon className="h-7 w-7" />
+                <span className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-tt-green font-mono text-[11px] font-bold text-white">
+                  {i + 1}
+                </span>
               </span>
-              <div>
+              <div className="pt-0.5">
                 <p className="font-bold">{title}</p>
-                <p className="text-sm text-tt-gray70">{desc}</p>
+                <p className="mt-0.5 text-sm leading-6 text-tt-gray70">{desc}</p>
               </div>
             </li>
           ))}
