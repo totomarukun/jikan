@@ -44,11 +44,6 @@ export default async function MapPage({
   return (
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">用具マップ</h1>
-      <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        使った人の「こっちが上」を集めて、用具を1本の軸に並べました。
-        直接比べていない用具も、まわりの比較から
-        <strong className="text-tt-charcoal">だいたいの位置</strong>がわかります。
-      </p>
 
       {/* 軸タブ */}
       <div className="mt-4 flex flex-wrap gap-2">
