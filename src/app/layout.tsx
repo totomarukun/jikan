@@ -25,11 +25,15 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   ),
   title: {
-    default: "TacTap | 卓球用具のAB比較",
+    default: "TacTap | 卓球用具を、比較で選ぶ。",
     template: "%s | TacTap",
   },
   description:
-    "両方使った人の比較から、卓球用具の特徴を相対的に。データで、用具選びの後悔を減らす。",
+    "両方使った人の比較から、卓球用具の特徴がわかる。データで、用具選びの後悔を減らす。",
+  openGraph: {
+    title: "TacTap | 卓球用具を、比較で選ぶ。",
+    description: "両方使った人の比較から、卓球用具の特徴がわかる。",
+  },
   twitter: { card: "summary_large_image" },
 };
 
