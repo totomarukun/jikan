@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import { searchEquipment, type SearchableItem } from "@/lib/search";
+import { RUBBER_AXES } from "@/lib/axes";
 
 // 用具カタログのブラウズ (探す/調べる の入口): 356件を比較データ無しでも
 // 種類・メーカー・価格で絞り込み＋検索して詳細へ。ユーザーの思考「種類→メーカー→…」に対応。
@@ -19,7 +20,20 @@ export interface CatalogItem {
   bladeSubcategory: string | null;
   comparisons: number;
   popularity: number;
+  /** 軸別スコア(0-100)。両方使った人の比較から推定。データが無い軸は欠落 */
+  scores?: Record<string, number>;
 }
+
+// ダッシュボードのスコア列に出すラバー軸 (粘着は粘着系専用なので一覧には出さない)
+const STRIP_AXES = RUBBER_AXES.filter((a) => !a.tackyOnly);
+const AXIS_SHORT: Record<string, string> = {
+  speed: "スピード",
+  spin: "スピン",
+  hardness: "かたさ",
+  arc: "弧線",
+  attackEase: "攻撃",
+  defenseEase: "守備",
+};
 
 // 戦型 → よく使われるラバー種類 (一般的な対応。種類フィルタのショートカット)
 const STYLE_CATS: Record<string, { label: string; cats: string[] }> = {
@@ -63,14 +77,17 @@ const HARDNESS_BANDS: Array<{ label: string; min: number; max: number }> = [
 ];
 
 type Kind = "all" | "rubber" | "blade";
-type Sort = "popular" | "name" | "priceAsc" | "priceDesc" | "hardness";
+// "popular" | "name" | "priceAsc" | "priceDesc" | "hardness" | "near" | 軸キー
+type Sort = string;
 
 export function CatalogExplorer({
   items,
   initialStyle = null,
+  currentIds = [],
 }: {
   items: CatalogItem[];
   initialStyle?: string | null;
+  currentIds?: string[];
 }) {
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
@@ -82,8 +99,16 @@ export function CatalogExplorer({
   const [band, setBand] = useState<number>(-1);
   const [hard, setHard] = useState<number>(-1);
   const [sort, setSort] = useState<Sort>("popular");
+  const [showScores, setShowScores] = useState(true);
   // 比較する2本の選択 (ブラウズ→対決作成の導線)
   const [picked, setPicked] = useState<CatalogItem[]>([]);
+
+  const currentSet = useMemo(() => new Set(currentIds), [currentIds]);
+  // 現用ラバー(基準)の軸スコア。あれば「現用に近い順」と差分表示に使う。
+  const baseline = useMemo(() => {
+    const base = items.find((e) => currentSet.has(e.id));
+    return base?.scores ?? null;
+  }, [items, currentSet]);
 
   const togglePick = (item: CatalogItem) =>
     setPicked((cur) => {
@@ -146,16 +171,38 @@ export function CatalogExplorer({
     const byName = (a: CatalogItem, b: CatalogItem) =>
       a.manufacturer.localeCompare(b.manufacturer, "ja") ||
       a.name.localeCompare(b.name, "ja");
+    // 現用ラバーとの軸プロフィール距離 (小さいほど近い)
+    const axisDist = (e: CatalogItem) => {
+      if (!baseline || !e.scores) return Infinity;
+      let sum = 0;
+      let n = 0;
+      for (const a of STRIP_AXES) {
+        const v = e.scores[a.key];
+        const b = baseline[a.key];
+        if (typeof v === "number" && typeof b === "number") {
+          sum += (v - b) ** 2;
+          n++;
+        }
+      }
+      return n ? Math.sqrt(sum / n) : Infinity;
+    };
     const sorted = [...list];
     sorted.sort((a, b) => {
       if (sort === "popular") return b.popularity - a.popularity || byName(a, b);
       if (sort === "priceAsc") return (a.price ?? 1e9) - (b.price ?? 1e9);
       if (sort === "priceDesc") return (b.price ?? -1) - (a.price ?? -1);
       if (sort === "hardness") return (b.hardness ?? -1) - (a.hardness ?? -1);
+      if (sort === "near") return axisDist(a) - axisDist(b) || byName(a, b);
+      if (sort.startsWith("axis:")) {
+        const k = sort.slice(5);
+        const av = typeof a.scores?.[k] === "number" ? a.scores![k] : -1;
+        const bv = typeof b.scores?.[k] === "number" ? b.scores![k] : -1;
+        return bv - av || byName(a, b);
+      }
       return byName(a, b);
     });
     return sorted;
-  }, [byKind, style, cat, mfr, band, hard, query, sort]);
+  }, [byKind, style, cat, mfr, band, hard, query, sort, baseline]);
 
   const hasFilter = Boolean(
     query.trim() || style || cat || mfr || band >= 0 || hard >= 0,
@@ -278,21 +325,43 @@ export function CatalogExplorer({
           onChange={(e) => setSort(e.target.value as Sort)}
           className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
         >
-          <option value="popular">人気順</option>
-          <option value="name">メーカー順</option>
-          <option value="priceAsc">価格が安い順</option>
-          <option value="priceDesc">価格が高い順</option>
-          <option value="hardness">硬度が高い順</option>
+          <optgroup label="並べ替え">
+            <option value="popular">人気順</option>
+            <option value="name">メーカー順</option>
+            <option value="priceAsc">価格が安い順</option>
+            <option value="priceDesc">価格が高い順</option>
+            <option value="hardness">硬度が高い順</option>
+            {baseline && <option value="near">現用に近い順</option>}
+          </optgroup>
+          {kind !== "blade" && (
+            <optgroup label="特徴スコアが高い順">
+              {STRIP_AXES.map((a) => (
+                <option key={a.key} value={`axis:${a.key}`}>
+                  {a.label}が高い順
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </div>
 
       <div className="mt-3 flex items-center justify-between text-xs text-tt-gray70">
-        <span>
-          <span className="font-mono font-bold text-tt-charcoal">
-            {filtered.length}
+        <div className="flex items-center gap-3">
+          <span>
+            <span className="font-mono font-bold text-tt-charcoal">
+              {filtered.length}
+            </span>
+            件
           </span>
-          件
-        </span>
+          {kind !== "blade" && (
+            <button
+              onClick={() => setShowScores((v) => !v)}
+              className="font-bold text-tt-green underline"
+            >
+              {showScores ? "スコアを隠す" : "スコアを表示"}
+            </button>
+          )}
+        </div>
         {hasFilter && (
           <button
             onClick={() => {
@@ -310,6 +379,14 @@ export function CatalogExplorer({
         )}
       </div>
 
+      {showScores && baseline && (
+        <p className="mt-2 text-[11px] leading-5 text-tt-gray70">
+          スコアの数字は<span className="font-bold text-tt-charcoal">現用ラバー</span>
+          との差（<span className="font-bold text-tt-deep-green">+</span>が上 /{" "}
+          <span className="font-bold text-tt-deep-coral">−</span>が下）。
+        </p>
+      )}
+
       {filtered.length === 0 ? (
         <div className="mt-4 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
           該当する用具がありません。
@@ -318,52 +395,70 @@ export function CatalogExplorer({
         <ul className="mt-3 space-y-2 pb-20">
           {filtered.map((e) => {
             const isPicked = picked.some((p) => p.id === e.id);
+            const isCurrentBase = currentSet.has(e.id);
             return (
               <li
                 key={e.id}
-                className={`flex items-center gap-2 rounded-xl bg-white p-3 shadow-sm ring-1 transition ${
-                  isPicked ? "ring-tt-green/60" : "ring-black/5"
+                className={`rounded-xl bg-white p-3 shadow-sm ring-1 transition ${
+                  isCurrentBase
+                    ? "ring-tt-green/70"
+                    : isPicked
+                      ? "ring-tt-green/60"
+                      : "ring-black/5"
                 }`}
               >
-                <Link
-                  href={`/equipment/${e.id}`}
-                  className="flex min-w-0 flex-1 items-center gap-3"
-                >
-                  <EquipmentVisual
-                    category={e.category}
-                    manufacturer={e.manufacturer}
-                    imageUrl={e.imageUrl}
-                    bladeSubcategory={e.bladeSubcategory}
-                    name={e.name}
-                    size={36}
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/equipment/${e.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-3"
+                  >
+                    <EquipmentVisual
+                      category={e.category}
+                      manufacturer={e.manufacturer}
+                      imageUrl={e.imageUrl}
+                      bladeSubcategory={e.bladeSubcategory}
+                      name={e.name}
+                      size={36}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1.5 truncate text-sm font-bold">
+                        <span className="truncate">{e.name}</span>
+                        {isCurrentBase && (
+                          <span className="shrink-0 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[9px] font-bold text-white">
+                            現用
+                          </span>
+                        )}
+                        {e.comparisons > 0 && (
+                          <span className="shrink-0 rounded-full bg-tt-soft-green px-1.5 py-0.5 text-[9px] font-bold text-tt-deep-green">
+                            比較{e.comparisons}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-tt-gray70">
+                        {e.manufacturer} ・ {CAT_LABEL[e.category] ?? ""}
+                        {e.hardness != null && ` ・ ${e.hardness}°`}
+                        {e.price != null && ` ・ ¥${e.price.toLocaleString()}`}
+                      </p>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => togglePick(e)}
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                      isPicked
+                        ? "bg-tt-deep-green text-white"
+                        : "bg-tt-offwhite text-tt-gray70 ring-1 ring-tt-gray30/50 hover:bg-tt-soft-green"
+                    }`}
+                  >
+                    {isPicked ? "選択中" : "比較"}
+                  </button>
+                </div>
+                {showScores && e.category.startsWith("RUBBER_") && (
+                  <ScoreStrip
+                    scores={e.scores}
+                    baseline={baseline && !isCurrentBase ? baseline : null}
                   />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 truncate text-sm font-bold">
-                      <span className="truncate">{e.name}</span>
-                      {e.comparisons > 0 && (
-                        <span className="shrink-0 rounded-full bg-tt-soft-green px-1.5 py-0.5 text-[9px] font-bold text-tt-deep-green">
-                          比較{e.comparisons}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-tt-gray70">
-                      {e.manufacturer} ・ {CAT_LABEL[e.category] ?? ""}
-                      {e.hardness != null && ` ・ ${e.hardness}°`}
-                      {e.price != null && ` ・ ¥${e.price.toLocaleString()}`}
-                    </p>
-                  </div>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => togglePick(e)}
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                    isPicked
-                      ? "bg-tt-deep-green text-white"
-                      : "bg-tt-offwhite text-tt-gray70 ring-1 ring-tt-gray30/50 hover:bg-tt-soft-green"
-                  }`}
-                >
-                  {isPicked ? "選択中" : "比較"}
-                </button>
+                )}
               </li>
             );
           })}
@@ -410,6 +505,61 @@ export function CatalogExplorer({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// 軸スコアの一覧帯。基準(現用)があるときは差分(+/-)を、無ければ絶対スコア(0-100)を出す。
+function ScoreStrip({
+  scores,
+  baseline,
+}: {
+  scores?: Record<string, number>;
+  baseline?: Record<string, number> | null;
+}) {
+  return (
+    <div className="mt-2 grid grid-cols-3 gap-x-2.5 gap-y-1">
+      {STRIP_AXES.map((a) => {
+        const v = scores?.[a.key];
+        const has = typeof v === "number";
+        const bv = baseline?.[a.key];
+        const delta =
+          has && typeof bv === "number" ? Math.round(v - bv) : null;
+        return (
+          <div key={a.key} className="flex items-center gap-1">
+            <span className="w-9 shrink-0 text-[9px] text-tt-gray70">
+              {AXIS_SHORT[a.key]}
+            </span>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-tt-gray30/30">
+              {has && (
+                <span
+                  className="block h-1.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
+                  style={{ width: `${Math.max(4, Math.round(v))}%` }}
+                />
+              )}
+            </span>
+            <span className="w-7 shrink-0 text-right font-mono text-[9px] tabular-nums">
+              {!has ? (
+                <span className="text-tt-gray30">–</span>
+              ) : delta != null ? (
+                <span
+                  className={
+                    delta > 0
+                      ? "text-tt-deep-green"
+                      : delta < 0
+                        ? "text-tt-deep-coral"
+                        : "text-tt-gray70"
+                  }
+                >
+                  {delta > 0 ? `+${delta}` : delta}
+                </span>
+              ) : (
+                <span className="text-tt-gray70">{Math.round(v)}</span>
+              )}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

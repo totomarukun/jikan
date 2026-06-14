@@ -403,6 +403,25 @@ export async function buildSwitchCandidates(
   return { baseRanked, candidates: candidates.slice(0, limit) };
 }
 
+// ラバーダッシュボード用: 全ラバーの軸別スコア(0-100)を1回のDB取得でまとめて返す。
+// カタログ(=ダッシュボード)の「軸スコアの一覧・並べ替え」に使う。
+export type RubberScores = Record<string, number>;
+
+export async function getRubberScores(): Promise<Map<string, RubberScores>> {
+  const { perAxis } = await loadRubberAxisRatings();
+  const out = new Map<string, RubberScores>();
+  for (const axis of ALL_AXES) {
+    const ratings = perAxis.get(axis);
+    if (!ratings) continue;
+    for (const [id, r] of ratings) {
+      const cur = out.get(id) ?? {};
+      cur[axis] = r.score;
+      out.set(id, cur);
+    }
+  }
+  return out;
+}
+
 export interface SimilarEquipment {
   id: string;
   name: string;
