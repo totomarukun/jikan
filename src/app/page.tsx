@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/logo";
-import { VersusBarOrPending } from "@/components/versus-bar";
-import { aggregatePairs } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 
@@ -9,19 +7,12 @@ import { getSessionId } from "@/lib/session";
 // SNS流入の着地点。実データ (注目の対決・累計回答数) を見せて
 // 「答えるとこのデータが見られる/育つ」を3秒で伝える。
 export default async function LandingPage() {
-  // eslint-disable-next-line prefer-const
-  let [featured, totalAnswers, equipmentCount, sessionId] =
-    await Promise.all([
-      aggregatePairs({ take: 3, minTotal: 3, experiencedOnly: true }),
-      // 看板数値は匿名セッション量産で水増しできない「実体験ベースの判定数」を出す
-      prisma.comparison.count({ where: { hasActualExperience: "BOTH" } }),
-      prisma.equipment.count({ where: { isActive: true } }),
-      getSessionId(),
-    ]);
-  if (featured.length === 0) {
-    // コールドスタート時のみ少数サンプルでも見せる (正直に n を表示している)
-    featured = await aggregatePairs({ take: 3, experiencedOnly: true });
-  }
+  const [totalAnswers, equipmentCount, sessionId] = await Promise.all([
+    // 看板数値は匿名セッション量産で水増しできない「実体験ベースの判定数」を出す
+    prisma.comparison.count({ where: { hasActualExperience: "BOTH" } }),
+    prisma.equipment.count({ where: { isActive: true } }),
+    getSessionId(),
+  ]);
   const hasSession = sessionId
     ? (await prisma.sessionProgress.findUnique({
         where: { sessionId },
@@ -37,14 +28,15 @@ export default async function LandingPage() {
           <LogoMark size={84} />
         </div>
         <h1 className="animate-rise mt-6 text-3xl font-bold leading-snug sm:text-4xl">
-          あの用具は、いまの自分と
+          次の用具選び、
           <br className="sm:hidden" />
-          比べてどう違う？
+          もう迷わない。
         </h1>
         <p className="animate-rise mt-3 leading-7 text-tt-gray70 [animation-delay:80ms]">
-          「硬い」「弾む」の感じ方は人それぞれ。だからTacTapは、
-          <strong className="text-tt-charcoal">両方を使った人の比較</strong>だけを集めました。
-          いまの用具と<strong className="text-tt-charcoal">何が違うか</strong>、そのまま分かります。
+          「この用具、自分に合うかな？」を、
+          <strong className="text-tt-charcoal">みんなの比較データ</strong>で解決。
+          気になる用具の特徴が、いまの自分の用具と比べて
+          <strong className="text-tt-charcoal">ひと目で分かります</strong>。
         </p>
         <div className="animate-rise mt-8 [animation-delay:160ms]">
           <Link
@@ -59,15 +51,7 @@ export default async function LandingPage() {
               href="/catalog"
               className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
             >
-              用具カタログを探す →
-            </Link>
-            <Link
-              href={hasSession ? "/switch" : "/onboarding"}
-              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
-            >
-              {hasSession
-                ? "いまのラバー基準で見る →"
-                : "自分のギア基準で見る（無料登録）→"}
+              用具を名前で探す →
             </Link>
           </div>
         </div>
@@ -78,7 +62,7 @@ export default async function LandingPage() {
         >
           {totalAnswers > 0 && (
             <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-              <dt className="text-xs text-tt-gray70">両方使った人の比較</dt>
+              <dt className="text-xs text-tt-gray70">集まった比較データ</dt>
               <dd className="font-mono text-2xl font-bold text-tt-deep-green">
                 {totalAnswers.toLocaleString()}
               </dd>
@@ -92,47 +76,6 @@ export default async function LandingPage() {
           </div>
         </dl>
       </section>
-
-      {/* 注目の対決 (実データ) */}
-      {featured.length > 0 && (
-        <section>
-          <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-lg font-bold">いま注目の対決</h2>
-            <Link
-              href="/battles"
-              className="text-sm font-medium text-tt-green hover:underline"
-            >
-              すべて見る →
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {featured.map((p) => (
-              <Link
-                key={`${p.aId}-${p.bId}`}
-                href={`/compare/${p.aId}/vs/${p.bId}`}
-                className="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-bold">
-                    {p.nameA} <span className="text-tt-gray30">vs</span>{" "}
-                    {p.nameB}
-                  </span>
-                  <span className="font-mono text-xs text-tt-gray70">
-                    n={p.total}
-                  </span>
-                </div>
-                <VersusBarOrPending
-                  votesA={p.votesA}
-                  votesB={p.votesB}
-                  votesSame={p.votesSame}
-                  nameA={p.nameA}
-                  nameB={p.nameB}
-                />
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* 価値訴求: 根本ペイン「感覚は人によって違う」への回答 */}
       <section className="grid gap-4 sm:grid-cols-3">
