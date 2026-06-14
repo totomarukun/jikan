@@ -47,7 +47,7 @@ export default async function LandingPage() {
         <HeroCompareIllustration className="animate-rise mx-auto mt-6 w-full max-w-[280px] [animation-delay:120ms]" />
         <div className="animate-rise mt-6 [animation-delay:160ms]">
           <Link
-            href="/map"
+            href="/catalog?view=map"
             className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
             用具マップを見る

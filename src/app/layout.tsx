@@ -55,7 +55,7 @@ export default function RootLayout({
               <Link href="/catalog" className="transition hover:text-tt-green">
                 用具を探す
               </Link>
-              <Link href="/map" className="transition hover:text-tt-green">
+              <Link href="/catalog?view=map" className="transition hover:text-tt-green">
                 用具マップ
               </Link>
               <Link href="/switch" className="transition hover:text-tt-green">
@@ -83,7 +83,7 @@ export default function RootLayout({
               <Link href="/catalog" className="hover:text-tt-green">
                 用具を探す
               </Link>
-              <Link href="/map" className="hover:text-tt-green">
+              <Link href="/catalog?view=map" className="hover:text-tt-green">
                 用具マップ
               </Link>
               <Link href="/battles" className="hover:text-tt-green">

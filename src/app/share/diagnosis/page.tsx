@@ -78,7 +78,7 @@ export default async function ShareDiagnosisPage({
           あなたも診断する（無料）
         </Link>
         <p className="mt-3 text-sm text-tt-gray70">
-          <Link href="/map" className="font-bold text-tt-green underline">
+          <Link href="/catalog?view=map" className="font-bold text-tt-green underline">
             用具マップを見る
           </Link>
         </p>
