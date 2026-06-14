@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
-import { aggregatePairs, getPopularRubbers, tallyPair } from "@/lib/data";
+import { aggregatePairs, getPopularRubbers } from "@/lib/data";
 import { feelStatements, getFeelProfile, type FeelStatement } from "@/lib/feel";
 import { amazonSearchUrl, rakutenSearchUrl } from "@/lib/links";
 import {
   buildSwitchCandidates,
   type SwitchCandidate,
 } from "@/lib/relative-map";
-import { VersusBarOrPending } from "@/components/versus-bar";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import {
@@ -98,14 +97,13 @@ export default async function SwitchPage({
 }
 
 const SWITCH_AXIS_LABEL: Record<string, string> = {
-  overall: "好み",
   speed: "スピード",
   spin: "スピン",
-  control: "コントロール",
-  ballHold: "球持ち",
+  hardness: "かたさ",
   arc: "弧線",
+  attackEase: "攻撃",
+  defenseEase: "守備",
   tackiness: "粘着",
-  hardness: "硬さ",
 };
 
 // 相対マップ(推移律)から、基準に対する候補を軸別差分つきで出す。
@@ -137,24 +135,22 @@ async function RelativeCandidates({
     <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
       <p className="font-bold">乗り換え候補</p>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        「{baseName}」と比べて、各項目がどう違うか。使った人の比較から推定しています。
+        「{baseName}」と比べて{" "}
+        <span className="font-bold text-tt-deep-green">▲高い</span>{" "}
+        <span className="font-bold text-tt-deep-coral">▼低い</span>{" "}
+        <span className="text-tt-gray70">≈同じ</span>
+        （数字は差の目安／グレーはデータ少なめ）
       </p>
       <ul className="mt-3 space-y-2">
         {candidates.map((c) => (
-          <RelativeCandidateRow key={c.id} c={c} baseName={baseName} />
+          <RelativeCandidateRow key={c.id} c={c} />
         ))}
       </ul>
     </section>
   );
 }
 
-function RelativeCandidateRow({
-  c,
-  baseName,
-}: {
-  c: SwitchCandidate;
-  baseName: string;
-}) {
+function RelativeCandidateRow({ c }: { c: SwitchCandidate }) {
   const sym = (d: string) =>
     d === "up" ? "▲" : d === "down" ? "▼" : "≈";
   const color = (d: string) =>
@@ -212,10 +208,6 @@ function RelativeCandidateRow({
             );
           })}
         </div>
-        <p className="mt-1 text-[10px] text-tt-gray70">
-          「{baseName}」と比べて ▲高い ▼低い ≈同じくらい（数字は差の目安）。
-          グレーはデータ少なめ。
-        </p>
       </Link>
     </li>
   );
@@ -317,14 +309,16 @@ async function SwitchBoard({
       e != null && e.isActive && e.category.startsWith("RUBBER_"),
   );
 
-  const [tallies, feels] = await Promise.all([
-    Promise.all(candidates.map((c) => tallyPair(current.id, c.id))),
+  const [feels, relCandidates] = await Promise.all([
     Promise.all(
       candidates.map(async (c) =>
         feelStatements(await getFeelProfile(current.id, c.id)),
       ),
     ),
+    buildSwitchCandidates(current.id, 100),
   ]);
+  // 基準に対する候補の軸別差分 (相対マップ。推移律で疎データでも出る)
+  const diffMap = new Map(relCandidates.candidates.map((r) => [r.id, r.axes]));
 
   // ワンタップ候補: この用具と対決データがあるラバー (人気順)
   let suggestionsLabel = "よく比較される:";
@@ -448,7 +442,7 @@ async function SwitchBoard({
               key={cand.id}
               current={current}
               candidate={cand}
-              tally={tallies[i]}
+              axisDiffs={diffMap.get(cand.id) ?? []}
               feel={feels[i]}
               remainingIds={candidates
                 .filter((c) => c.id !== cand.id)
@@ -469,16 +463,13 @@ async function SwitchBoard({
             <thead>
               <tr className="text-left text-[10px] text-tt-gray70">
                 <th className="pb-1.5 font-medium">候補</th>
-                <th className="pb-1.5 font-medium">みんなの好み</th>
+                <th className="pb-1.5 font-medium">基準との違い</th>
                 <th className="pb-1.5 text-right font-medium">公称硬度差</th>
                 <th className="pb-1.5 text-right font-medium">価格差</th>
               </tr>
             </thead>
             <tbody>
-              {candidates.map((cand, i) => {
-                const t = tallies[i];
-                const decidedPct =
-                  t.total >= 3 ? Math.round((t.b / t.total) * 100) : null;
+              {candidates.map((cand) => {
                 const sameMaker = cand.manufacturer === current.manufacturer;
                 const hardnessDelta =
                   sameMaker && cand.hardness != null && current.hardness != null
@@ -488,6 +479,12 @@ async function SwitchBoard({
                   cand.price != null && current.price != null
                     ? cand.price - current.price
                     : null;
+                const topDiffs = (diffMap.get(cand.id) ?? [])
+                  .filter((a) => a.diff !== "even" && a.comparisons >= 3)
+                  .sort(
+                    (a, b) => Math.abs(b.scoreDelta) - Math.abs(a.scoreDelta),
+                  )
+                  .slice(0, 3);
                 return (
                   <tr key={cand.id} className="border-t border-tt-gray30/30">
                     <td className="py-2 pr-2">
@@ -499,20 +496,23 @@ async function SwitchBoard({
                       </Link>
                     </td>
                     <td className="py-2 pr-2">
-                      {decidedPct != null ? (
-                        <span>
-                          <span className="font-mono font-bold text-tt-deep-green">
-                            {decidedPct}%
-                          </span>
-                          がこちら派
-                          <span className="font-mono text-tt-gray70">
-                            {" "}
-                            (n={t.total})
-                          </span>
-                        </span>
+                      {topDiffs.length === 0 ? (
+                        <span className="text-tt-gray70">集計中</span>
                       ) : (
-                        <span className="text-tt-gray70">
-                          集計中 (回答{t.total}件)
+                        <span className="flex flex-wrap gap-x-1.5">
+                          {topDiffs.map((a) => (
+                            <span
+                              key={a.axis}
+                              className={`font-bold ${
+                                a.diff === "up"
+                                  ? "text-tt-deep-green"
+                                  : "text-tt-deep-coral"
+                              }`}
+                            >
+                              {SWITCH_AXIS_LABEL[a.axis] ?? a.axis}
+                              {a.diff === "up" ? "▲" : "▼"}
+                            </span>
+                          ))}
                         </span>
                       )}
                     </td>
@@ -532,8 +532,7 @@ async function SwitchBoard({
             </tbody>
           </table>
           <p className="mt-2 text-[10px] text-tt-gray70">
-            ※「好み」は判定3件以上のみ%表示。硬度差は同一メーカー間のみ
-            (各社基準が異なるため)。
+            ※違いは使った人の比較から推定（判定3件以上）。硬度差は同一メーカー間のみ。
           </p>
         </section>
       )}
@@ -559,13 +558,13 @@ async function SwitchBoard({
 function CandidateCard({
   current,
   candidate,
-  tally,
+  axisDiffs,
   feel,
   remainingIds,
 }: {
   current: Equipment;
   candidate: Equipment;
-  tally: { a: number; b: number; same: number; total: number };
+  axisDiffs: SwitchCandidate["axes"];
   feel: FeelStatement[];
   remainingIds: string[];
 }) {
@@ -628,29 +627,49 @@ function CandidateCard({
         </Link>
       </div>
 
-      {/* みんなの好み (現用 vs 候補) */}
+      {/* 基準と比べた特徴差 (相対マップ。推移律で疎データでも出る) */}
       <div className="mt-4">
         <p className="text-xs font-bold text-tt-gray70">
-          みんなの好み
-          <span className="ml-2 font-mono font-normal">n={tally.total}</span>
+          「{current.name}」と比べて
         </p>
-        {tally.total === 0 ? (
+        {axisDiffs.length === 0 ? (
           <p className="mt-1 text-sm text-tt-gray70">
-            この対決のデータはまだありません。
+            比較データがまだありません。
             <Link href="/play" className="text-tt-green underline">
               答えて最初のデータを作る
             </Link>
           </p>
         ) : (
-          <div className="mt-2">
-            {/* n が少ないうちは % を断言しない (リスト類と同じルール) */}
-            <VersusBarOrPending
-              votesA={tally.a}
-              votesB={tally.b}
-              votesSame={tally.same}
-              nameA={`${current.name} (いまの)`}
-              nameB={candidate.name}
-            />
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {axisDiffs.map((a) => {
+              const low = a.comparisons < 3;
+              const color =
+                a.diff === "up"
+                  ? "text-tt-deep-green"
+                  : a.diff === "down"
+                    ? "text-tt-deep-coral"
+                    : "text-tt-gray70";
+              const sym =
+                a.diff === "up" ? "▲" : a.diff === "down" ? "▼" : "≈";
+              return (
+                <span
+                  key={a.axis}
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${
+                    low
+                      ? "bg-tt-gray30/20 text-tt-gray70"
+                      : `bg-tt-offwhite ${color}`
+                  }`}
+                >
+                  {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym}
+                  {!low && a.diff !== "even" && a.scoreDelta !== 0 && (
+                    <span className="ml-0.5 font-mono">
+                      {a.scoreDelta > 0 ? "+" : ""}
+                      {a.scoreDelta}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
