@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git -C /home/user/jikan log -1 --pretty=%s 2>/dev/null | jq -Rs '{systemMessage: (\"\\u2705 TacTap \\u5b8c\\u4e86 \\u2014 \\u6700\\u65b0: \" + (rtrimstr(\"\\n\")))}' 2>/dev/null || echo '{\"systemMessage\":\"\\u2705 TacTap: \\u4f5c\\u696d\\u304c\\u4e00\\u533a\\u5207\\u308a\\u3064\\u304d\\u307e\\u3057\\u305f\"}'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

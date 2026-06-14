@@ -66,9 +66,9 @@ export function VersusBarOrPending(props: {
   if (total < (props.minTotal ?? 3)) {
     return (
       <p className="text-xs text-tt-gray70">
-        集計中 — 回答{total}件・
+        回答{total}件・
         <span className="font-bold text-tt-deep-coral">
-          あと{(props.minTotal ?? 3) - total}件で結果公開
+          あと{(props.minTotal ?? 3) - total}件で結果が見られます
         </span>
       </p>
     );

@@ -366,7 +366,7 @@ export default async function CompareViewPage({
               ))}
           </dl>
           <p className="mt-2 text-xs text-tt-gray70">
-            これはあなた自身の記録です。下の集計は他の人の回答が集まると公開されます。
+            これはあなた自身の記録です。みんなの結果は、回答が集まると表示されます。
           </p>
         </div>
       )}
@@ -402,7 +402,7 @@ export default async function CompareViewPage({
             <AxisCard label="硬く感じる" bucket={tally.hardness} nameA={equipA.name} nameB={equipB.name} />
             <AxisCard label="球持ちが良いと感じる" bucket={tally.ballHold} nameA={equipA.name} nameB={equipB.name} />
             <div className="rounded-2xl bg-tt-soft-green p-4 text-sm ring-1 ring-tt-green/20">
-              <p className="font-bold text-tt-deep-green">インサイト</p>
+              <p className="font-bold text-tt-deep-green">わかること</p>
               <p className="mt-1 leading-6">{insight}</p>
             </div>
           </>
@@ -413,7 +413,7 @@ export default async function CompareViewPage({
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
         <h2 className="font-bold">両方使った人の声</h2>
         <p className="mt-0.5 text-xs text-tt-gray70">
-          数値でなく言葉で。勝率より、乗り換え判断に効くことがあります。
+          数字より、使った人のひとこと。乗り換えの決め手になります。
         </p>
         {pairVoices.length > 0 ? (
           <ul className="mt-3 space-y-2">
@@ -496,8 +496,8 @@ export default async function CompareViewPage({
           </tbody>
         </table>
         <p className="mt-2 text-xs text-tt-gray70">
-          ※硬度は各社独自基準のため、メーカーが異なる場合は直接比較できません。
-          使用感は上のAB比較データを参照してください。太字は価格の安い側。
+          ※硬度は各社の独自基準です。メーカーが違うと、数値での比較はできません。
+          使い心地は上の比較を見てください（太字は価格が安いほう）。
         </p>
       </section>
 
@@ -627,7 +627,9 @@ function buildInsight(
   const total = overall.a + overall.b + overall.same;
   // n が少ないうちは % や多数派を断言しない (バー表示と同じルール)
   if (total < 3) {
-    return `「好み」の回答が${total}件あります。あと${3 - total}件集まると傾向の解釈が表示されます。`;
+    return total === 0
+      ? `「好み」の回答はまだありません。あと3件集まると、傾向が読み取れます。`
+      : `「好み」の回答はいま${total}件。あと${3 - total}件集まると、傾向が読み取れます。`;
   }
   if (overall.a === overall.b) {
     return `この条件では ${nameA} と ${nameB} の好みは拮抗しています。`;

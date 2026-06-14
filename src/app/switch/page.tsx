@@ -83,8 +83,7 @@ export default async function SwitchPage({
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">乗り換え検討</h1>
       <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        いま使っているラバーを基準に、候補を実データで比べる。
-        「弾む」「球持ち」の言葉のズレに惑わされない用具選びを。
+        いま使っているラバーを基準に、気になる候補を実際の比較で見比べられます。
       </p>
 
       {!current ? (
@@ -125,24 +124,23 @@ async function RelativeCandidates({
   const { baseRanked, candidates } = await buildSwitchCandidates(baseId, 6);
   if (!baseRanked || candidates.length === 0) {
     return (
-      <section className="mt-4 rounded-2xl border border-dashed border-tt-gray30/50 bg-white p-4 text-sm text-tt-gray70">
-        <p className="font-bold text-tt-charcoal">相対マップから見た候補</p>
+      <section className="mt-4 rounded-2xl border border-dashed border-tt-gray30/50 bg-white p-4 text-sm leading-6 text-tt-gray70">
+        <p className="font-bold text-tt-charcoal">乗り換え候補</p>
         <p className="mt-1">
-          「{baseName}」を含む比較がまだありません。
+          「{baseName}」の比較がまだありません。
           <Link href="/play" className="font-bold text-tt-green underline">
-            ひと比較
+            1つ答える
           </Link>
-          答えると、ここに{baseName}基準の候補が並び始めます（1票から育ちます）。
+          と、ここに候補が並び始めます。
         </p>
       </section>
     );
   }
   return (
     <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-      <p className="font-bold">相対マップから見た候補</p>
+      <p className="font-bold">乗り換え候補</p>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        みんなの比較を合成した相対評価で、「{baseName}」と比べた各軸の違い。
-        直接対決がなくても、他の比較を経由して位置が決まります。
+        「{baseName}」と比べて、各項目がどう違うか。使った人の比較から推定しています。
       </p>
       <ul className="mt-3 space-y-2">
         {candidates.map((c) => (
@@ -189,12 +187,9 @@ function RelativeCandidateRow({
           <span className="min-w-0 flex-1 truncate text-sm font-bold">
             {c.name}
           </span>
-          <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
-            共通{c.sharedAxes}軸
-          </span>
           {provisional && (
             <span className="shrink-0 rounded-full bg-tt-gray30/40 px-1.5 py-0.5 text-[9px] font-bold text-tt-gray70">
-              参考程度
+              データ少なめ
             </span>
           )}
         </div>
@@ -209,23 +204,20 @@ function RelativeCandidateRow({
                 }`}
               >
                 {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
-                {/* 量は支持が十分なときだけ出す。薄い根拠では方向のみ。 */}
+                {/* 差の大きさは、データが十分なときだけ出す */}
                 {!low && a.diff !== "even" && a.scoreDelta !== 0 && (
                   <span className="ml-0.5 font-mono">
                     {a.scoreDelta > 0 ? "+" : ""}
                     {a.scoreDelta}
                   </span>
                 )}
-                <span className="ml-0.5 font-mono text-[9px] opacity-60">
-                  n{a.comparisons}
-                </span>
               </span>
             );
           })}
         </div>
         <p className="mt-1 text-[10px] text-tt-gray70">
-          {baseName}比 ・ 数値=相対位置の差(0-100) ・ n=支持本数 ・ 薄い根拠(グレー)は
-          方向のみ ▲高い ▼低い ≈同等
+          「{baseName}」と比べて ▲高い ▼低い ≈同じくらい（数字は差の目安）。
+          グレーはデータ少なめ。
         </p>
       </Link>
     </li>
@@ -554,13 +546,13 @@ async function SwitchBoard({
           データが足りない対決があります？
         </p>
         <p className="mt-1 leading-6 text-tt-gray70">
-          AB比較に答えるほど、あなたの「{current.name}」基準のデータが増えます。
+          比較に答えるほど、「{current.name}」基準のデータが増えます。
         </p>
         <Link
           href="/play"
           className="mt-3 inline-block rounded-full bg-gradient-to-r from-tt-deep-coral to-tt-coral px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
         >
-          AB比較に答えてデータを増やす
+          比較に答えてデータを増やす
         </Link>
       </div>
     </>
@@ -695,7 +687,7 @@ function CandidateCard({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-tt-gray70">
-        ※硬度は各社独自基準のため他社間では表示しません。体感は上の実体験データを参照。
+        ※硬度は各社の独自基準です。他社とは比べられません。使い心地は上の比較を。
       </p>
 
       {/* アクション */}

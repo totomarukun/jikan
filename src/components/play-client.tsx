@@ -110,24 +110,19 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
             <Link href="/gear" className="font-bold text-tt-deep-coral underline">
               ラバーをもう1本追加
             </Link>
-            すると実体験の質問が最大5問増えます。
+            すると質問が最大5問増えます。
           </p>
         </div>
       ) : (
         /* 実体験ペアがまだ作れていない (同面2本未満)。「出し尽くした」ではない。
            面跨ぎの2本は比較にならないため、同じ面にもう1本を促す */
         <div className="mb-3 rounded-xl bg-tt-soft-coral p-3 text-center text-xs ring-1 ring-tt-coral/15">
-          <p className="font-bold text-tt-deep-coral">
-            これはイメージ回答 (参考データ) です
-          </p>
+          <p className="font-bold text-tt-deep-coral">予想で答える（参考データ）</p>
           <p className="mt-0.5 text-tt-gray70">
-            {progress.gearCount === 0
-              ? "まだギアが未登録です。"
-              : "フォアとバックの2本は「両方使った比較」にはなりません。"}
             <Link href="/gear" className="font-bold text-tt-deep-coral underline">
-              同じ面にもう1本
+              同じ面のラバーをもう1本
             </Link>
-            使ったラバーを登録すると、あなただけの実体験比較 (最大5問) が出せます。
+            登録すると、両方使った比較が出ます。
           </p>
         </div>
       )}
@@ -237,7 +232,7 @@ function RevealPanel({
   const majority = tally.a === tally.b ? null : tally.a > tally.b ? "A" : "B";
   let verdict: string;
   if (tally.total <= 1) {
-    verdict = "この対決の最初の回答者です。あなたがデータを作っています！";
+    verdict = "この比較にいちばん乗り！あなたの1票から見えてきます。";
   } else if (winner === "SAME" || winner === "UNKNOWN") {
     verdict = `この対決には ${tally.total}人が回答しています。`;
   } else if (majority === null) {
@@ -267,7 +262,7 @@ function RevealPanel({
       </div>
       <p className="mt-3 text-sm">{verdict}</p>
       <p className="mt-1 text-xs text-tt-green">
-        +1 あなたの回答がこの対決のデータになりました
+        +1 回答ありがとう！この比較に反映されました
         {tally.total < 3 && (
           <span className="ml-1 text-tt-deep-coral">
             — あと{3 - tally.total}件でみんなに公開されます

@@ -42,12 +42,9 @@ export default async function LandingPage() {
           比べてどう違う？
         </h1>
         <p className="animate-rise mt-3 leading-7 text-tt-gray70 [animation-delay:80ms]">
-          「硬い」「弾む」の感じ方は人それぞれ。
-          <br />
-          だからTacTapは、<strong className="text-tt-charcoal">両方使った人の比較</strong>
-          を1枚の地図に合成して、
-          <br />
-          用具の特徴を<strong className="text-tt-charcoal">相対的に</strong>見られるようにしました。
+          「硬い」「弾む」の感じ方は人それぞれ。だからTacTapは、
+          <strong className="text-tt-charcoal">両方を使った人の比較</strong>だけを集めました。
+          いまの用具と<strong className="text-tt-charcoal">何が違うか</strong>、そのまま分かります。
         </p>
         <div className="animate-rise mt-8 [animation-delay:160ms]">
           <Link
@@ -75,14 +72,18 @@ export default async function LandingPage() {
           </div>
         </div>
 
-        {/* ライブ統計 */}
-        <dl className="mt-8 grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-            <dt className="text-xs text-tt-gray70">両方使った人の判定</dt>
-            <dd className="font-mono text-2xl font-bold text-tt-deep-green">
-              {totalAnswers.toLocaleString()}
-            </dd>
-          </div>
+        {/* ライブ統計 (比較データは集まってから出す) */}
+        <dl
+          className={`mt-8 grid gap-3 text-center ${totalAnswers > 0 ? "grid-cols-2" : "grid-cols-1"}`}
+        >
+          {totalAnswers > 0 && (
+            <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
+              <dt className="text-xs text-tt-gray70">両方使った人の比較</dt>
+              <dd className="font-mono text-2xl font-bold text-tt-deep-green">
+                {totalAnswers.toLocaleString()}
+              </dd>
+            </div>
+          )}
           <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
             <dt className="text-xs text-tt-gray70">収録用具</dt>
             <dd className="font-mono text-2xl font-bold text-tt-deep-coral">
@@ -138,10 +139,10 @@ export default async function LandingPage() {
         <div className="rounded-2xl bg-tt-soft-green p-5 ring-1 ring-tt-green/10">
           <p className="font-mono text-2xl font-bold text-tt-deep-green">01</p>
           <h2 className="mt-2 font-bold text-tt-deep-green">
-            あなたの感覚に翻訳
+            「硬い」を自分基準に
           </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            レビューの「硬い」はその人の感覚。TacTapは、あなたが使ったことのあるラバーを基準に「それより硬いと感じた人が68%」という形で示します。
+            あなたが使ったラバーを基準に「それより硬いと感じた人が68%」と表示します。
           </p>
         </div>
         <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
@@ -150,7 +151,7 @@ export default async function LandingPage() {
             「両方使った人」に絞れる比較
           </h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
-            すべての回答に経験フラグが付きます。イメージ回答も集めますが、ワンタップで「実際に両方使った人の判定だけ」に絞り込めます。
+            回答には「実際に両方を使ったか」の印が付きます。使っていない人の予想も参考に集めますが、ワンタップで「両方使った人だけ」に絞れます。
           </p>
         </div>
         <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
@@ -177,7 +178,7 @@ export default async function LandingPage() {
             ],
             [
               "気になった所で、体感を1問だけ答える",
-              "答えるほど地図の解像度が上がる。記憶で答えられる軽さ",
+              "答えるほど地図がくわしくなります。うろ覚えでも答えてOK",
             ],
           ].map(([title, desc], i) => (
             <li key={title} className="flex items-start gap-4">

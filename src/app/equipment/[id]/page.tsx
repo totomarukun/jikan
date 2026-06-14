@@ -138,11 +138,8 @@ export default async function EquipmentPage({
             </div>
           ) : (
             <div className="rounded-full bg-white/80 px-3 py-1.5 ring-1 ring-black/5">
-              <span className="text-tt-gray70">「好み」評価 </span>
-              <span className="font-mono font-bold">収集中</span>
-              <span className="font-mono text-tt-gray70">
-                (判定{decided}件)
-              </span>
+              <span className="text-tt-gray70">みんなの「好み」 </span>
+              <span className="font-mono font-bold">まだ{decided}件</span>
             </div>
           )}
         </dl>
@@ -246,7 +243,7 @@ export default async function EquipmentPage({
         <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
           <h2 className="font-bold">これに似た用具</h2>
           <p className="mt-0.5 text-xs text-tt-gray70">
-            軸別の相対プロフィールが近い順（みんなの比較から推定）。次に試す候補に。
+            特徴が近い順。次に試す1本の候補に。
           </p>
           <ul className="mt-3 space-y-2">
             {similar.map((s) => (
@@ -269,7 +266,7 @@ export default async function EquipmentPage({
                     </span>
                   </span>
                   <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
-                    {s.sharedAxes}軸で近い
+                    {s.sharedAxes}項目で近い
                   </span>
                 </Link>
               </li>
@@ -283,7 +280,7 @@ export default async function EquipmentPage({
         <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
           <h2 className="font-bold">両方使った人の声</h2>
           <p className="mt-0.5 text-xs text-tt-gray70">
-            この用具を含む比較に添えられた、使った人の言葉。
+            この用具を使った人が残した、ひとことの声。
           </p>
           <ul className="mt-3 space-y-2">
             {voices.map((v, i) => (
@@ -400,7 +397,7 @@ function MakerSpecSection({
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
       <h2 className="font-bold">メーカー公称スペック</h2>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        各社の自社基準値（横並び比較はできません）。使った人の相対判定は、みんなのA/B比較から推定する相対マップで。
+        各社の自社基準の数値です（メーカーをまたいだ比較はできません）。使った人の評価は「用具マップ」で。
       </p>
       <ul className="mt-3 space-y-2">
         {rows.map(([label, v]) =>
@@ -440,9 +437,9 @@ const AXIS_META: Record<string, { label: string; high: string }> = {
 function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
   return (
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-      <h2 className="font-bold">相対マップ上の位置</h2>
+      <h2 className="font-bold">用具マップ上の位置</h2>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        みんなのA/B比較を合成した相対評価。全ラバー中での位置と、支えている比較本数。
+        使った人の比較から推定した、全ラバー中での位置です。
       </p>
       <ul className="mt-3 space-y-2.5">
         {positions.map((p) => {
@@ -455,10 +452,7 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold">{meta.label}</span>
                   <span className="font-mono text-tt-gray70">
-                    {p.totalRanked}本中 {p.rank}位 ・{" "}
-                    {p.bothComparisons > 0
-                      ? `実${p.bothComparisons}/全${p.comparisons}件`
-                      : `${p.comparisons}件`}
+                    {p.totalRanked}本中 {p.rank}位 ・ {p.comparisons}件
                   </span>
                 </div>
                 <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-tt-gray30/30">
@@ -473,7 +467,7 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
                 </div>
                 {low && (
                   <p className="mt-0.5 text-[10px] text-tt-gray70">
-                    支持が少なく中央寄りの暫定位置
+                    データ少なめ（おおよその位置）
                   </p>
                 )}
               </Link>
@@ -482,7 +476,7 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
         })}
       </ul>
       <p className="mt-3 text-[11px] leading-5 text-tt-gray70">
-        ※「{AXIS_META.hardness.high}」ほど右。メーカー公称でなく、使った人の相対判定に基づきます。
+        ※右にいくほど強い特徴。メーカーの数値ではなく、使った人の比較に基づきます。
       </p>
     </section>
   );

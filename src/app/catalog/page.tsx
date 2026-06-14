@@ -45,8 +45,8 @@ export default async function CatalogPage({
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">用具カタログ</h1>
       <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        収録{items.length}件。種類・メーカー・価格・硬度で絞り込み、用具名で検索（日本語・
-        英語・ローマ字OK）。気になる用具の詳細・相対位置・両方使った人の声へ。
+        ラバー・ラケット全{items.length}件。名前で検索（ひらがな・英語・ローマ字OK）、
+        種類・メーカー・価格・硬さで絞り込めます。
       </p>
       <div className="mt-4">
         <CatalogExplorer items={items} initialStyle={initialStyle} />

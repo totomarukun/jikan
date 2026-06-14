@@ -12,15 +12,15 @@ export const metadata = { title: "用具マップ" };
 // 全A/B比較を1枚の順序推定に合成し、軸ごとに全ラバーの相対位置を見せる。
 // 3票ゲートで「結論を出さない」のをやめ、推定位置 + 支持本数(信頼度)を出す。
 
-const AXES: Array<{ key: AxisKey; label: string; high: string }> = [
-  { key: "overall", label: "好み", high: "好まれる" },
-  { key: "speed", label: "スピード", high: "速い" },
-  { key: "spin", label: "スピン", high: "かかる" },
-  { key: "control", label: "コントロール", high: "扱いやすい" },
-  { key: "ballHold", label: "球持ち", high: "球持ち良い" },
-  { key: "arc", label: "弧線", high: "弧線が高い" },
-  { key: "tackiness", label: "粘着", high: "粘着が強い" },
-  { key: "hardness", label: "硬さ", high: "硬い" },
+const AXES: Array<{ key: AxisKey; label: string; low: string; high: string }> = [
+  { key: "overall", label: "好み", low: "ひかえめ", high: "好まれる" },
+  { key: "speed", label: "スピード", low: "おそい", high: "はやい" },
+  { key: "spin", label: "スピン", low: "かからない", high: "かかる" },
+  { key: "control", label: "コントロール", low: "むずかしい", high: "扱いやすい" },
+  { key: "ballHold", label: "球持ち", low: "弾く", high: "球持ち良い" },
+  { key: "arc", label: "弧線", low: "直線的", high: "山なり" },
+  { key: "tackiness", label: "粘着", low: "弱い", high: "強い" },
+  { key: "hardness", label: "硬さ", low: "やわらかい", high: "かたい" },
 ];
 
 export default async function MapPage({
@@ -56,10 +56,9 @@ export default async function MapPage({
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">用具マップ</h1>
       <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        みんなのA/B比較を1枚の相対地図に合成。直接対決していないラバー同士も、
-        他の比較を経由して相対位置が決まります（A&gt;B・B&gt;C なら A&gt;C）。
-        各ラバーには<strong className="text-tt-charcoal">何件の比較に支えられているか</strong>
-        を添えています。
+        使った人の「こっちが上」を集めて、用具を1本の軸に並べました。
+        直接比べていない用具も、まわりの比較から
+        <strong className="text-tt-charcoal">だいたいの位置</strong>がわかります。
       </p>
 
       {/* 軸タブ */}
@@ -81,17 +80,17 @@ export default async function MapPage({
 
       <div className="mt-3 flex items-center justify-between text-xs text-tt-gray70">
         <span>
-          ← 平均より弱い／
+          ← {axis.low}／
           <span className="font-bold text-tt-deep-green">{axis.high}</span> →
         </span>
-        <span className="font-mono">この軸の比較 {map.totalComparisons} 件</span>
+        <span className="font-mono">比較 {map.totalComparisons} 件</span>
       </div>
 
       {/* 自分のギアの現在地 */}
       {myEntries.length > 0 && (
         <div className="mt-3 rounded-2xl bg-tt-soft-green p-3 ring-1 ring-tt-green/25">
           <p className="text-xs font-bold text-tt-deep-green">
-            あなたのギアの現在地（{axis.label}）
+            あなたのギア（{axis.label}）
           </p>
           <div className="mt-2 space-y-2">
             {myEntries.map((e) => (
@@ -100,7 +99,6 @@ export default async function MapPage({
                 entry={e}
                 isGear
                 isCurrent={currentIds.has(e.id)}
-                axisLabel={axis.label}
               />
             ))}
           </div>
@@ -109,33 +107,30 @@ export default async function MapPage({
 
       {/* 全体マップ (検索・絞り込み付き) */}
       {map.entries.length === 0 ? (
-        <div className="mt-6 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
-          まだこの軸の比較データがありません。
+        <div className="mt-6 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
+          この項目はまだデータがありません。
           <br />
           <Link href="/play" className="font-bold text-tt-green underline">
-            AB比較に答える
+            比較に1つ答える
           </Link>
-          と、1票から地図が描かれ始めます。
+          と、ここに用具が並び始めます。
           <br />
-          まずは{" "}
           <Link href="/catalog" className="font-bold text-tt-green underline">
-            用具カタログ
-          </Link>{" "}
-          から探すこともできます。
+            カタログから探す
+          </Link>
+          のもおすすめです。
         </div>
       ) : (
         <MapExplorer
           entries={map.entries}
           gearIds={[...gearIds]}
           currentIds={[...currentIds]}
-          axisLabel={axis.label}
         />
       )}
 
       <p className="mt-6 text-xs leading-6 text-tt-gray70">
-        ※位置は実際のA/B比較からの推定です（実体験の回答を重く、イメージ回答を
-        軽く扱います）。支持本数が少ないラバーは中央（平均）寄りに置かれます。
-        メーカー公称スペックではなく、使った人の相対判定に基づきます。
+        ※メーカーの数値ではなく、使った人の比較から推定した位置です。
+        両方使った人の声を重く見ています。データが少ない用具は真ん中寄りになります。
       </p>
 
       <div className="mt-6 flex gap-3">
@@ -161,16 +156,14 @@ function PositionBar({
   rank,
   isGear,
   isCurrent,
-  axisLabel,
 }: {
   entry: import("@/lib/relative-map").MapEntry;
   rank?: number;
   isGear: boolean;
   isCurrent: boolean;
-  axisLabel: string;
 }) {
   const pct = Math.round(entry.score);
-  // 支持の薄さ = 信頼度の低さを点線とラベルで明示
+  // データの薄さ = 信頼度の低さをラベルで明示
   const lowConfidence = entry.comparisons < 3;
   return (
     <Link
@@ -208,9 +201,7 @@ function PositionBar({
           )}
         </span>
         <span className="shrink-0 font-mono text-xs text-tt-gray70">
-          {entry.bothComparisons > 0
-            ? `実${entry.bothComparisons}/全${entry.comparisons}件`
-            : `${entry.comparisons}件`}
+          {entry.comparisons}件
         </span>
       </div>
       {/* 相対位置バー */}
@@ -226,7 +217,7 @@ function PositionBar({
       </div>
       {lowConfidence && (
         <p className="mt-1 text-[10px] text-tt-gray70">
-          支持が少なく中央寄りの暫定位置（{axisLabel}）
+          データ少なめ（おおよその位置）
         </p>
       )}
     </Link>
