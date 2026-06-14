@@ -100,6 +100,8 @@ export function CatalogExplorer({
   const [hard, setHard] = useState<number>(-1);
   const [sort, setSort] = useState<Sort>("popular");
   const [showScores, setShowScores] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   // 比較する2本の選択 (ブラウズ→対決作成の導線)
   const [picked, setPicked] = useState<CatalogItem[]>([]);
 
@@ -204,9 +206,51 @@ export function CatalogExplorer({
     return sorted;
   }, [byKind, style, cat, mfr, band, hard, query, sort, baseline]);
 
-  const hasFilter = Boolean(
-    query.trim() || style || cat || mfr || band >= 0 || hard >= 0,
+  // タイプ即サジェスト: 候補から用具詳細へ直接ジャンプできる (≤6件)
+  const suggestions = useMemo(
+    () =>
+      query.trim().length >= 1
+        ? searchEquipment(byKind, query, { limit: 6 })
+        : [],
+    [byKind, query],
   );
+
+  // 適用中フィルタ (常に見える・個別に外せる)
+  const activeFilters: Array<{ id: string; label: string; clear: () => void }> =
+    [];
+  if (style && STYLE_CATS[style])
+    activeFilters.push({
+      id: "style",
+      label: STYLE_CATS[style].label,
+      clear: () => setStyle(null),
+    });
+  if (cat)
+    activeFilters.push({
+      id: "cat",
+      label: CAT_LABEL[cat] ?? cat,
+      clear: () => setCat(null),
+    });
+  if (mfr)
+    activeFilters.push({ id: "mfr", label: mfr, clear: () => setMfr("") });
+  if (band >= 0)
+    activeFilters.push({
+      id: "band",
+      label: PRICE_BANDS[band].label,
+      clear: () => setBand(-1),
+    });
+  if (hard >= 0)
+    activeFilters.push({
+      id: "hard",
+      label: HARDNESS_BANDS[hard].label,
+      clear: () => setHard(-1),
+    });
+  const clearAll = () => {
+    setStyle(null);
+    setCat(null);
+    setMfr("");
+    setBand(-1);
+    setHard(-1);
+  };
 
   return (
     <div>
@@ -234,96 +278,64 @@ export function CatalogExplorer({
         ))}
       </div>
 
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="用具名で検索（ひらがな・英語・ローマ字OK 例: rozena / dignics）"
-        className="mt-3 block w-full rounded-full border border-tt-gray30/50 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-tt-green focus:outline-none"
-      />
-
-      {/* 戦型から探す (種類のショートカット。ラバーのみ) */}
-      {kind === "rubber" && (
-        <div className="mt-3">
-          <p className="mb-1 text-[11px] font-bold text-tt-gray70">
-            戦型から探す
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            <Chip active={style === null} onClick={() => setStyle(null)}>
-              指定なし
-            </Chip>
-            {Object.entries(STYLE_CATS).map(([k, v]) => (
-              <Chip
-                key={k}
-                active={style === k}
-                onClick={() => {
-                  setStyle(style === k ? null : k);
-                  setCat(null);
-                }}
-              >
-                {v.label}
-              </Chip>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {cats.length > 1 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Chip active={cat === null} onClick={() => setCat(null)}>
-            すべての種類
-          </Chip>
-          {cats.map((c) => (
-            <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
-              {CAT_LABEL[c]}
-            </Chip>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-2 flex flex-wrap gap-2">
-        <select
-          value={mfr}
-          onChange={(e) => setMfr(e.target.value)}
-          className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">すべてのメーカー</option>
-          {mfrs.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <select
-          value={band}
-          onChange={(e) => setBand(Number(e.target.value))}
-          className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
-        >
-          <option value={-1}>すべての価格</option>
-          {PRICE_BANDS.map((p, i) => (
-            <option key={p.label} value={i}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        {kind !== "blade" && (
-          <select
-            value={hard}
-            onChange={(e) => setHard(Number(e.target.value))}
-            className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
+      {/* 検索 + サジェスト (タイプして候補から直接ジャンプ) */}
+      <div className="relative mt-3">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => window.setTimeout(() => setFocused(false), 120)}
+          placeholder="用具名で検索（ひらがな・英語・ローマ字OK 例: rozena）"
+          className="block w-full rounded-full border border-tt-gray30/50 bg-white px-4 py-2.5 pr-10 text-sm shadow-sm focus:border-tt-green focus:outline-none"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label="検索をクリア"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setQuery("")}
+            className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-tt-gray30/40 text-sm text-tt-gray70 transition hover:bg-tt-gray30/70"
           >
-            <option value={-1}>すべての硬度</option>
-            {HARDNESS_BANDS.map((h, i) => (
-              <option key={h.label} value={i}>
-                {h.label}
-              </option>
-            ))}
-          </select>
+            ×
+          </button>
         )}
+        {focused && suggestions.length > 0 && (
+          <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl border border-tt-gray30/50 bg-white shadow-lg">
+            {suggestions.map((s) => (
+              <li
+                key={s.id}
+                className="border-b border-tt-gray30/20 last:border-0"
+              >
+                <Link
+                  href={`/equipment/${s.id}`}
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm transition hover:bg-tt-soft-green"
+                >
+                  <EquipmentVisual
+                    category={s.category}
+                    manufacturer={s.manufacturer}
+                    imageUrl={s.imageUrl}
+                    bladeSubcategory={s.bladeSubcategory}
+                    name={s.name}
+                    size={24}
+                  />
+                  <span className="truncate font-bold">{s.name}</span>
+                  <span className="ml-auto shrink-0 text-[11px] text-tt-gray70">
+                    {s.manufacturer}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* 並べ替え + 絞り込み開閉 */}
+      <div className="mt-2 flex gap-2">
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
-          className="flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
+          className="min-w-0 flex-1 rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
         >
           <optgroup label="並べ替え">
             <option value="popular">人気順</option>
@@ -343,7 +355,134 @@ export function CatalogExplorer({
             </optgroup>
           )}
         </select>
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((v) => !v)}
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-bold transition ${
+            filtersOpen || activeFilters.length > 0
+              ? "border-tt-green bg-tt-soft-green text-tt-deep-green"
+              : "border-tt-gray30/50 bg-white text-tt-gray70"
+          }`}
+        >
+          絞り込み
+          {activeFilters.length > 0 && (
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-tt-deep-green px-1 text-[10px] text-white">
+              {activeFilters.length}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* 適用中フィルタ (常に見える・個別に外せる) */}
+      {activeFilters.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {activeFilters.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={f.clear}
+              className="flex items-center gap-1 rounded-full bg-tt-soft-green px-2.5 py-1 text-xs font-bold text-tt-deep-green transition hover:bg-tt-green/15"
+            >
+              {f.label}
+              <span className="text-tt-deep-green/60">×</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={clearAll}
+            className="ml-1 text-xs font-bold text-tt-gray70 underline"
+          >
+            すべて解除
+          </button>
+        </div>
+      )}
+
+      {/* 絞り込みパネル (折りたたみ。普段は閉じてスッキリ) */}
+      {filtersOpen && (
+        <div className="mt-3 space-y-3 rounded-2xl bg-tt-offwhite p-3 ring-1 ring-black/5">
+          {kind === "rubber" && (
+            <div>
+              <p className="mb-1 text-[11px] font-bold text-tt-gray70">
+                戦型から探す
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <Chip active={style === null} onClick={() => setStyle(null)}>
+                  指定なし
+                </Chip>
+                {Object.entries(STYLE_CATS).map(([k, v]) => (
+                  <Chip
+                    key={k}
+                    active={style === k}
+                    onClick={() => {
+                      setStyle(style === k ? null : k);
+                      setCat(null);
+                    }}
+                  >
+                    {v.label}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {cats.length > 1 && (
+            <div>
+              <p className="mb-1 text-[11px] font-bold text-tt-gray70">種類</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Chip active={cat === null} onClick={() => setCat(null)}>
+                  すべて
+                </Chip>
+                {cats.map((c) => (
+                  <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
+                    {CAT_LABEL[c]}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-2">
+            <select
+              value={mfr}
+              onChange={(e) => setMfr(e.target.value)}
+              className="rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">すべてのメーカー</option>
+              {mfrs.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select
+              value={band}
+              onChange={(e) => setBand(Number(e.target.value))}
+              className="rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
+            >
+              <option value={-1}>すべての価格</option>
+              {PRICE_BANDS.map((p, i) => (
+                <option key={p.label} value={i}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            {kind !== "blade" && (
+              <select
+                value={hard}
+                onChange={(e) => setHard(Number(e.target.value))}
+                className="rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm"
+              >
+                <option value={-1}>すべての硬度</option>
+                {HARDNESS_BANDS.map((h, i) => (
+                  <option key={h.label} value={i}>
+                    {h.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-xs text-tt-gray70">
         <div className="flex items-center gap-3">
@@ -362,21 +501,6 @@ export function CatalogExplorer({
             </button>
           )}
         </div>
-        {hasFilter && (
-          <button
-            onClick={() => {
-              setQuery("");
-              setStyle(null);
-              setCat(null);
-              setMfr("");
-              setBand(-1);
-              setHard(-1);
-            }}
-            className="font-bold text-tt-green underline"
-          >
-            絞り込みを解除
-          </button>
-        )}
       </div>
 
       {showScores && baseline && (
