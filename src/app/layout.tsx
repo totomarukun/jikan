@@ -51,15 +51,12 @@ export default function RootLayout({
         <header className="sticky top-0 z-20 border-b border-tt-gray30/30 bg-white/85 backdrop-blur">
           <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
             <LogoHorizontal />
-            <nav className="flex items-center gap-4 text-sm font-medium text-tt-gray70">
+            <nav className="flex items-center gap-4 text-sm font-medium text-tt-gray70 sm:gap-6">
               <Link href="/catalog" className="transition hover:text-tt-green">
-                用具を探す
+                用具をみる
               </Link>
-              <Link href="/catalog?view=map" className="transition hover:text-tt-green">
-                用具マップ
-              </Link>
-              <Link href="/switch" className="transition hover:text-tt-green">
-                乗り換え検討
+              <Link href="/play" className="transition hover:text-tt-green">
+                答える
               </Link>
               <Link href="/me" className="transition hover:text-tt-green">
                 マイページ
