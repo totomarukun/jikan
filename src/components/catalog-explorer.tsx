@@ -35,23 +35,6 @@ const AXIS_SHORT: Record<string, string> = {
   defenseEase: "守備",
 };
 
-// 戦型 → よく使われるラバー種類 (一般的な対応。種類フィルタのショートカット)
-const STYLE_CATS: Record<string, { label: string; cats: string[] }> = {
-  DRIVE: { label: "ドライブ主戦", cats: ["RUBBER_INVERTED", "RUBBER_STICKY"] },
-  QUICK_ATTACK: {
-    label: "前陣速攻",
-    cats: ["RUBBER_PIMPLE_OUT", "RUBBER_INVERTED"],
-  },
-  CUT: {
-    label: "カット",
-    cats: ["RUBBER_PIMPLE_LONG", "RUBBER_ANTI", "RUBBER_INVERTED"],
-  },
-  OTHER: {
-    label: "異質",
-    cats: ["RUBBER_PIMPLE_OUT", "RUBBER_PIMPLE_LONG", "RUBBER_ANTI"],
-  },
-};
-
 const CAT_LABEL: Record<string, string> = {
   RUBBER_INVERTED: "裏ソフト",
   RUBBER_PIMPLE_OUT: "表ソフト",
@@ -82,18 +65,13 @@ type Sort = string;
 
 export function CatalogExplorer({
   items,
-  initialStyle = null,
   currentIds = [],
 }: {
   items: CatalogItem[];
-  initialStyle?: string | null;
   currentIds?: string[];
 }) {
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
-  const [style, setStyle] = useState<string | null>(
-    initialStyle && STYLE_CATS[initialStyle] ? initialStyle : null,
-  );
   const [cat, setCat] = useState<string | null>(null);
   const [mfr, setMfr] = useState("");
   const [band, setBand] = useState<number>(-1);
@@ -148,8 +126,6 @@ export function CatalogExplorer({
 
   const filtered = useMemo(() => {
     let list = byKind;
-    if (style && STYLE_CATS[style])
-      list = list.filter((e) => STYLE_CATS[style].cats.includes(e.category));
     if (cat) list = list.filter((e) => e.category === cat);
     if (mfr) list = list.filter((e) => e.manufacturer === mfr);
     if (band >= 0) {
@@ -204,7 +180,7 @@ export function CatalogExplorer({
       return byName(a, b);
     });
     return sorted;
-  }, [byKind, style, cat, mfr, band, hard, query, sort, baseline]);
+  }, [byKind, cat, mfr, band, hard, query, sort, baseline]);
 
   // タイプ即サジェスト: 候補から用具詳細へ直接ジャンプできる (≤6件)
   const suggestions = useMemo(
@@ -218,12 +194,6 @@ export function CatalogExplorer({
   // 適用中フィルタ (常に見える・個別に外せる)
   const activeFilters: Array<{ id: string; label: string; clear: () => void }> =
     [];
-  if (style && STYLE_CATS[style])
-    activeFilters.push({
-      id: "style",
-      label: STYLE_CATS[style].label,
-      clear: () => setStyle(null),
-    });
   if (cat)
     activeFilters.push({
       id: "cat",
@@ -245,7 +215,6 @@ export function CatalogExplorer({
       clear: () => setHard(-1),
     });
   const clearAll = () => {
-    setStyle(null);
     setCat(null);
     setMfr("");
     setBand(-1);
@@ -270,7 +239,6 @@ export function CatalogExplorer({
               setKind(k);
               setCat(null);
               setPicked([]);
-              if (k === "blade") setStyle(null);
             }}
           >
             {label}
@@ -400,31 +368,6 @@ export function CatalogExplorer({
       {/* 絞り込みパネル (折りたたみ。普段は閉じてスッキリ) */}
       {filtersOpen && (
         <div className="mt-3 space-y-3 rounded-2xl bg-tt-offwhite p-3 ring-1 ring-black/5">
-          {kind === "rubber" && (
-            <div>
-              <p className="mb-1 text-[11px] font-bold text-tt-gray70">
-                戦型から探す
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                <Chip active={style === null} onClick={() => setStyle(null)}>
-                  指定なし
-                </Chip>
-                {Object.entries(STYLE_CATS).map(([k, v]) => (
-                  <Chip
-                    key={k}
-                    active={style === k}
-                    onClick={() => {
-                      setStyle(style === k ? null : k);
-                      setCat(null);
-                    }}
-                  >
-                    {v.label}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-          )}
-
           {cats.length > 1 && (
             <div>
               <p className="mb-1 text-[11px] font-bold text-tt-gray70">種類</p>

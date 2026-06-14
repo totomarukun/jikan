@@ -7,14 +7,7 @@ export const metadata = { title: "ラバーを探す" };
 
 // ラバーダッシュボード: 全用具をブラウズしつつ、軸スコア(両方使った人の比較から推定)で
 // 並べ替え・比較できる「探す/見極める」入口。現用ラバーを基準に差分も読める。
-export default async function CatalogPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = await searchParams;
-  const initialStyle = typeof sp.style === "string" ? sp.style : null;
-
+export default async function CatalogPage() {
   const sessionId = await getSessionId();
   const [rows, scores, gearItems] = await Promise.all([
     prisma.equipment.findMany({
@@ -65,17 +58,8 @@ export default async function CatalogPage({
   return (
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">ラバーを探す</h1>
-      <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        名前で検索（ひらがな・英語・ローマ字OK）、種類・メーカー・価格・硬さで絞り込み。
-        <strong className="text-tt-charcoal">スピード・スピン・かたさ</strong>
-        などのスコアで並べ替えて、特徴から選べます。
-      </p>
       <div className="mt-4">
-        <CatalogExplorer
-          items={items}
-          initialStyle={initialStyle}
-          currentIds={currentIds}
-        />
+        <CatalogExplorer items={items} currentIds={currentIds} />
       </div>
     </div>
   );

@@ -142,9 +142,6 @@ export default function GearPage() {
   return (
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">マイギア</h1>
-      <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        使ったことのあるラバーの記録です。登録した分だけ、答えやすい比較が出てきます。
-      </p>
 
       {gear === null ? (
         <p className="py-12 text-center text-sm text-tt-gray70">マイギアを読み込んでいます…</p>

@@ -82,9 +82,6 @@ export default async function SwitchPage({
   return (
     <div className="mx-auto max-w-md py-4">
       <h1 className="text-2xl font-bold">乗り換え検討</h1>
-      <p className="mt-1 text-sm leading-6 text-tt-gray70">
-        いま使っているラバーを基準に、気になる候補を実際の比較で見比べられます。
-      </p>
 
       {!current ? (
         <NoBaseSetup sessionId={sessionId} />
