@@ -14,6 +14,7 @@ import {
   type Level,
   type Playstyle,
 } from "@/lib/types";
+import { axesForPair } from "@/lib/axes";
 import { VersusBarOrPending } from "@/components/versus-bar";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import { PairCommentForm } from "@/components/pair-comment-form";
@@ -133,44 +134,39 @@ export default async function CompareViewPage({
   const myExperienced = myComparisons.some(
     (c) => c.hasActualExperience === "BOTH",
   );
-  const myPick = (
-    col:
-      | "winnerOverall"
-      | "winnerSpeed"
-      | "winnerSpin"
-      | "winnerHardness"
-      | "winnerBallHold",
-  ): { name: string } | "SAME" | null => {
-    const row = myComparisons.find((c) => c[col] != null);
+  // 表示する軸はラバー軸モデルから (粘着は粘着系同士のときだけ)
+  const displayAxes = axesForPair(equipA.category, equipB.category);
+  const winnerColOf: Record<string, string> = {
+    speed: "winnerSpeed",
+    spin: "winnerSpin",
+    hardness: "winnerHardness",
+    arc: "winnerArc",
+    attackEase: "winnerAttackEase",
+    defenseEase: "winnerDefenseEase",
+    tackiness: "winnerTackiness",
+  };
+
+  const myPick = (col: string): { name: string } | "SAME" | null => {
+    const row = myComparisons.find(
+      (c) => (c as unknown as Record<string, string | null>)[col] != null,
+    );
     if (!row) return null;
-    const w = row[col];
+    const w = (row as unknown as Record<string, string | null>)[col];
     if (w === "SAME") return "SAME";
     const pickedId = w === "A" ? row.optionAEquipmentId : row.optionBEquipmentId;
     return { name: pickedId === aId ? equipA.name : equipB.name };
   };
-  const myByAxis = {
-    overall: myPick("winnerOverall"),
-    speed: myPick("winnerSpeed"),
-    spin: myPick("winnerSpin"),
-    hardness: myPick("winnerHardness"),
-    ballHold: myPick("winnerBallHold"),
-  };
+  const myByAxis: Record<string, { name: string } | "SAME" | null> = {};
+  for (const m of displayAxes) myByAxis[m.key] = myPick(winnerColOf[m.key]);
   const hasMine = myComparisons.length > 0;
 
   // A/B を equipA / equipB 基準に正規化して集計
-  const tally = {
-    overall: { a: 0, b: 0, same: 0 },
-    speed: { a: 0, b: 0, same: 0 },
-    spin: { a: 0, b: 0, same: 0 },
-    hardness: { a: 0, b: 0, same: 0 },
-    ballHold: { a: 0, b: 0, same: 0 },
-  };
+  type Bucket = { a: number; b: number; same: number };
+  const tally: Record<string, Bucket> = {};
+  for (const m of displayAxes) tally[m.key] = { a: 0, b: 0, same: 0 };
   for (const c of comparisons) {
     const flipped = c.optionAEquipmentId === bId;
-    const add = (
-      bucket: { a: number; b: number; same: number },
-      winner: string | null,
-    ) => {
+    const add = (bucket: Bucket, winner: string | null) => {
       if (winner === "A") {
         if (flipped) bucket.b++;
         else bucket.a++;
@@ -181,18 +177,15 @@ export default async function CompareViewPage({
         bucket.same++;
       }
     };
-    add(tally.overall, c.winnerOverall);
-    add(tally.speed, c.winnerSpeed);
-    add(tally.spin, c.winnerSpin);
-    add(tally.hardness, c.winnerHardness);
-    add(tally.ballHold, c.winnerBallHold);
+    const row = c as unknown as Record<string, string | null>;
+    for (const m of displayAxes) add(tally[m.key], row[winnerColOf[m.key]]);
   }
   const total = comparisons.length;
   // 公開母数は「行数」ではなく「実際に答えた人数」で数える。
   // 1人が軸別に答えると行が増えるため、行数だと n が水増しに見える。
   const voterCount = new Set(comparisons.map((c) => c.sessionId)).size;
 
-  const insight = buildInsight(equipA.name, equipB.name, tally.overall);
+  const insight = buildInsight(equipA.name, equipB.name, displayAxes, tally);
 
   // 表示するのはメーカー公称の生値のみ (独自の0-100正規化値は信頼性を
   // 毀損するため廃止)。硬さは中立軸のため優位表示しない。価格は安い側を優位
@@ -346,17 +339,10 @@ export default async function CompareViewPage({
             )}
           </div>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-            {(
-              [
-                ["好み", myByAxis.overall],
-                ["スピード", myByAxis.speed],
-                ["スピン", myByAxis.spin],
-                ["硬く感じる", myByAxis.hardness],
-                ["球持ち", myByAxis.ballHold],
-              ] as const
-            )
-              .filter(([, pick]) => pick != null)
-              .map(([label, pick]) => (
+            {displayAxes
+              .map((m) => ({ label: m.label, pick: myByAxis[m.key] }))
+              .filter((x) => x.pick != null)
+              .map(({ label, pick }) => (
                 <div key={label} className="flex items-baseline justify-between gap-2">
                   <dt className="text-xs text-tt-gray70">{label}</dt>
                   <dd className="truncate text-right font-bold text-tt-charcoal">
@@ -396,11 +382,15 @@ export default async function CompareViewPage({
                 データが少ないため参考程度に（回答者{voterCount}人）
               </p>
             )}
-            <AxisCard label="好み" bucket={tally.overall} nameA={equipA.name} nameB={equipB.name} />
-            <AxisCard label="スピード" bucket={tally.speed} nameA={equipA.name} nameB={equipB.name} />
-            <AxisCard label="スピン" bucket={tally.spin} nameA={equipA.name} nameB={equipB.name} />
-            <AxisCard label="硬く感じる" bucket={tally.hardness} nameA={equipA.name} nameB={equipB.name} />
-            <AxisCard label="球持ちが良いと感じる" bucket={tally.ballHold} nameA={equipA.name} nameB={equipB.name} />
+            {displayAxes.map((m) => (
+              <AxisCard
+                key={m.key}
+                label={m.label}
+                bucket={tally[m.key]}
+                nameA={equipA.name}
+                nameB={equipB.name}
+              />
+            ))}
             <div className="rounded-2xl bg-tt-soft-green p-4 text-sm ring-1 ring-tt-green/20">
               <p className="font-bold text-tt-deep-green">わかること</p>
               <p className="mt-1 leading-6">{insight}</p>
@@ -622,21 +612,29 @@ function FilterSelect({
 function buildInsight(
   nameA: string,
   nameB: string,
-  overall: { a: number; b: number; same: number },
+  axes: Array<{ key: string; label: string }>,
+  tally: Record<string, { a: number; b: number; same: number }>,
 ): string {
-  const total = overall.a + overall.b + overall.same;
-  // n が少ないうちは % や多数派を断言しない (バー表示と同じルール)
-  if (total < 3) {
-    return total === 0
-      ? `「好み」の回答はまだありません。あと3件集まると、傾向が読み取れます。`
-      : `「好み」の回答はいま${total}件。あと${3 - total}件集まると、傾向が読み取れます。`;
+  // 表示軸の中で、いちばん意見がはっきり割れている軸を1つ取り上げて要約する。
+  // n が少ないうちは断言しない (バー表示と同じルール)。
+  let best: { label: string; a: number; b: number; ratio: number } | null = null;
+  for (const m of axes) {
+    const t = tally[m.key];
+    if (!t) continue;
+    const decided = t.a + t.b;
+    const total = decided + t.same;
+    if (total < 3 || decided === 0) continue;
+    const ratio = Math.max(t.a, t.b) / decided;
+    if (!best || ratio > best.ratio)
+      best = { label: m.label, a: t.a, b: t.b, ratio };
   }
-  if (overall.a === overall.b) {
-    return `この条件では ${nameA} と ${nameB} の好みは拮抗しています。`;
+  if (!best) {
+    return "まだ傾向を出せるほど回答が集まっていません。答えるほど、ここに特徴が出てきます。";
   }
-  const winner = overall.a > overall.b ? nameA : nameB;
-  const pct = Math.round(
-    (Math.max(overall.a, overall.b) / Math.max(overall.a + overall.b, 1)) * 100,
-  );
-  return `この条件では ${winner} を好む人が${pct}%と多数派です。`;
+  if (best.a === best.b) {
+    return `${best.label}は ${nameA} と ${nameB} で拮抗しています。`;
+  }
+  const winner = best.a > best.b ? nameA : nameB;
+  const pct = Math.round(best.ratio * 100);
+  return `${best.label}は ${winner} という人が${pct}%と多数派です。`;
 }

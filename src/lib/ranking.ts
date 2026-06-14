@@ -21,7 +21,9 @@ export type AxisKey =
   | "hardness"
   | "ballHold"
   | "arc"
-  | "tackiness";
+  | "tackiness"
+  | "attackEase"
+  | "defenseEase";
 
 export interface PairwiseInput {
   aId: string;

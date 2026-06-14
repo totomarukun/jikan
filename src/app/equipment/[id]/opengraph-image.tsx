@@ -12,13 +12,13 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const AXIS_LABEL: Record<string, string> = {
-  overall: "好み",
   speed: "スピード",
   spin: "スピン",
-  control: "コントロール",
-  ballHold: "球持ち",
+  hardness: "かたさ",
   arc: "弧線",
-  hardness: "硬さ",
+  attackEase: "攻撃のしやすさ",
+  defenseEase: "守備のしやすさ",
+  tackiness: "粘着",
 };
 
 export default async function Image({
