@@ -89,6 +89,8 @@ model GearItem {
   usageStartedAt   DateTime?
   // 乗り換え理由・感想などの自由メモ (遍歴の質的記録)
   note             String?
+  // カット後の実測重量(g)。任意。合計重量(ラケット+ラバー)計算に使う
+  weightGrams      Int?
   createdAt        DateTime   @default(now())
 
   @@index([sessionId])

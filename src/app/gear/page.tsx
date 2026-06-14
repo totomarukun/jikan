@@ -39,6 +39,7 @@ interface GearEntry {
   isCurrent: boolean;
   usageStartedAt: string | null;
   note: string | null;
+  weightGrams: number | null;
   equipment: {
     id: string;
     name: string;
@@ -89,6 +90,7 @@ export default function GearPage() {
         thickness: draft.thickness,
         bladeEquipmentId: draft.blade?.id,
         isCurrent: draft.isCurrent,
+        weightGrams: draft.weightGrams ?? undefined,
       }),
     });
     setShowForm(false);
@@ -103,7 +105,7 @@ export default function GearPage() {
   // 既存ギアの貼った日・メモを更新 (同一 equipmentId×side は更新扱い)
   async function saveDetails(
     g: GearEntry,
-    patch: { note?: string; usageStartedAt?: string },
+    patch: { note?: string; usageStartedAt?: string; weightGrams?: number },
   ) {
     await fetch("/api/gear", {
       method: "POST",
@@ -114,6 +116,7 @@ export default function GearPage() {
         thickness: "UNKNOWN", // 既存の厚さを保持
         note: patch.note,
         usageStartedAt: patch.usageStartedAt,
+        weightGrams: patch.weightGrams,
       }),
     });
     await reload();
@@ -184,9 +187,30 @@ export default function GearPage() {
               <>
                 {current.length > 0 && (
                   <>
-                    <h2 className="mt-4 text-sm font-bold text-tt-deep-green">
-                      現在の構成
-                    </h2>
+                    <div className="mt-4 flex items-baseline justify-between">
+                      <h2 className="text-sm font-bold text-tt-deep-green">
+                        現在の構成
+                      </h2>
+                      {(() => {
+                        const weighed = current.filter(
+                          (g) => g.weightGrams != null,
+                        );
+                        if (weighed.length === 0) return null;
+                        const sum = weighed.reduce(
+                          (s, g) => s + (g.weightGrams ?? 0),
+                          0,
+                        );
+                        return (
+                          <span className="text-xs text-tt-gray70">
+                            ラバー計{" "}
+                            <span className="font-mono font-bold text-tt-charcoal">
+                              {sum}g
+                            </span>
+                            {weighed.length < current.length && "（記録分）"}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <ul className="mt-2 space-y-2">
                       {current.map((g) => (
                         <GearRow
@@ -359,7 +383,7 @@ function GearRow({
   onRemove: (id: string) => void;
   onSave: (
     g: GearEntry,
-    patch: { note?: string; usageStartedAt?: string },
+    patch: { note?: string; usageStartedAt?: string; weightGrams?: number },
   ) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -367,14 +391,19 @@ function GearRow({
   const [date, setDate] = useState(
     g.usageStartedAt ? g.usageStartedAt.slice(0, 10) : "",
   );
+  const [weight, setWeight] = useState(
+    g.weightGrams != null ? String(g.weightGrams) : "",
+  );
   const [saving, setSaving] = useState(false);
   const reminder = g.isCurrent ? gearReminder(g.usageStartedAt) : null;
 
   async function save() {
     setSaving(true);
+    const w = weight.trim() ? Number(weight) : NaN;
     await onSave(g, {
       note,
       usageStartedAt: date ? new Date(date).toISOString() : undefined,
+      weightGrams: Number.isFinite(w) && w > 0 ? Math.round(w) : undefined,
     });
     setSaving(false);
     setEditing(false);
@@ -408,6 +437,7 @@ function GearRow({
             <p className="text-xs text-tt-gray70">
               {g.equipment.manufacturer} ・ {GEAR_SIDE_LABELS[g.side]}面・
               {THICKNESS_LABELS[g.thickness]}
+              {g.weightGrams != null && ` ・ ${g.weightGrams}g`}
               {g.blade && ` / ${g.blade.name}`}
             </p>
             {reminder && (
@@ -446,15 +476,30 @@ function GearRow({
 
       {editing && (
         <div className="mt-3 space-y-2 border-t border-tt-gray30/30 pt-3">
-          <label className="block text-xs font-medium text-tt-gray70">
-            貼った日（張り替え時期の目安に）
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-tt-gray30/50 px-3 py-2 text-sm"
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-xs font-medium text-tt-gray70">
+              使い始めた日（古さ・張替の目安）
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-tt-gray30/50 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-medium text-tt-gray70">
+              重さ（カット後・g）
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={150}
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder="例: 47"
+                className="mt-1 block w-full rounded-lg border border-tt-gray30/50 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
           <label className="block text-xs font-medium text-tt-gray70">
             メモ（乗り換え理由・感想など）
             <textarea

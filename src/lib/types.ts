@@ -92,6 +92,8 @@ export const gearSchema = z.object({
   usageStartedAt: z.string().datetime().optional(),
   // 乗り換え理由・感想メモ
   note: z.string().max(500).optional(),
+  // カット後の実測重量(g)。任意 (合計重量計算用)
+  weightGrams: z.number().int().positive().max(150).optional(),
 });
 
 export const signupSchema = z.object({
