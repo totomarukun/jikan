@@ -431,17 +431,25 @@ export interface SimilarEquipment {
   /** 相対プロフィールの近さ (共通軸の平均二乗差の平方根。小さいほど似ている) */
   distance: number;
   sharedAxes: number;
+  /** 近さの根拠となった実比較の最小本数 (確信度表示用) */
+  support: number;
 }
 
 /**
  * 「これに似た用具」: 軸別の相対プロフィール(0-100スケール)が近いラバーを返す。
  * 推移律で合成した相対位置のベクトル距離で測るため、直接対決がなくても近さが出る。
- * 共通軸が少ない(=根拠が薄い)用具は除外し、誤った"似ている"を出さない。
+ *
+ * コールドスタート対策: 比較が疎だと正則化アンカーで全ラバーのスコアが中央(~50)に
+ * 潰れ、距離がほぼ0=「全部似ている」になる(上位機に入門機を勧める等の破綻)。
+ * これを防ぐため、距離計算に使う軸は「基準・候補の双方がその軸で実比較を
+ * minAxisSupport 本以上持つ」ものに限定する。根拠ある軸が minSharedAxes 本に
+ * 満たなければ除外し、誤った"似ている"を出さない(出ないことを正直に受け入れる)。
  */
 export async function findSimilarEquipment(
   baseId: string,
   limit = 4,
   minSharedAxes = 2,
+  minAxisSupport = 2,
 ): Promise<SimilarEquipment[]> {
   const { equipments, perAxis } = await loadRubberAxisRatings();
   const baseCat = equipments.find((e) => e.id === baseId)?.category;
@@ -452,14 +460,20 @@ export async function findSimilarEquipment(
     if (e.id === baseId || !isRubberCategory(e.category)) continue;
     let sumSq = 0;
     let shared = 0;
+    let support = Infinity;
     for (const axis of ALL_AXES) {
       const ratings = perAxis.get(axis)!;
       const base = ratings.get(baseId);
       const cand = ratings.get(e.id);
       if (!base || !cand) continue;
+      // 双方がその軸で実比較を十分持つ場合のみ距離に算入する。
+      // (アンカーで中央に寄っただけの根拠の薄い位置は近さの判定に使わない)
+      if (base.comparisons < minAxisSupport || cand.comparisons < minAxisSupport)
+        continue;
       const d = cand.score - base.score; // 0-100スケール
       sumSq += d * d;
       shared++;
+      support = Math.min(support, base.comparisons, cand.comparisons);
     }
     if (shared < minSharedAxes) continue;
     out.push({
@@ -470,6 +484,7 @@ export async function findSimilarEquipment(
       imageUrl: e.imageUrl,
       distance: Math.sqrt(sumSq / shared),
       sharedAxes: shared,
+      support: Number.isFinite(support) ? support : 0,
     });
   }
   // 近い順。同距離なら共通軸が多い(根拠が厚い)方を上に

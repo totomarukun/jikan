@@ -219,7 +219,7 @@ export default async function EquipmentPage({
         <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
           <h2 className="font-bold">これに似た用具</h2>
           <p className="mt-0.5 text-xs text-tt-gray70">
-            特徴が近い順。次に試す1本の候補に。
+            使った人の比較から、特徴が近いと推定された順。
           </p>
           <ul className="mt-3 space-y-2">
             {similar.map((s) => (
@@ -241,8 +241,13 @@ export default async function EquipmentPage({
                       {s.manufacturer}
                     </span>
                   </span>
-                  <span className="shrink-0 font-mono text-[10px] text-tt-gray70">
+                  <span className="shrink-0 text-right font-mono text-[10px] text-tt-gray70">
                     {s.sharedAxes}項目で近い
+                    {s.support < 3 && (
+                      <span className="block text-[9px] text-tt-coral">
+                        データ少なめ
+                      </span>
+                    )}
                   </span>
                 </Link>
               </li>

@@ -20,12 +20,17 @@ export const metadata = { title: "マイページ" };
 // L1: マイページ
 export default async function MyPage() {
   const userId = await getUserId();
-  if (!userId) redirect("/login");
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) redirect("/login");
-
   const sessionId = await getSessionId();
-  const answerCount = await prisma.comparison.count({ where: { userId } });
+  // 匿名でもギア・回答・プロフィールは sessionId に紐づいて存在する。
+  // ログインを壁にせず、自分の原点として見せる (登録は端末間引き継ぎの任意アップグレード)。
+  if (!userId && !sessionId) redirect("/onboarding");
+  const user = userId
+    ? await prisma.user.findUnique({ where: { id: userId } })
+    : null;
+
+  // 登録済みは userId、匿名は sessionId で自分のデータを引く
+  const ownWhere = userId ? { userId } : { sessionId: sessionId! };
+  const answerCount = await prisma.comparison.count({ where: ownWhere });
 
   // プロフィールはオンボーディング回答 (SessionProgress) を優先する。
   // User 側はデフォルト値のまま残っている既存アカウントがあるため
@@ -33,9 +38,9 @@ export default async function MyPage() {
     ? await prisma.sessionProgress.findUnique({ where: { sessionId } })
     : null;
   const profile = {
-    level: progress?.level ?? user.level,
-    playstyle: progress?.playstyle ?? user.playstyle,
-    bladeCategory: progress?.bladeCategory ?? user.bladeCategory,
+    level: progress?.level ?? user?.level ?? null,
+    playstyle: progress?.playstyle ?? user?.playstyle ?? null,
+    bladeCategory: progress?.bladeCategory ?? user?.bladeCategory ?? null,
   };
 
   let styleName: string | null = null;
@@ -47,7 +52,7 @@ export default async function MyPage() {
   }
 
   const recent = await prisma.comparison.findMany({
-    where: { userId },
+    where: ownWhere,
     include: {
       optionA: { select: { name: true } },
       optionB: { select: { name: true } },
@@ -86,15 +91,19 @@ export default async function MyPage() {
     <div className="mx-auto max-w-md py-4">
       <div className="flex items-center gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-tt-green text-xl font-bold text-white">
-          {(user.nickname ?? user.email)[0].toUpperCase()}
+          {(user?.nickname ?? user?.email ?? "あ")[0].toUpperCase()}
         </div>
         <div>
-          <h1 className="text-xl font-bold">{user.nickname ?? "プレイヤー"}</h1>
-          <p className="text-sm text-tt-gray70">
-            {LEVEL_LABELS[profile.level as Level]} ・{" "}
-            {PLAYSTYLE_LABELS[profile.playstyle as Playstyle]} ・{" "}
-            {BLADE_CATEGORY_LABELS[profile.bladeCategory as BladeCategory]}
-          </p>
+          <h1 className="text-xl font-bold">{user?.nickname ?? "あなた"}</h1>
+          {profile.level ? (
+            <p className="text-sm text-tt-gray70">
+              {LEVEL_LABELS[profile.level as Level]} ・{" "}
+              {PLAYSTYLE_LABELS[profile.playstyle as Playstyle]} ・{" "}
+              {BLADE_CATEGORY_LABELS[profile.bladeCategory as BladeCategory]}
+            </p>
+          ) : (
+            <p className="text-sm text-tt-gray70">プロフィール未設定</p>
+          )}
           <Link
             href="/onboarding"
             className="text-xs text-tt-gray70 underline"
@@ -226,7 +235,30 @@ export default async function MyPage() {
       )}
 
       <div className="mt-10 border-t border-tt-gray30/40 pt-4">
-        <LogoutButton />
+        {user ? (
+          <LogoutButton />
+        ) : (
+          <div className="rounded-2xl bg-tt-soft-green p-4 ring-1 ring-tt-green/25">
+            <p className="text-sm font-bold text-tt-deep-green">
+              この内容はこの端末にだけ保存されています
+            </p>
+            <p className="mt-1 text-xs text-tt-gray70">
+              登録すると、ギア・回答・体感メモを他の端末でも引き継げます。
+            </p>
+            <Link
+              href="/signup"
+              className="mt-3 inline-block rounded-full bg-tt-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
+            >
+              登録してデータを引き継ぐ
+            </Link>
+            <Link
+              href="/login"
+              className="ml-3 text-sm text-tt-gray70 underline"
+            >
+              ログイン
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
