@@ -91,6 +91,7 @@ export default function OnboardingPage() {
           thickness: g.thickness,
           bladeEquipmentId: g.blade?.id,
           isCurrent: g.isCurrent,
+          weightGrams: g.weightGrams ?? undefined,
         }),
       });
     }

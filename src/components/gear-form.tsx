@@ -21,6 +21,7 @@ export interface GearDraft {
   thickness: Thickness;
   blade: RubberItem | null;
   isCurrent: boolean;
+  weightGrams: number | null;
 }
 
 export interface ExistingGearInfo {
@@ -169,6 +170,7 @@ export function GearForm({
   const [bladeQuery, setBladeQuery] = useState("");
   const [blade, setBlade] = useState<RubberItem | null>(null);
   const [isCurrent, setIsCurrent] = useState(false);
+  const [weight, setWeight] = useState("");
   const [busy, setBusy] = useState(false);
   const rubberResults = useEquipmentSearch(query, "rubber");
   const bladeResults = useEquipmentSearch(bladeQuery, "blade");
@@ -190,7 +192,15 @@ export function GearForm({
   async function submit() {
     if (!picked || busy) return;
     setBusy(true);
-    await onAdd({ equipment: picked, side, thickness, blade, isCurrent });
+    const w = weight.trim() ? Number(weight) : NaN;
+    await onAdd({
+      equipment: picked,
+      side,
+      thickness,
+      blade,
+      isCurrent,
+      weightGrams: Number.isFinite(w) && w > 0 ? Math.round(w) : null,
+    });
     // 連続追加できるようリセット
     setQuery("");
     setPicked(null);
@@ -199,6 +209,7 @@ export function GearForm({
     setBladeQuery("");
     setBlade(null);
     setIsCurrent(false);
+    setWeight("");
     setBusy(false);
   }
 
@@ -310,6 +321,22 @@ export function GearForm({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-tt-gray70">
+              重さ（カット後・g／任意）
+            </p>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={150}
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              placeholder="例: 47（あとで記録してもOK）"
+              className="h-10 w-full rounded-xl border border-tt-gray30/50 bg-white px-3 text-sm shadow-sm outline-none focus:border-tt-green"
+            />
           </div>
 
           <div>

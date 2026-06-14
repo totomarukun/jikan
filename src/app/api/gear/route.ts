@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     isCurrent,
     usageStartedAt,
     note,
+    weightGrams,
   } = parsed.data;
   const usageStartedDate = usageStartedAt ? new Date(usageStartedAt) : null;
 
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
           isCurrent: isCurrent ?? existing.isCurrent,
           usageStartedAt: resolvedUsageStart ?? existing.usageStartedAt,
           note: note ?? existing.note,
+          weightGrams: weightGrams ?? existing.weightGrams,
         },
       })
     : await prisma.gearItem.create({
@@ -122,6 +124,7 @@ export async function POST(request: Request) {
           isCurrent: isCurrent ?? false,
           usageStartedAt: resolvedUsageStart,
           note: note ?? null,
+          weightGrams: weightGrams ?? null,
         },
       });
 
