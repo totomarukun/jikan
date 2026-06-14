@@ -1,5 +1,6 @@
 import type { QuestionAxis } from "./types";
 import { isRubberCategory } from "./types";
+import { RUBBER_AXES, axesForPair } from "./axes";
 
 // マイギア中心の出題 (サービス再設計の核):
 // - 出題は原則「ユーザーが使ったことのあるラバー同士」(ギア内ペア)。
@@ -65,35 +66,18 @@ export function pairKey(aId: string, bId: string): string {
   return [aId, bId].sort().join("|");
 }
 
-const FEEL_AXES: Array<{ axis: QuestionAxis; weight: number }> = [
-  { axis: "overall", weight: 0.32 },
-  { axis: "hardness", weight: 0.18 },
-  { axis: "spin", weight: 0.14 },
-  { axis: "speed", weight: 0.14 },
-  { axis: "ballHold", weight: 0.12 },
-  { axis: "arc", weight: 0.1 },
-  { axis: "tackiness", weight: 0.08 },
-];
+// 軸・重み・プロンプトは axes.ts (ラバー軸モデルの単一の真実) から導出する。
+const FEEL_AXES: Array<{ axis: QuestionAxis; weight: number }> = RUBBER_AXES.map(
+  (a) => ({ axis: a.key as QuestionAxis, weight: a.weight }),
+);
 
-const GEAR_PROMPTS: Record<string, string> = {
-  overall: "どちらが好みだった？",
-  hardness: "硬く感じたのはどちら？",
-  spin: "スピンがかかったのはどちら？",
-  speed: "スピードが出たのはどちら？",
-  ballHold: "球持ちが良かったのはどちら？",
-  arc: "弧線が高かった (山なりだった) のはどちら？",
-  tackiness: "粘着が強かった (ひっかかった) のはどちら？",
-};
+const GEAR_PROMPTS: Record<string, string> = Object.fromEntries(
+  RUBBER_AXES.map((a) => [a.key, a.gearPrompt]),
+);
 
-const EXPLORE_PROMPTS: Record<string, string> = {
-  overall: "イメージでOK: どちらが好みそう？",
-  hardness: "イメージでOK: 硬そうなのはどちら？",
-  spin: "イメージでOK: スピンがかかりそうなのは？",
-  speed: "イメージでOK: 速そうなのはどちら？",
-  ballHold: "イメージでOK: 球持ちが良さそうなのは？",
-  arc: "イメージでOK: 弧線が高そう (山なり) なのは？",
-  tackiness: "イメージでOK: 粘着が強そうなのは？",
-};
+const EXPLORE_PROMPTS: Record<string, string> = Object.fromEntries(
+  RUBBER_AXES.map((a) => [a.key, a.explorePrompt]),
+);
 
 function pickRandom<T>(items: T[], random: () => number): T {
   return items[Math.floor(random() * items.length)];
@@ -115,8 +99,6 @@ function pickAxis(
   }
   return candidates[candidates.length - 1].axis;
 }
-
-const ASKABLE_AXES = FEEL_AXES.map((a) => a.axis);
 
 /**
  * 次の1問を生成する。出題できるものがなければ null
@@ -158,8 +140,14 @@ export function generateQuestion(
         const a = gearRubbers[i];
         const b = gearRubbers[j];
         if (a.side !== b.side) continue;
+        const eqA = byId.get(a.equipmentId)!;
+        const eqB = byId.get(b.equipmentId)!;
         const key = pairKey(a.equipmentId, b.equipmentId);
-        const axes = ASKABLE_AXES.filter(
+        // 粘着は粘着系ラバー同士のときだけ出題する (axesForPair が制御)
+        const allowed = axesForPair(eqA.category, eqB.category).map(
+          (m) => m.key as QuestionAxis,
+        );
+        const axes = allowed.filter(
           (axis) => !askedKeys.has(`${key}#${axis}`),
         );
         if (axes.length > 0) {
@@ -240,7 +228,10 @@ export function generateQuestion(
         if (optionA.category !== optionB.category) continue;
       }
       const key = pairKey(optionA.id, optionB.id);
-      const axes = ASKABLE_AXES.filter(
+      const allowed = axesForPair(optionA.category, optionB.category).map(
+        (m) => m.key as QuestionAxis,
+      );
+      const axes = allowed.filter(
         (axis) => !askedKeys.has(`${key}#${axis}`),
       );
       if (axes.length === 0) continue;

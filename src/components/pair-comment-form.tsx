@@ -3,21 +3,22 @@
 import { useState } from "react";
 
 // 体感を残す: funnel思想「レビューを見るために、自分の体感を書く」。
-// 好み(overall)だけでなく軸別(スピード/スピン/コントロール/球持ち/弧線/硬さ)にも
-// 答えられる。軸別nが貯まらないと「軸別の相対差分」というコア価値がデータ枯渇するため、
+// スピード/スピン/かたさ/弧線/攻撃のしやすさ/守備のしやすさ の各軸に答えられる。
+// 軸別nが貯まらないと「軸別の相対差分」というコア価値がデータ枯渇するため、
 // 軸別投票の導線をここに置く。各軸の回答は /api/answers に1件ずつ送る。
 
 type Winner = "A" | "B" | "SAME";
 
 const AXES: Array<{ key: string; label: string; primary?: boolean }> = [
-  { key: "overall", label: "好み", primary: true },
-  { key: "speed", label: "スピード" },
+  { key: "speed", label: "スピード", primary: true },
   { key: "spin", label: "スピン" },
-  { key: "control", label: "コントロール" },
-  { key: "ballHold", label: "球持ち" },
+  { key: "hardness", label: "かたさ" },
   { key: "arc", label: "弧線" },
-  { key: "hardness", label: "硬さ" },
+  { key: "attackEase", label: "攻撃のしやすさ" },
+  { key: "defenseEase", label: "守備のしやすさ" },
 ];
+
+const PRIMARY_AXIS = AXES.find((a) => a.primary)!.key;
 
 export function PairCommentForm({
   aId,
@@ -44,8 +45,8 @@ export function PairCommentForm({
 
   async function submit() {
     setSaving(true);
-    // コメントは overall に付ける(なければ最初に選んだ軸)
-    const commentAxis = picks.overall ? "overall" : pickedAxes[0];
+    // コメントは主要軸に付ける(なければ最初に選んだ軸)
+    const commentAxis = picks[PRIMARY_AXIS] ? PRIMARY_AXIS : pickedAxes[0];
     for (const axis of pickedAxes) {
       await fetch("/api/answers", {
         method: "POST",
@@ -78,11 +79,11 @@ export function PairCommentForm({
   return (
     <div className="space-y-3">
       <AxisRow
-        label="どちらが好み？"
+        label="スピードが上なのは？"
         nameA={nameA}
         nameB={nameB}
-        value={picks.overall}
-        onPick={(w) => setPick("overall", w)}
+        value={picks[PRIMARY_AXIS]}
+        onPick={(w) => setPick(PRIMARY_AXIS, w)}
       />
 
       <button
@@ -127,7 +128,7 @@ export function PairCommentForm({
           ? "送信中…"
           : pickedAxes.length > 0
             ? `体感を残す（${pickedAxes.length}軸）`
-            : "どちらが好みか選んでください"}
+            : "どれか1つ選んでください"}
       </button>
     </div>
   );

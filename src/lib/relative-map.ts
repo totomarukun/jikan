@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { isRubberCategory } from "./types";
+import { RUBBER_AXIS_KEYS } from "./axes";
 import { computeAxisRatings, type AxisKey, type PairwiseInput } from "./ranking";
 
 // 相対マップ: 全ユーザーの全A/B比較を1つの順序推定に合成し、
@@ -14,6 +15,8 @@ const AXIS_COLUMN: Record<AxisKey, keyof ComparisonAxisRow> = {
   ballHold: "winnerBallHold",
   arc: "winnerArc",
   tackiness: "winnerTackiness",
+  attackEase: "winnerAttackEase",
+  defenseEase: "winnerDefenseEase",
 };
 
 interface ComparisonAxisRow {
@@ -28,6 +31,8 @@ interface ComparisonAxisRow {
   winnerBallHold: string | null;
   winnerArc: string | null;
   winnerTackiness: string | null;
+  winnerAttackEase: string | null;
+  winnerDefenseEase: string | null;
 }
 
 // 実体験ほど信頼できるので重み付け (イメージ回答も地図には薄く効かせる)
@@ -89,6 +94,8 @@ export async function buildRelativeMap(axis: AxisKey): Promise<RelativeMap> {
         winnerBallHold: true,
         winnerArc: true,
         winnerTackiness: true,
+        winnerAttackEase: true,
+        winnerDefenseEase: true,
       },
     }),
   ]);
@@ -159,16 +166,9 @@ export interface AxisPosition {
   totalRanked: number;
 }
 
-const ALL_AXES: AxisKey[] = [
-  "overall",
-  "speed",
-  "spin",
-  "control",
-  "ballHold",
-  "arc",
-  "tackiness",
-  "hardness",
-];
+// マップ/詳細/乗り換えで使う軸は新しいラバー軸モデル(axes.ts)に一本化する。
+// overall/control/ballHold は診断・対決の後方互換のため型・DBには残すが、ここでは扱わない。
+const ALL_AXES: AxisKey[] = RUBBER_AXIS_KEYS;
 
 export async function getEquipmentAxisPositions(
   equipmentId: string,
@@ -191,6 +191,8 @@ export async function getEquipmentAxisPositions(
         winnerBallHold: true,
         winnerArc: true,
         winnerTackiness: true,
+        winnerAttackEase: true,
+        winnerDefenseEase: true,
       },
     }),
   ]);
@@ -266,8 +268,6 @@ export interface SwitchCandidate {
   }>;
   /** 共通軸数 (基準との経路のつながりの強さ) */
   sharedAxes: number;
-  /** overall の相対スコア (なければ null) */
-  overallLog: number | null;
 }
 
 export interface SwitchCandidates {
@@ -320,6 +320,8 @@ async function loadRubberAxisRatings(): Promise<{
         winnerBallHold: true,
         winnerArc: true,
         winnerTackiness: true,
+        winnerAttackEase: true,
+        winnerDefenseEase: true,
       },
     }),
   ]);
@@ -387,16 +389,37 @@ export async function buildSwitchCandidates(
       price: e.price,
       axes,
       sharedAxes: axes.length,
-      overallLog: perAxis.get("overall")!.get(e.id)?.logStrength ?? null,
     });
   }
 
+  // データの厚み (軸ごとの実比較本数の合計)。多いほど根拠が確か。
+  const dataScore = (c: SwitchCandidate) =>
+    c.axes.reduce((s, a) => s + a.comparisons, 0);
   candidates.sort((a, b) => {
     if (b.sharedAxes !== a.sharedAxes) return b.sharedAxes - a.sharedAxes;
-    return (b.overallLog ?? -99) - (a.overallLog ?? -99);
+    return dataScore(b) - dataScore(a);
   });
 
   return { baseRanked, candidates: candidates.slice(0, limit) };
+}
+
+// ラバーダッシュボード用: 全ラバーの軸別スコア(0-100)を1回のDB取得でまとめて返す。
+// カタログ(=ダッシュボード)の「軸スコアの一覧・並べ替え」に使う。
+export type RubberScores = Record<string, number>;
+
+export async function getRubberScores(): Promise<Map<string, RubberScores>> {
+  const { perAxis } = await loadRubberAxisRatings();
+  const out = new Map<string, RubberScores>();
+  for (const axis of ALL_AXES) {
+    const ratings = perAxis.get(axis);
+    if (!ratings) continue;
+    for (const [id, r] of ratings) {
+      const cur = out.get(id) ?? {};
+      cur[axis] = r.score;
+      out.set(id, cur);
+    }
+  }
+  return out;
 }
 
 export interface SimilarEquipment {

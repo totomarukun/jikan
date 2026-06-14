@@ -422,14 +422,13 @@ function MakerSpecSection({
 }
 
 const AXIS_META: Record<string, { label: string; high: string }> = {
-  overall: { label: "好み", high: "好まれる" },
   speed: { label: "スピード", high: "速い" },
   spin: { label: "スピン", high: "かかる" },
-  control: { label: "コントロール", high: "扱いやすい" },
-  ballHold: { label: "球持ち", high: "球持ち" },
+  hardness: { label: "かたさ", high: "かたい" },
   arc: { label: "弧線", high: "弧線が高い" },
+  attackEase: { label: "攻撃のしやすさ", high: "攻撃しやすい" },
+  defenseEase: { label: "守備のしやすさ", high: "守備しやすい" },
   tackiness: { label: "粘着", high: "粘着が強い" },
-  hardness: { label: "硬さ", high: "硬い" },
 };
 
 // 相対マップ上の位置: みんなのA/B比較を合成した相対評価で、この用具が

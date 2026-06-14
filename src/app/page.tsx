@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/logo";
+import {
+  HeroCompareIllustration,
+  IconRuler,
+  IconBothUsed,
+  IconSplit,
+} from "@/components/hero-illustration";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
 
@@ -38,7 +44,8 @@ export default async function LandingPage() {
           気になる用具の特徴が、いまの自分の用具と比べて
           <strong className="text-tt-charcoal">ひと目で分かります</strong>。
         </p>
-        <div className="animate-rise mt-8 [animation-delay:160ms]">
+        <HeroCompareIllustration className="animate-rise mx-auto mt-6 w-full max-w-[280px] [animation-delay:120ms]" />
+        <div className="animate-rise mt-6 [animation-delay:160ms]">
           <Link
             href="/map"
             className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
@@ -80,7 +87,10 @@ export default async function LandingPage() {
       {/* 価値訴求: 根本ペイン「感覚は人によって違う」への回答 */}
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl bg-tt-soft-green p-5 ring-1 ring-tt-green/10">
-          <p className="font-mono text-2xl font-bold text-tt-deep-green">01</p>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-2xl font-bold text-tt-deep-green">01</p>
+            <IconRuler className="h-8 w-8" />
+          </div>
           <h2 className="mt-2 font-bold text-tt-deep-green">
             「硬い」を自分基準に
           </h2>
@@ -89,7 +99,10 @@ export default async function LandingPage() {
           </p>
         </div>
         <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
-          <p className="font-mono text-2xl font-bold text-tt-deep-coral">02</p>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-2xl font-bold text-tt-deep-coral">02</p>
+            <IconBothUsed className="h-8 w-8" />
+          </div>
           <h2 className="mt-2 font-bold text-tt-deep-coral">
             「両方使った人」に絞れる比較
           </h2>
@@ -98,7 +111,10 @@ export default async function LandingPage() {
           </p>
         </div>
         <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
-          <p className="font-mono text-2xl font-bold">03</p>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-2xl font-bold">03</p>
+            <IconSplit className="h-8 w-8" />
+          </div>
           <h2 className="mt-2 font-bold">割れる意見も、そのまま</h2>
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
             感じ方が分かれる用具は「意見が割れています」と正直に表示。断定しないから、判断を間違えにくい。

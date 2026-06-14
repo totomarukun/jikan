@@ -50,6 +50,8 @@ export async function POST(request: Request) {
     ballHold: "winnerBallHold",
     arc: "winnerArc",
     tackiness: "winnerTackiness",
+    attackEase: "winnerAttackEase",
+    defenseEase: "winnerDefenseEase",
   }[axis] as
     | "winnerOverall"
     | "winnerSpeed"
@@ -58,7 +60,9 @@ export async function POST(request: Request) {
     | "winnerHardness"
     | "winnerBallHold"
     | "winnerArc"
-    | "winnerTackiness";
+    | "winnerTackiness"
+    | "winnerAttackEase"
+    | "winnerDefenseEase";
 
   // 同一セッション×ペア×軸の再回答は「最新で上書き」する。
   // 連投で n (母数) と % を1人で水増しできると、表示している

@@ -66,6 +66,8 @@ export async function buildQuestionPayload(
         winnerBallHold: true,
         winnerArc: true,
         winnerTackiness: true,
+        winnerAttackEase: true,
+        winnerDefenseEase: true,
       },
     }),
   ]);
@@ -93,6 +95,8 @@ export async function buildQuestionPayload(
       ["ballHold", r.winnerBallHold],
       ["arc", r.winnerArc],
       ["tackiness", r.winnerTackiness],
+      ["attackEase", r.winnerAttackEase],
+      ["defenseEase", r.winnerDefenseEase],
     ];
     for (const [axis, winner] of answered) {
       if (winner) recentAsked.push({ pairKey: key, axis });
@@ -124,6 +128,8 @@ export async function buildQuestionPayload(
     ballHold: "winnerBallHold",
     arc: "winnerArc",
     tackiness: "winnerTackiness",
+    attackEase: "winnerAttackEase",
+    defenseEase: "winnerDefenseEase",
   } as const;
   const axisCounts = await Promise.all(
     Object.values(axisCols).map((col) =>
