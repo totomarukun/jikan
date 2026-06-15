@@ -327,7 +327,7 @@ export function CatalogExplorer({
           onFocus={() => setFocused(true)}
           onBlur={() => window.setTimeout(() => setFocused(false), 120)}
           placeholder="用具名で検索（ひらがな・英語・ローマ字OK 例: rozena）"
-          className="block w-full rounded-full border border-tt-gray30/50 bg-white px-4 py-2.5 pr-10 text-sm shadow-sm focus:border-tt-green focus:outline-none"
+          className="block w-full rounded-full border border-tt-gray30/50 bg-white px-4 py-2.5 pr-10 text-sm focus:border-tt-green focus:outline-none"
         />
         {query && (
           <button
@@ -341,7 +341,7 @@ export function CatalogExplorer({
           </button>
         )}
         {focused && suggestions.length > 0 && (
-          <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl border border-tt-gray30/50 bg-white shadow-lg">
+          <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-tt-gray30/50 bg-white shadow-lg">
             {suggestions.map((s) => (
               <li
                 key={s.id}
@@ -420,7 +420,7 @@ export function CatalogExplorer({
         >
           絞り込み
           {activeFilters.length > 0 && (
-            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-tt-deep-green px-1 text-[10px] text-white">
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-tt-deep-green px-1 text-[11px] text-white">
               {activeFilters.length}
             </span>
           )}
@@ -453,7 +453,7 @@ export function CatalogExplorer({
 
       {/* 絞り込みパネル (折りたたみ。普段は閉じてスッキリ) */}
       {filtersOpen && (
-        <div className="mt-3 space-y-3 rounded-2xl bg-tt-offwhite p-3 ring-1 ring-black/5">
+        <div className="mt-3 space-y-3 rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5">
           {cats.length > 1 && (
             <div>
               <p className="mb-1 text-[11px] font-bold text-tt-gray70">種類</p>
@@ -548,7 +548,7 @@ export function CatalogExplorer({
       )}
 
       {filtered.length === 0 ? (
-        <div className="mt-4 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
+        <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
           該当する用具がありません。
         </div>
       ) : (
@@ -560,12 +560,12 @@ export function CatalogExplorer({
             return (
               <li
                 key={e.id}
-                className={`rounded-xl bg-white p-3 shadow-sm ring-1 transition ${
+                className={`rounded-xl bg-white p-3 ring-1 transition ${
                   isBase
                     ? "ring-2 ring-tt-green"
                     : isPicked
                       ? "ring-tt-green/60"
-                      : "ring-black/5"
+                      : "ring-tt-gray30/40"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -793,7 +793,7 @@ function BasePicker({
         )
       : [];
   return (
-    <div className="mt-3 rounded-2xl bg-tt-soft-green/50 p-2.5 ring-1 ring-tt-green/20">
+    <div className="mt-3 rounded-xl bg-tt-soft-green/50 p-2.5 ring-1 ring-tt-green/20">
       <div className="flex items-center gap-2">
         <span className="shrink-0 text-[11px] font-bold text-tt-deep-green">
           基準
@@ -843,7 +843,7 @@ function BasePicker({
         <div className="mt-2 rounded-xl bg-white p-2.5 ring-1 ring-black/5">
           {gearRubbers.length > 0 && (
             <div className="mb-2">
-              <p className="mb-1 text-[10px] font-bold text-tt-gray70">
+              <p className="mb-1 text-[11px] font-bold text-tt-gray70">
                 マイギアから
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -915,7 +915,7 @@ function MapBars({
 
   if (ranked.length === 0) {
     return (
-      <div className="mt-4 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
+      <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
         この軸はまだ比較データが少なく、分布を出せません。
         <br />
         「一覧」から探すか、比較に答えると地図が育ちます。
@@ -940,8 +940,8 @@ function MapBars({
             <li key={e.id}>
               <Link
                 href={`/equipment/${e.id}`}
-                className={`block rounded-xl bg-white p-2.5 shadow-sm ring-1 transition hover:-translate-y-0.5 hover:shadow-md ${
-                  isBase ? "ring-2 ring-tt-green" : "ring-black/5"
+                className={`block rounded-xl bg-white p-3 ring-1 transition hover:-translate-y-0.5 hover:shadow-md ${
+                  isBase ? "ring-2 ring-tt-green" : "ring-tt-gray30/40"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -1005,7 +1005,7 @@ function CompareView({
 }) {
   if (picked.length < 2) {
     return (
-      <div className="mt-4 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
+      <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
         くらべたいラバーを
         <span className="font-bold text-tt-charcoal">2本</span>えらびます。
         {picked.length === 1 && (
@@ -1031,7 +1031,7 @@ function CompareView({
           <Link
             key={e.id}
             href={`/equipment/${e.id}`}
-            className={`rounded-2xl p-3 text-center shadow-sm ring-1 ${
+            className={`rounded-xl p-3 text-center ring-1 ${
               i === 0
                 ? "bg-tt-soft-green ring-tt-green/25"
                 : "bg-tt-soft-coral ring-tt-coral/25"
@@ -1107,7 +1107,7 @@ function CompareBar({ value, side }: { value?: number; side: "a" | "b" }) {
           />
         )}
       </span>
-      <span className="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-tt-gray70">
+      <span className="w-7 shrink-0 text-right font-mono text-[11px] tabular-nums text-tt-gray70">
         {has ? Math.round(value) : "–"}
       </span>
     </div>
