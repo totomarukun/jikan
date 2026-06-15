@@ -442,12 +442,12 @@ async function SwitchBoard({
         />
       </div>
 
-      {/* 候補カード */}
+      {/* 候補カード (詳しく比べる用に選んだ候補。上の自動「乗り換え候補」とは別) */}
       {candidates.length === 0 ? (
         <EmptyState
           className="mt-6"
-          title="候補はまだありません"
-          description={`気になるラバーを検索して候補に追加すると、「${current.name}」との実データ比較がここに並びます。`}
+          title="詳しく比べる候補は未選択です"
+          description={`上の「乗り換え候補」や検索から気になるラバーを追加すると、「${current.name}」との価格差・体感メモまで並べて詳しく比較できます。`}
         />
       ) : (
         <div className="mt-6 space-y-4">

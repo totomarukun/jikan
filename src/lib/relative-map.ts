@@ -376,6 +376,52 @@ export async function buildSwitchCandidates(
   const baseCat = byId.get(baseId)?.category ?? "";
   if (!isRubberCategory(baseCat)) return { baseRanked: false, candidates: [] };
 
+  // 確信度(comparisons)は「基準↔候補の直接比較本数」を出所にする。
+  // 位置(scoreDelta)は推移律で疎データでも出せるが、それを直接データと同じ確信度で
+  // 見せると、直接比較ゼロの候補まで断定的に見え信頼を損なう(/compareは正直に「データ不足」と
+  // 出すため不整合になる)。直接本数を渡し、UI側の n<3 グレー縮約・参考バッジを正しく効かせる。
+  const baseRows = (await prisma.comparison.findMany({
+    where: {
+      OR: [
+        { optionAEquipmentId: baseId },
+        { optionBEquipmentId: baseId },
+      ],
+    },
+    select: {
+      optionAEquipmentId: true,
+      optionBEquipmentId: true,
+      winnerOverall: true,
+      winnerSpeed: true,
+      winnerSpin: true,
+      winnerControl: true,
+      winnerHardness: true,
+      winnerBallHold: true,
+      winnerArc: true,
+      winnerTackiness: true,
+      winnerAttackEase: true,
+      winnerDefenseEase: true,
+    },
+  })) as ComparisonAxisRow[];
+  // otherId -> axis -> 直接比較本数
+  const directCount = new Map<string, Map<AxisKey, number>>();
+  for (const r of baseRows) {
+    const other =
+      r.optionAEquipmentId === baseId
+        ? r.optionBEquipmentId
+        : r.optionAEquipmentId;
+    let m = directCount.get(other);
+    if (!m) {
+      m = new Map();
+      directCount.set(other, m);
+    }
+    for (const axis of ALL_AXES) {
+      const w = r[AXIS_COLUMN[axis]];
+      if (w === "A" || w === "B" || w === "SAME") {
+        m.set(axis, (m.get(axis) ?? 0) + 1);
+      }
+    }
+  }
+
   let baseRanked = false;
   const candidates: SwitchCandidate[] = [];
   for (const e of equipments) {
@@ -396,7 +442,8 @@ export async function buildSwitchCandidates(
         axis,
         diff,
         scoreDelta: Math.round(cand.score - base.score),
-        comparisons: cand.comparisons,
+        // 直接比較本数(基準↔候補)。0でも推移律で位置(diff)は出すが、確信度は薄いと表示
+        comparisons: directCount.get(e.id)?.get(axis) ?? 0,
       });
     }
     if (axes.length === 0) continue;
