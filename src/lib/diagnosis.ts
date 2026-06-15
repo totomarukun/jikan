@@ -35,7 +35,26 @@ function diffScore(winner: SpecLite, loser: SpecLite, key: keyof SpecLite): numb
   return w > l ? 1 : -1;
 }
 
-export function diagnose(answers: DiagnosisInput[]): DiagnosisResult {
+// 回答からの傾向がまだ弱いとき、攻撃志向などと断言せず中立に。
+// 申告したプレイスタイル(カット主戦型など)があればそれを尊重したラベルにする
+// (守備型を「攻撃志向」と言い切ってカット型ユーザーの信頼を失わないため)。
+function neutralStyleLabel(playstyle?: string): string {
+  switch (playstyle) {
+    case "CUT":
+      return "守備（カット）型";
+    case "DRIVE":
+      return "ドライブ型";
+    case "QUICK_ATTACK":
+      return "前陣速攻型";
+    default:
+      return "バランス型";
+  }
+}
+
+export function diagnose(
+  answers: DiagnosisInput[],
+  playstyle?: string,
+): DiagnosisResult {
   let spin = 0;
   let speed = 0;
   let hard = 0;
@@ -75,12 +94,20 @@ export function diagnose(answers: DiagnosisInput[]): DiagnosisResult {
   const hardness = norm(hard);
   const controlVsPower = norm(control);
 
-  const spinLabel =
-    spinVsSpeed > 0.4 ? "スピン重視" : spinVsSpeed < -0.4 ? "スピード重視" : "バランス";
-  const controlLabel = controlVsPower > 0.3 ? "コントロール志向" : "攻撃志向";
+  // 強い傾向が出た軸だけをラベルにする。弱い軸を埋め草で断言しない
+  // (とくに control は signal が無いと従来「攻撃志向」に倒れ、カット型を
+  //  攻撃志向と言い切る不具合があった)。
+  const parts: string[] = [];
+  if (spinVsSpeed > 0.4) parts.push("スピン重視");
+  else if (spinVsSpeed < -0.4) parts.push("スピード重視");
+  if (controlVsPower > 0.3) parts.push("コントロール志向");
+  else if (controlVsPower < -0.3) parts.push("攻撃志向");
+
+  const styleName =
+    parts.length > 0 ? `${parts.join("・")}型` : neutralStyleLabel(playstyle);
 
   return {
-    styleName: `${spinLabel}・${controlLabel}型`,
+    styleName,
     spinVsSpeed,
     hardness,
     controlVsPower,

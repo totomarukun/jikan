@@ -47,7 +47,7 @@ export default async function MyPage() {
   if (sessionId && answerCount >= MIN_DIAGNOSIS_ANSWERS) {
     const answers = await getAnswersForDiagnosis(sessionId);
     if (answers.length >= MIN_DIAGNOSIS_ANSWERS) {
-      styleName = diagnose(answers).styleName;
+      styleName = diagnose(answers, profile.playstyle ?? undefined).styleName;
     }
   }
 

@@ -78,6 +78,31 @@ describe("diagnose", () => {
     expect(result.styleName).toContain("バランス");
   });
 
+  it("傾向が弱いとき攻撃志向と断言しない (中立に倒す)", () => {
+    // speed/spin など軸指定回答ばかりで control の signal が無いケース。
+    // 従来は無条件に「攻撃志向型」と断言していた回帰を防ぐ。
+    const answers: DiagnosisInput[] = Array.from({ length: 10 }, () => ({
+      axis: "speed",
+      winner: "A" as const,
+      optionA: { officialSpeed: 80, officialSpin: 80, hardness: 40 },
+      optionB: { officialSpeed: 70, officialSpin: 80, hardness: 40 },
+    }));
+    const result = diagnose(answers);
+    expect(result.styleName).not.toContain("攻撃志向");
+  });
+
+  it("傾向が弱いカット型は守備型として尊重し攻撃志向と言わない", () => {
+    const answers: DiagnosisInput[] = Array.from({ length: 10 }, () => ({
+      axis: "speed",
+      winner: "A" as const,
+      optionA: { officialSpeed: 80, officialSpin: 80, hardness: 40 },
+      optionB: { officialSpeed: 70, officialSpin: 80, hardness: 40 },
+    }));
+    const result = diagnose(answers, "CUT");
+    expect(result.styleName).not.toContain("攻撃志向");
+    expect(result.styleName).toContain("守備");
+  });
+
   it("スペック欠損 (null) があっても例外を投げない", () => {
     const answers: DiagnosisInput[] = [
       {

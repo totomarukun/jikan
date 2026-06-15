@@ -87,6 +87,12 @@ export default async function CatalogPage({
     typeof sp.category === "string" && RUBBER_CATS.includes(sp.category)
       ? sp.category
       : null;
+  // ?axis= で分布(マップ)の初期軸を指定できる (URL共有・SSRで守備軸等の地図を再現)
+  const MAP_AXES = ["speed", "spin", "hardness", "arc", "attackEase", "defenseEase"];
+  const initialMapAxis =
+    typeof sp.axis === "string" && MAP_AXES.includes(sp.axis)
+      ? sp.axis
+      : "speed";
   // 基準ラバー: 明示の ?base= が最優先。次に種類指定(?category=)があるときは
   // 現用ラバーの自動基準を当てない (種類フィルタと別グループの自動基準が衝突して
   // 空リストになるのを避ける)。どちらも無ければ現用を自動基準にする。
@@ -107,6 +113,7 @@ export default async function CatalogPage({
           initialBaseId={initialBaseId}
           initialView={initialView}
           initialCat={initialCat}
+          initialMapAxis={initialMapAxis}
         />
       </div>
     </div>

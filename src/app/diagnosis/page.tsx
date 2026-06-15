@@ -47,7 +47,7 @@ export default async function DiagnosisPage() {
   }
 
   const answers = await getAnswersForDiagnosis(sessionId);
-  const result = diagnose(answers);
+  const result = diagnose(answers, progress.playstyle);
 
   if (progress.diagnosedStyle !== result.styleName) {
     await prisma.sessionProgress.update({

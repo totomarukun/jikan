@@ -72,6 +72,7 @@ export function CatalogExplorer({
   initialBaseId = null,
   initialView = "list",
   initialCat = null,
+  initialMapAxis = "speed",
 }: {
   items: CatalogItem[];
   currentIds?: string[];
@@ -79,9 +80,10 @@ export function CatalogExplorer({
   initialBaseId?: string | null;
   initialView?: View;
   initialCat?: string | null;
+  initialMapAxis?: string;
 }) {
   const [view, setView] = useState<View>(initialView);
-  const [mapAxis, setMapAxis] = useState<string>("speed");
+  const [mapAxis, setMapAxis] = useState<string>(initialMapAxis);
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
   const [baseId, setBaseId] = useState<string | null>(initialBaseId);
