@@ -5,6 +5,7 @@ import Link from "next/link";
 import { EquipmentVisual } from "@/components/equipment-visual";
 import { searchEquipment, type SearchableItem } from "@/lib/search";
 import { RUBBER_AXES } from "@/lib/axes";
+import { rubberGroup } from "@/lib/types";
 
 // 用具カタログのブラウズ (探す/調べる の入口): 356件を比較データ無しでも
 // 種類・メーカー・価格で絞り込み＋検索して詳細へ。ユーザーの思考「種類→メーカー→…」に対応。
@@ -70,12 +71,14 @@ export function CatalogExplorer({
   gearRubbers = [],
   initialBaseId = null,
   initialView = "list",
+  initialCat = null,
 }: {
   items: CatalogItem[];
   currentIds?: string[];
   gearRubbers?: Array<{ id: string; name: string }>;
   initialBaseId?: string | null;
   initialView?: View;
+  initialCat?: string | null;
 }) {
   const [view, setView] = useState<View>(initialView);
   const [mapAxis, setMapAxis] = useState<string>("speed");
@@ -83,7 +86,7 @@ export function CatalogExplorer({
   const [query, setQuery] = useState("");
   const [baseId, setBaseId] = useState<string | null>(initialBaseId);
   const [basePickerOpen, setBasePickerOpen] = useState(false);
-  const [cat, setCat] = useState<string | null>(null);
+  const [cat, setCat] = useState<string | null>(initialCat);
   const [mfr, setMfr] = useState("");
   const [band, setBand] = useState<number>(-1);
   const [hard, setHard] = useState<number>(-1);
@@ -101,6 +104,12 @@ export function CatalogExplorer({
     [items, baseId],
   );
   const baseline = baseItem?.scores ?? null;
+  // 基準ラバーの比較可能グループ(表/裏系/粒高/アンチ)。基準を置くと一覧・分布を
+  // この種類の中だけに閉じる (種類を跨いだ差分・近い順は意味を成さないため)。
+  const baseGroup = useMemo(
+    () => (baseItem ? rubberGroup(baseItem.category) : null),
+    [baseItem],
+  );
 
   const togglePick = (item: CatalogItem) =>
     setPicked((cur) => {
@@ -111,14 +120,17 @@ export function CatalogExplorer({
 
   const byKind = useMemo(
     () =>
-      items.filter((e) =>
-        kind === "all"
-          ? true
-          : kind === "blade"
-            ? e.category === "BLADE"
-            : e.category.startsWith("RUBBER_"),
-      ),
-    [items, kind],
+      items.filter((e) => {
+        if (kind === "blade") return e.category === "BLADE";
+        const isRubber = e.category.startsWith("RUBBER_");
+        if (kind === "rubber" && !isRubber) return false;
+        // 基準ラバーがあるとき、ラバーは同じ比較可能グループだけに残す。
+        // (表ソフト基準に裏ソフトを「近い順」で混ぜない。詳細/分布と同じ種類隔離)
+        if (baseGroup && isRubber && rubberGroup(e.category) !== baseGroup)
+          return false;
+        return true;
+      }),
+    [items, kind, baseGroup],
   );
 
   const cats = useMemo(
@@ -814,7 +826,8 @@ function BasePicker({
 
       {baseItem && (
         <p className="mt-1 text-[11px] leading-5 text-tt-gray70">
-          一覧・分布・くらべるが「{baseItem.name}」基準（差分・近い順）に。
+          {CAT_LABEL[baseItem.category] ?? "同じ種類"}の中で「{baseItem.name}
+          」基準（差分・近い順）に。
           <Link
             href={`/switch?base=${baseItem.id}`}
             className="ml-1 font-bold text-tt-deep-green underline"

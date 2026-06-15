@@ -75,10 +75,26 @@ export default async function CatalogPage({
     gearRubbers.push({ id: g.equipmentId, name: g.equipment.name });
   }
   // 基準ラバー: ?base= 優先、なければ現用。これで分布/くらべる/一覧が自分基準になる。
-  const initialBaseId =
+  // ?category= で種類を直接絞れる (有効なラバー種別のみ受け付ける)
+  const RUBBER_CATS = [
+    "RUBBER_INVERTED",
+    "RUBBER_PIMPLE_OUT",
+    "RUBBER_PIMPLE_LONG",
+    "RUBBER_ANTI",
+    "RUBBER_STICKY",
+  ];
+  const initialCat =
+    typeof sp.category === "string" && RUBBER_CATS.includes(sp.category)
+      ? sp.category
+      : null;
+  // 基準ラバー: 明示の ?base= が最優先。次に種類指定(?category=)があるときは
+  // 現用ラバーの自動基準を当てない (種類フィルタと別グループの自動基準が衝突して
+  // 空リストになるのを避ける)。どちらも無ければ現用を自動基準にする。
+  const explicitBase =
     typeof sp.base === "string" && items.some((e) => e.id === sp.base)
       ? sp.base
-      : (currentIds[0] ?? null);
+      : null;
+  const initialBaseId = explicitBase ?? (initialCat ? null : (currentIds[0] ?? null));
 
   return (
     <div className="mx-auto max-w-md py-4">
@@ -90,6 +106,7 @@ export default async function CatalogPage({
           gearRubbers={gearRubbers}
           initialBaseId={initialBaseId}
           initialView={initialView}
+          initialCat={initialCat}
         />
       </div>
     </div>
