@@ -544,7 +544,13 @@ export function CatalogExplorer({
             基準「{baseItem?.name}」
           </span>
           との差（<span className="font-bold text-tt-deep-green">+</span>が上 /{" "}
-          <span className="font-bold text-tt-deep-coral">−</span>が下）。
+          <span className="font-bold text-tt-deep-coral">−</span>が下）。「少」は実比較3件未満。
+        </p>
+      )}
+      {showScores && !baseline && (
+        <p className="mt-2 text-[11px] leading-5 text-tt-gray70">
+          スコアは使った人の比較から推定した相対位置（0-100）。
+          「少」は実比較が3件未満で、まだ位置を確定できないものです。
         </p>
       )}
 
@@ -639,6 +645,7 @@ export function CatalogExplorer({
                   <ScoreStrip
                     scores={e.scores}
                     baseline={baseline && !isBase ? baseline : null}
+                    comparisons={e.comparisons}
                   />
                 )}
               </li>
@@ -713,13 +720,18 @@ export function CatalogExplorer({
 }
 
 // 軸スコアの一覧帯。基準(現用)があるときは差分(+/-)を、無ければ絶対スコア(0-100)を出す。
+// 支持(実比較本数)が薄いと0-100は1票で100/0に飽和し「満点ラバー」と誤読されるため、
+// 閾値未満は数値を断定せず「少」表示・バーをグレーに縮約する(他画面の非断定ルールと統一)。
 function ScoreStrip({
   scores,
   baseline,
+  comparisons,
 }: {
   scores?: Record<string, number>;
   baseline?: Record<string, number> | null;
+  comparisons: number;
 }) {
+  const low = comparisons < 3;
   return (
     <div className="mt-2 grid grid-cols-3 gap-x-2.5 gap-y-1">
       {STRIP_AXES.map((a) => {
@@ -736,7 +748,7 @@ function ScoreStrip({
             <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-tt-gray30/30">
               {has && (
                 <span
-                  className="block h-1.5 rounded-full bg-tt-green"
+                  className={`block h-1.5 rounded-full ${low ? "bg-tt-gray30" : "bg-tt-green"}`}
                   style={{ width: `${Math.max(4, Math.round(v))}%` }}
                 />
               )}
@@ -744,6 +756,10 @@ function ScoreStrip({
             <span className="w-7 shrink-0 text-right font-mono text-[9px] tabular-nums">
               {!has ? (
                 <span className="text-tt-gray30">–</span>
+              ) : low ? (
+                <span className="text-tt-gray30" title="データ少なめ">
+                  少
+                </span>
               ) : delta != null ? (
                 <span
                   className={
@@ -971,7 +987,13 @@ function MapBars({
                     )}
                   </span>
                   <span className="shrink-0 font-mono text-xs text-tt-gray70">
-                    {pct}
+                    {low ? (
+                      <span className="text-tt-gray30" title="データ少なめ">
+                        少
+                      </span>
+                    ) : (
+                      pct
+                    )}
                   </span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-tt-gray30/30">
@@ -990,7 +1012,8 @@ function MapBars({
         })}
       </ul>
       <p className="mt-4 text-[11px] leading-5 text-tt-gray70">
-        ※メーカーの数値ではなく、使った人の比較から推定した相対位置です。グレーはデータ少なめ。
+        ※メーカーの数値ではなく、使った人の比較から推定した相対位置です。
+        「少」グレーは実比較が3件未満で、まだ位置を確定できないものです。
       </p>
     </div>
   );
