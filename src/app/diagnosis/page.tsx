@@ -7,14 +7,12 @@ import {
   getPopularPicksForSimilarUsers,
 } from "@/lib/data";
 import { diagnose, tendencyRows } from "@/lib/diagnosis";
-import { getEntryPointAnchors } from "@/lib/entry-anchors";
 import {
   MIN_DIAGNOSIS_ANSWERS,
   PLAYSTYLE_LABELS,
   type Playstyle,
 } from "@/lib/types";
 import { ShareButton } from "@/components/share-button";
-import { EntryPointAnchors } from "@/components/entry-point-anchors";
 
 export const metadata = { title: "スタイル診断" };
 
@@ -26,32 +24,24 @@ export default async function DiagnosisPage() {
     where: { sessionId },
   });
   if (!progress) redirect("/onboarding");
-  // 基準(原点)が無いユーザーには「はじめの基準(参考)」を出して地図に入れるようにする(M8)。
-  // 既に現用ラバー=原点があるなら不要。
-  const entryAnchors = progress.currentRubberId
-    ? []
-    : await getEntryPointAnchors();
   // 報酬ゲートは廃止。精度の下限だけ設け、足りなければ案内する
   if (progress.answerCount < MIN_DIAGNOSIS_ANSWERS) {
     return (
-      <div className="mx-auto max-w-md py-16">
-        <div className="text-center">
-          <h1 className="text-xl font-bold">スタイル診断</h1>
-          <p className="mt-3 text-sm leading-6 text-tt-gray70">
-            診断にはあと
-            <span className="font-mono font-bold text-tt-green">
-              {MIN_DIAGNOSIS_ANSWERS - progress.answerCount}
-            </span>
-            件の回答が必要です（現在 {progress.answerCount} 件）。
-          </p>
-          <Link
-            href="/play"
-            className="mt-6 inline-block rounded-full bg-tt-green px-8 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
-          >
-            比較に答える
-          </Link>
-        </div>
-        <EntryPointAnchors anchors={entryAnchors} className="mt-8" />
+      <div className="mx-auto max-w-md py-16 text-center">
+        <h1 className="text-xl font-bold">スタイル診断</h1>
+        <p className="mt-3 text-sm leading-6 text-tt-gray70">
+          診断にはあと
+          <span className="font-mono font-bold text-tt-green">
+            {MIN_DIAGNOSIS_ANSWERS - progress.answerCount}
+          </span>
+          件の回答が必要です（現在 {progress.answerCount} 件）。
+        </p>
+        <Link
+          href="/play"
+          className="mt-6 inline-block rounded-full bg-tt-green px-8 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
+        >
+          比較に答える
+        </Link>
       </div>
     );
   }
@@ -201,8 +191,6 @@ export default async function DiagnosisPage() {
           </Link>
         </div>
       )}
-
-      <EntryPointAnchors anchors={entryAnchors} className="mt-6" />
 
       <div className="mt-6 space-y-3 text-center">
         {userId ? (
