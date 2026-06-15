@@ -74,7 +74,11 @@ export default async function LandingPage() {
           className={`mt-8 grid gap-3 text-center ${totalAnswers > 0 ? "grid-cols-2" : "grid-cols-1"}`}
         >
           {totalAnswers > 0 && (
-            <Stat label="集まった比較データ" value={totalAnswers} tone="green" />
+            <Stat
+              label="両方使った人の比較"
+              value={totalAnswers}
+              tone="green"
+            />
           )}
           <Stat label="収録用具" value={equipmentCount} tone="coral" />
         </dl>
