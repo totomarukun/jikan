@@ -170,7 +170,6 @@ function RelativeCandidateRow({ c }: { c: SwitchCandidate }) {
   // 支持が薄い軸は「量」を信用できない(疎データの飽和値)。確信度が乗るまで
   // 数値を出さず方向のみ・グレーに縮約する。閾値=実比較3件。
   const LOW = 3;
-  const provisional = c.axes.some((a) => a.comparisons < LOW);
   return (
     <li>
       <Link
@@ -188,9 +187,18 @@ function RelativeCandidateRow({ c }: { c: SwitchCandidate }) {
           <span className="min-w-0 flex-1 truncate text-sm font-bold">
             {c.name}
           </span>
-          {provisional && (
+          {/* 確信度の出所を明示: この候補の差分が「両方使った人」何件に基づくか */}
+          {c.directComparisons >= LOW ? (
+            <span className="shrink-0 rounded-full bg-tt-soft-green px-1.5 py-0.5 text-[9px] font-bold text-tt-deep-green">
+              両方使った人 {c.directComparisons}件
+            </span>
+          ) : c.directComparisons > 0 ? (
             <span className="shrink-0 rounded-full bg-tt-gray30/40 px-1.5 py-0.5 text-[9px] font-bold text-tt-gray70">
-              データ少なめ
+              両方使った人 {c.directComparisons}件・参考
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-tt-gray30/40 px-1.5 py-0.5 text-[9px] font-bold text-tt-gray70">
+              直接データなし・推定
             </span>
           )}
         </div>

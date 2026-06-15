@@ -273,6 +273,8 @@ export interface SwitchCandidate {
   }>;
   /** 共通軸数 (基準との経路のつながりの強さ) */
   sharedAxes: number;
+  /** 基準↔候補の直接比較本数 (軸を跨いだ最大。確信度の出所表示用。0=直接データなし=推定) */
+  directComparisons: number;
 }
 
 export interface SwitchCandidates {
@@ -457,6 +459,7 @@ export async function buildSwitchCandidates(
       price: e.price,
       axes,
       sharedAxes: axes.length,
+      directComparisons: axes.reduce((m, a) => Math.max(m, a.comparisons), 0),
     });
   }
 
