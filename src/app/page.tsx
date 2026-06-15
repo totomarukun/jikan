@@ -11,6 +11,9 @@ import {
 } from "@/components/hero-illustration";
 import { prisma } from "@/lib/prisma";
 import { getSessionId } from "@/lib/session";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Stat } from "@/components/ui/stat";
 
 // M1: ランディング画面
 // SNS流入の着地点。実データ (注目の対決・累計回答数) を見せて
@@ -31,8 +34,8 @@ export default async function LandingPage() {
 
   return (
     <div className="space-y-12 py-6">
-      {/* ヒーロー */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-8 text-center shadow-sm ring-1 ring-black/5 sm:p-12">
+      {/* ヒーロー: ミニマル=単色のやわらかい地 + 1pxボーダー (影は使わない) */}
+      <section className="relative overflow-hidden rounded-2xl bg-tt-soft-green/40 p-8 text-center ring-1 ring-tt-green/15 sm:p-12">
         <div className="animate-pop mx-auto w-fit">
           <LogoMark size={84} />
         </div>
@@ -47,11 +50,11 @@ export default async function LandingPage() {
           気になる用具の特徴が、いまの自分の用具と比べて
           <strong className="text-tt-charcoal">ひと目で分かります</strong>。
         </p>
-        <HeroCompareIllustration className="animate-rise mx-auto mt-7 w-full max-w-[330px] drop-shadow-[0_12px_28px_rgba(15,110,86,0.16)] [animation-delay:120ms]" />
+        <HeroCompareIllustration className="animate-rise mx-auto mt-7 w-full max-w-[330px] [animation-delay:120ms]" />
         <div className="animate-rise mt-6 [animation-delay:160ms]">
           <Link
             href="/catalog?view=map"
-            className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+            className={buttonVariants({ size: "lg" })}
           >
             用具マップを見る
           </Link>
@@ -59,37 +62,27 @@ export default async function LandingPage() {
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Link
               href="/catalog"
-              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
             >
               用具を名前で探す →
             </Link>
           </div>
         </div>
 
-        {/* ライブ統計 (比較データは集まってから出す) */}
+        {/* ライブ統計 (データ前面。比較データは集まってから出す) */}
         <dl
           className={`mt-8 grid gap-3 text-center ${totalAnswers > 0 ? "grid-cols-2" : "grid-cols-1"}`}
         >
           {totalAnswers > 0 && (
-            <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-              <dt className="text-xs text-tt-gray70">集まった比較データ</dt>
-              <dd className="font-mono text-2xl font-bold text-tt-deep-green">
-                {totalAnswers.toLocaleString()}
-              </dd>
-            </div>
+            <Stat label="集まった比較データ" value={totalAnswers} tone="green" />
           )}
-          <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-            <dt className="text-xs text-tt-gray70">収録用具</dt>
-            <dd className="font-mono text-2xl font-bold text-tt-deep-coral">
-              {equipmentCount.toLocaleString()}
-            </dd>
-          </div>
+          <Stat label="収録用具" value={equipmentCount} tone="coral" />
         </dl>
       </section>
 
       {/* 価値訴求: 根本ペイン「感覚は人によって違う」への回答 */}
       <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl bg-tt-soft-green p-5 ring-1 ring-tt-green/10">
+        <Card surface="accent" pad="lg">
           <div className="flex items-center justify-between">
             <p className="font-mono text-2xl font-bold text-tt-deep-green">01</p>
             <IconRuler className="h-8 w-8" />
@@ -100,8 +93,8 @@ export default async function LandingPage() {
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
             あなたが使ったラバーを基準に「それより硬いと感じた人が68%」と表示します。
           </p>
-        </div>
-        <div className="rounded-2xl bg-tt-soft-coral p-5 ring-1 ring-tt-coral/10">
+        </Card>
+        <Card pad="lg" className="bg-tt-soft-coral ring-tt-coral/15">
           <div className="flex items-center justify-between">
             <p className="font-mono text-2xl font-bold text-tt-deep-coral">02</p>
             <IconBothUsed className="h-8 w-8" />
@@ -112,8 +105,8 @@ export default async function LandingPage() {
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
             回答には「実際に両方を使ったか」の印が付きます。使っていない人の予想も参考に集めますが、ワンタップで「両方使った人だけ」に絞れます。
           </p>
-        </div>
-        <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
+        </Card>
+        <Card pad="lg">
           <div className="flex items-center justify-between">
             <p className="font-mono text-2xl font-bold">03</p>
             <IconSplit className="h-8 w-8" />
@@ -122,11 +115,11 @@ export default async function LandingPage() {
           <p className="mt-1 text-sm leading-6 text-tt-gray70">
             感じ方が分かれる用具は「意見が割れています」と正直に表示。断定しないから、判断を間違えにくい。
           </p>
-        </div>
+        </Card>
       </section>
 
       {/* 流れ */}
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
+      <Card pad="lg" className="sm:p-6">
         <h2 className="text-lg font-bold">使い方</h2>
         <ol className="mt-4 space-y-3">
           {[
@@ -148,9 +141,9 @@ export default async function LandingPage() {
           ].map(({ Icon, title, desc }, i) => (
             <li
               key={title}
-              className="flex items-start gap-3 rounded-2xl bg-tt-offwhite p-3 ring-1 ring-black/5"
+              className="flex items-start gap-3 rounded-lg bg-tt-offwhite p-3 ring-1 ring-tt-gray30/30"
             >
-              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-tt-green/20">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-tt-green/20">
                 <Icon className="h-7 w-7" />
                 <span className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-tt-green font-mono text-[11px] font-bold text-white">
                   {i + 1}
@@ -166,12 +159,12 @@ export default async function LandingPage() {
         <div className="mt-6 text-center">
           <Link
             href={hasSession ? "/play" : "/onboarding"}
-            className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-10 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+            className={buttonVariants({ size: "lg" })}
           >
             いますぐ始める
           </Link>
         </div>
-      </section>
+      </Card>
 
       <p className="text-center text-sm text-tt-gray70">
         アカウントをお持ちの方は{" "}

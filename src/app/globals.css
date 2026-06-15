@@ -64,3 +64,15 @@ body {
   transform-origin: left;
   animation: var(--animate-grow);
 }
+
+/* アクセシビリティ: モーション削減設定を尊重する (design.md §1.6) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
