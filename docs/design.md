@@ -135,6 +135,7 @@
 | **VersusBar** | アプリ | — | A/B/SAME の割合バー。n表示必須。n<3 は集計中表示(後述) |
 | **AxisBar(相対位置)** | アプリ | — | 0-100 の相対位置。支持<3 は `tt-gray30` に縮約し「データ少なめ」 |
 | **EmptyState** | アプリ | — | 破線枠 `border-2 border-dashed border-tt-gray30/50`、正直な説明 + 次の一手の導線 |
+| **EntryPointAnchors** | アプリ | — | 基準ゼロの初心者の「はじめの基準(参考)」(M8)。`参考`バッジ + 控えめ面で実集計と分離。主動作は「これを基準に用具マップを見る」。推薦でなく原点供給。「べき」不使用・公称数値の順位を出さない |
 | **Form (input/select)** | プリミティブ | `input`/`select`/`label` | `rounded-lg ring-1`、エラーはシステム側の謝罪トーン(§5) |
 | **Tabs / Segmented** | プリミティブ | `tabs` | 一覧/分布/くらべる、軸切替。選択中をリングで明示 |
 | **Dialog / Sheet** | プリミティブ | `dialog`/`sheet` | 基準ピッカー等。overlay は elevation2 |

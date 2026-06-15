@@ -44,7 +44,9 @@ export async function getEntryPointAnchors(limit = 3): Promise<EntryAnchor[]> {
     },
   });
   // 定評リストの順序を保つ(価格や公称スペックで並べ替えない=数値順位を出さない)
-  const order = new Map(ENTRY_ANCHOR_NAMES.map((n, i) => [n, i]));
+  const order = new Map<string, number>(
+    ENTRY_ANCHOR_NAMES.map((n, i) => [n, i]),
+  );
   rows.sort(
     (a, b) => (order.get(a.name) ?? 99) - (order.get(b.name) ?? 99),
   );
