@@ -270,6 +270,10 @@ export interface SwitchCandidate {
     /** 基準に対する相対位置の差 (0-100スケール。正=基準より高い) */
     scoreDelta: number;
     comparisons: number;
+    /** 直接対決(基準↔候補)の投票内訳。確信度の「量」を直接データで示す */
+    directHigher: number; // 候補が上と答えた数
+    directLower: number; // 基準が上と答えた数
+    directSame: number; // 同じくらい
   }>;
   /** 共通軸数 (基準との経路のつながりの強さ) */
   sharedAxes: number;
@@ -404,23 +408,33 @@ export async function buildSwitchCandidates(
       winnerDefenseEase: true,
     },
   })) as ComparisonAxisRow[];
-  // otherId -> axis -> 直接比較本数
-  const directCount = new Map<string, Map<AxisKey, number>>();
+  // otherId -> axis -> 直接対決の投票内訳 {higher(候補が上), lower(基準が上), same}
+  interface DirectTally {
+    higher: number;
+    lower: number;
+    same: number;
+  }
+  const directVotes = new Map<string, Map<AxisKey, DirectTally>>();
   for (const r of baseRows) {
-    const other =
-      r.optionAEquipmentId === baseId
-        ? r.optionBEquipmentId
-        : r.optionAEquipmentId;
-    let m = directCount.get(other);
+    // 候補(other)が row の A 側か B 側か。winner を「候補が上か」に正規化する
+    const candIsA = r.optionAEquipmentId !== baseId; // baseがB側 → 候補(other)はA側
+    const other = candIsA ? r.optionAEquipmentId : r.optionBEquipmentId;
+    let m = directVotes.get(other);
     if (!m) {
       m = new Map();
-      directCount.set(other, m);
+      directVotes.set(other, m);
     }
     for (const axis of ALL_AXES) {
       const w = r[AXIS_COLUMN[axis]];
-      if (w === "A" || w === "B" || w === "SAME") {
-        m.set(axis, (m.get(axis) ?? 0) + 1);
+      if (w !== "A" && w !== "B" && w !== "SAME") continue;
+      const t = m.get(axis) ?? { higher: 0, lower: 0, same: 0 };
+      if (w === "SAME") t.same++;
+      else {
+        const candWon = candIsA ? w === "A" : w === "B";
+        if (candWon) t.higher++;
+        else t.lower++;
       }
+      m.set(axis, t);
     }
   }
 
@@ -440,12 +454,19 @@ export async function buildSwitchCandidates(
       const d = cand.logStrength - base.logStrength;
       const diff: AxisDiff =
         d > DIFF_EPS ? "up" : d < -DIFF_EPS ? "down" : "even";
+      const dv = directVotes.get(e.id)?.get(axis);
+      const directHigher = dv?.higher ?? 0;
+      const directLower = dv?.lower ?? 0;
+      const directSame = dv?.same ?? 0;
       axes.push({
         axis,
         diff,
         scoreDelta: Math.round(cand.score - base.score),
         // 直接比較本数(基準↔候補)。0でも推移律で位置(diff)は出すが、確信度は薄いと表示
-        comparisons: directCount.get(e.id)?.get(axis) ?? 0,
+        comparisons: directHigher + directLower + directSame,
+        directHigher,
+        directLower,
+        directSame,
       });
     }
     if (axes.length === 0) continue;

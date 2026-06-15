@@ -147,7 +147,7 @@ async function RelativeCandidates({
         <span className="font-bold text-tt-deep-green">▲高い</span>{" "}
         <span className="font-bold text-tt-deep-coral">▼低い</span>{" "}
         <span className="text-tt-gray70">≈同じ</span>
-        （数字は差の目安／グレーはデータ少なめ）
+        （%は両方使った人の支持率／グレーはデータ少なめで方向のみ）
       </p>
       <ul className="mt-3 space-y-2">
         {candidates.map((c) => (
@@ -213,13 +213,17 @@ function RelativeCandidateRow({ c }: { c: SwitchCandidate }) {
                 }`}
               >
                 {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
-                {/* 差の大きさは、データが十分なときだけ出す */}
-                {!low && a.diff !== "even" && a.scoreDelta !== 0 && (
-                  <span className="ml-0.5 font-mono">
-                    {a.scoreDelta > 0 ? "+" : ""}
-                    {a.scoreDelta}
-                  </span>
-                )}
+                {/* 直接データが十分なときは「両方使った人の支持率%」を出す。
+                    推移律の位置差(scoreDelta)より、頭打ちの強さが意思決定に直結する。 */}
+                {!low &&
+                  (() => {
+                    const decisive = a.directHigher + a.directLower;
+                    if (decisive < 3) return null; // 決着票が薄い(同じが多い)ときは%を出さず方向のみ
+                    const pct = Math.round(
+                      (Math.max(a.directHigher, a.directLower) / decisive) * 100,
+                    );
+                    return <span className="ml-0.5 font-mono">{pct}%</span>;
+                  })()}
               </span>
             );
           })}
@@ -688,12 +692,16 @@ function CandidateCard({
                   }`}
                 >
                   {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym}
-                  {!low && a.diff !== "even" && a.scoreDelta !== 0 && (
-                    <span className="ml-0.5 font-mono">
-                      {a.scoreDelta > 0 ? "+" : ""}
-                      {a.scoreDelta}
-                    </span>
-                  )}
+                  {!low &&
+                    (() => {
+                      const decisive = a.directHigher + a.directLower;
+                      if (decisive < 3) return null; // 決着票が薄い(同じが多い)ときは%を出さず方向のみ
+                      const pct = Math.round(
+                        (Math.max(a.directHigher, a.directLower) / decisive) *
+                          100,
+                      );
+                      return <span className="ml-0.5 font-mono">{pct}%</span>;
+                    })()}
                 </span>
               );
             })}
