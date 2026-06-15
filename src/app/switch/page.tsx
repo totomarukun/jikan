@@ -10,6 +10,7 @@ import {
 } from "@/lib/relative-map";
 import { FeelProfileCard } from "@/components/feel-profile";
 import { EquipmentVisual } from "@/components/equipment-visual";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   BaseFromGear,
   CandidatePicker,
@@ -443,11 +444,11 @@ async function SwitchBoard({
 
       {/* 候補カード */}
       {candidates.length === 0 ? (
-        <div className="mt-6 rounded-2xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
-          気になるラバーを検索して候補に追加すると、
-          <br />
-          「{current.name}」との実データ比較がここに並びます。
-        </div>
+        <EmptyState
+          className="mt-6"
+          title="候補はまだありません"
+          description={`気になるラバーを検索して候補に追加すると、「${current.name}」との実データ比較がここに並びます。`}
+        />
       ) : (
         <div className="mt-6 space-y-4">
           {autoFilledFromMyAnswers && (

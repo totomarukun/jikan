@@ -6,6 +6,7 @@ import { EquipmentVisual } from "@/components/equipment-visual";
 import { searchEquipment, type SearchableItem } from "@/lib/search";
 import { RUBBER_AXES } from "@/lib/axes";
 import { rubberGroup } from "@/lib/types";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // 用具カタログのブラウズ (探す/調べる の入口): 356件を比較データ無しでも
 // 種類・メーカー・価格で絞り込み＋検索して詳細へ。ユーザーの思考「種類→メーカー→…」に対応。
@@ -548,9 +549,11 @@ export function CatalogExplorer({
       )}
 
       {filtered.length === 0 ? (
-        <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm text-tt-gray70">
-          該当する用具がありません。
-        </div>
+        <EmptyState
+          className="mt-4"
+          title="該当する用具がありません"
+          description="検索語や絞り込みを変えてみてください。"
+        />
       ) : (
         <ul className="mt-3 space-y-2 pb-20">
           {filtered.map((e) => {
