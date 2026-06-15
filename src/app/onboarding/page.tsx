@@ -109,7 +109,7 @@ export default function OnboardingPage() {
         </div>
         <div className="h-2.5 rounded-full bg-tt-gray30/30">
           <div
-            className="h-2.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green transition-all duration-300"
+            className="h-2.5 rounded-full bg-tt-green transition-all duration-300"
             style={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
           />
         </div>
@@ -164,7 +164,7 @@ export default function OnboardingPage() {
                     <p className="font-bold">
                       {g.equipment.name}
                       {g.isCurrent && (
-                        <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[10px] font-bold text-white">
+                        <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[11px] font-bold text-white">
                           いま使用中
                         </span>
                       )}
@@ -202,7 +202,7 @@ export default function OnboardingPage() {
             <button
               disabled={submitting || gear.length === 0}
               onClick={finish}
-              className="w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+              className="w-full rounded-xl bg-tt-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
             >
               {submitting
                 ? "保存中..."

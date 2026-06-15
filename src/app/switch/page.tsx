@@ -365,7 +365,7 @@ async function SwitchBoard({
   return (
     <>
       {/* 基準: 現用ラバー */}
-      <div className="mt-6 rounded-2xl bg-gradient-to-br from-tt-soft-green to-white p-4 shadow-sm ring-1 ring-tt-green/25">
+      <div className="mt-6 rounded-2xl bg-tt-soft-green/50 p-4 shadow-sm ring-1 ring-tt-green/25">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <EquipmentVisual
@@ -479,7 +479,7 @@ async function SwitchBoard({
           </p>
           <table className="mt-3 w-full text-xs">
             <thead>
-              <tr className="text-left text-[10px] text-tt-gray70">
+              <tr className="text-left text-[11px] text-tt-gray70">
                 <th className="pb-1.5 font-medium">候補</th>
                 <th className="pb-1.5 font-medium">基準との違い</th>
                 <th className="pb-1.5 text-right font-medium">公称硬度差</th>
@@ -549,7 +549,7 @@ async function SwitchBoard({
               })}
             </tbody>
           </table>
-          <p className="mt-2 text-[10px] text-tt-gray70">
+          <p className="mt-2 text-[11px] text-tt-gray70">
             ※違いは使った人の比較から推定（判定3件以上）。硬度差は同一メーカー間のみ。
           </p>
         </section>
@@ -564,7 +564,7 @@ async function SwitchBoard({
         </p>
         <Link
           href="/play"
-          className="mt-3 inline-block rounded-full bg-gradient-to-r from-tt-deep-coral to-tt-coral px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
+          className="mt-3 inline-block rounded-full bg-tt-coral px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
         >
           比較に答えてデータを増やす
         </Link>
@@ -711,7 +711,7 @@ function CandidateCard({
       <div className="mt-4 grid grid-cols-2 gap-2 text-center">
         {deltas.map((d) => (
           <div key={d.label} className="rounded-xl bg-tt-offwhite p-2 ring-1 ring-black/5">
-            <p className="text-[10px] text-tt-gray70">{d.label}</p>
+            <p className="text-[11px] text-tt-gray70">{d.label}</p>
             <p className="font-mono text-sm font-bold">
               {d.delta == null
                 ? "—"
@@ -720,7 +720,7 @@ function CandidateCard({
           </div>
         ))}
       </div>
-      <p className="mt-1 text-[10px] text-tt-gray70">
+      <p className="mt-1 text-[11px] text-tt-gray70">
         ※硬度は各社の独自基準です。他社とは比べられません。使い心地は上の比較を。
       </p>
 
@@ -728,7 +728,7 @@ function CandidateCard({
       <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
         <Link
           href={`/compare/${current.id}/vs/${candidate.id}`}
-          className="rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-5 py-2 font-bold text-white shadow shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
+          className="rounded-full bg-tt-green px-5 py-2 font-bold text-white shadow shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
         >
           詳細比較を見る
         </Link>

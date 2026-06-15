@@ -161,14 +161,14 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
             <button
               disabled={busy}
               onClick={() => answer("A")}
-              className="rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+              className="rounded-xl bg-tt-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
             >
               Aを選ぶ
             </button>
             <button
               disabled={busy}
               onClick={() => answer("B")}
-              className="rounded-xl bg-gradient-to-r from-tt-deep-coral to-tt-coral py-3.5 font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+              className="rounded-xl bg-tt-coral py-3.5 font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
             >
               Bを選ぶ
             </button>
@@ -273,7 +273,7 @@ function RevealPanel({
         onClick={onNext}
         disabled={busy}
         autoFocus
-        className="mt-4 w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+        className="mt-4 w-full rounded-xl bg-tt-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
       >
         次の質問へ
       </button>
@@ -306,8 +306,8 @@ function EquipmentCard({
 }) {
   const palette =
     side === "A"
-      ? "bg-gradient-to-br from-tt-soft-green to-white ring-tt-green/25"
-      : "bg-gradient-to-br from-tt-soft-coral to-white ring-tt-coral/25";
+      ? "bg-tt-soft-green/50 ring-tt-green/25"
+      : "bg-tt-soft-coral/50 ring-tt-coral/25";
   const pickedRing =
     side === "A" ? "ring-2 ring-tt-green" : "ring-2 ring-tt-coral";
   return (

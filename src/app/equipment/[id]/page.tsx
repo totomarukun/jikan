@@ -84,7 +84,7 @@ export default async function EquipmentPage({
   return (
     <div className="mx-auto max-w-md py-4">
       {/* ヘッダーカード */}
-      <div className="rounded-3xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-6 shadow-sm ring-1 ring-black/5">
+      <div className="rounded-2xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-6 shadow-sm ring-1 ring-black/5">
         <div className="flex items-start gap-4">
           <EquipmentVisual
             category={equipment.category}
@@ -241,7 +241,7 @@ export default async function EquipmentPage({
                       {s.manufacturer}
                     </span>
                   </span>
-                  <span className="shrink-0 text-right font-mono text-[10px] text-tt-gray70">
+                  <span className="shrink-0 text-right font-mono text-[11px] text-tt-gray70">
                     {s.sharedAxes}項目で近い
                     {s.support < 3 && (
                       <span className="block text-[9px] text-tt-coral">
@@ -270,7 +270,7 @@ export default async function EquipmentPage({
                 className="rounded-xl bg-tt-offwhite p-3 text-sm ring-1 ring-black/5"
               >
                 <p className="leading-6">「{v.comment}」</p>
-                <p className="mt-1 text-[10px] text-tt-gray70">
+                <p className="mt-1 text-[11px] text-tt-gray70">
                   {v.otherName} と比較 ・{v.both ? "両方使った人" : "イメージ"}
                 </p>
               </li>
@@ -334,7 +334,7 @@ export default async function EquipmentPage({
           ))}
         <Link
           href="/compare/select"
-          className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+          className="block rounded-full bg-tt-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
         >
           この用具で対決を作る
         </Link>
@@ -387,7 +387,7 @@ function MakerSpecSection({
               <span className="w-20 shrink-0 text-xs font-bold">{label}</span>
               <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-tt-gray30/30">
                 <div
-                  className="h-2.5 rounded-full bg-gradient-to-r from-tt-green/70 to-tt-deep-green/70"
+                  className="h-2.5 rounded-full bg-tt-green/70"
                   style={{ width: `${Math.max(4, Math.min(100, v))}%` }}
                 />
               </div>
@@ -440,13 +440,13 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
                     className={`h-2.5 rounded-full ${
                       low
                         ? "bg-tt-gray30"
-                        : "bg-gradient-to-r from-tt-green to-tt-deep-green"
+                        : "bg-tt-green"
                     }`}
                     style={{ width: `${Math.max(4, pct)}%` }}
                   />
                 </div>
                 {low && (
-                  <p className="mt-0.5 text-[10px] text-tt-gray70">
+                  <p className="mt-0.5 text-[11px] text-tt-gray70">
                     データ少なめ（おおよその位置）
                   </p>
                 )}

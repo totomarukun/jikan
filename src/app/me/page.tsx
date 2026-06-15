@@ -155,13 +155,13 @@ export default async function MyPage() {
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Link
           href="/compare/select"
-          className="rounded-2xl bg-gradient-to-br from-tt-green to-tt-deep-green p-4 text-center font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
+          className="rounded-2xl bg-tt-green p-4 text-center font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
         >
           新しい対決を作成
         </Link>
         <Link
           href="/play"
-          className="rounded-2xl bg-gradient-to-br from-tt-deep-coral to-tt-coral p-4 text-center font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
+          className="rounded-2xl bg-tt-coral p-4 text-center font-bold text-white shadow-lg shadow-tt-coral/20 transition hover:opacity-90 active:scale-95"
         >
           比較を続ける
         </Link>
@@ -204,7 +204,7 @@ export default async function MyPage() {
                   {c.optionA.name} <span className="text-tt-gray70">vs</span>{" "}
                   {c.optionB.name}
                   {c.hasActualExperience === "BOTH" && (
-                    <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[10px] font-bold text-tt-deep-green">
+                    <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[11px] font-bold text-tt-deep-green">
                       両方使った
                     </span>
                   )}

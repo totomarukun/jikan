@@ -237,19 +237,19 @@ function PositionBar({
         <span className="min-w-0 flex-1 truncate text-sm font-bold">
           {entry.name}
           {isCurrent && (
-            <span className="ml-1.5 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="ml-1.5 rounded-full bg-tt-charcoal px-1.5 py-0.5 text-[11px] font-bold text-white">
               使用中
             </span>
           )}
           {isGear && !isCurrent && (
-            <span className="ml-1.5 rounded-full bg-tt-green px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="ml-1.5 rounded-full bg-tt-green px-1.5 py-0.5 text-[11px] font-bold text-white">
               マイギア
             </span>
           )}
         </span>
         {deltaVsCurrent != null && (
           <span
-            className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+            className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] font-bold ${
               deltaVsCurrent > 0
                 ? "bg-tt-soft-green text-tt-deep-green"
                 : deltaVsCurrent < 0
@@ -270,13 +270,13 @@ function PositionBar({
           className={`h-2.5 rounded-full ${
             lowConfidence
               ? "bg-tt-gray30"
-              : "bg-gradient-to-r from-tt-green to-tt-deep-green"
+              : "bg-tt-green"
           }`}
           style={{ width: `${Math.max(4, pct)}%` }}
         />
       </div>
       {lowConfidence && (
-        <p className="mt-1 text-[10px] text-tt-gray70">
+        <p className="mt-1 text-[11px] text-tt-gray70">
           データ少なめ（おおよその位置）
         </p>
       )}

@@ -51,7 +51,7 @@ export default async function BattlesPage() {
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Link
               href="/gear"
-              className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-6 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
+              className="inline-block rounded-full bg-tt-green px-6 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
             >
               使った用具を登録して答える
             </Link>

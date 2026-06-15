@@ -220,7 +220,7 @@ export default function GearPage() {
                                 <span className="font-mono font-bold text-tt-charcoal">
                                   {rubberSum + bladeW}g
                                 </span>
-                                <span className="text-[10px]">
+                                <span className="text-[11px]">
                                   （ラケット込）
                                 </span>
                               </>
@@ -305,7 +305,7 @@ export default function GearPage() {
             ) : (
               <button
                 onClick={() => setShowForm(true)}
-                className="w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
+                className="w-full rounded-xl bg-tt-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
               >
                 ＋ 使ったことのあるラバーを追加
               </button>
@@ -339,7 +339,7 @@ export default function GearPage() {
                         {f.nameA} <span className="text-tt-gray30">vs</span>{" "}
                         {f.nameB}
                         {f.isGearBased && (
-                          <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[10px] font-bold text-tt-deep-green">
+                          <span className="ml-2 rounded-full bg-tt-soft-green px-2 py-0.5 text-[11px] font-bold text-tt-deep-green">
                             両方使った
                           </span>
                         )}
@@ -476,7 +476,7 @@ function GearRow({
                 {g.equipment.name}
               </Link>
               {g.isCurrent && (
-                <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="ml-2 rounded-full bg-tt-charcoal px-2 py-0.5 text-[11px] font-bold text-white">
                   いま使用中
                 </span>
               )}

@@ -33,14 +33,14 @@ export function VersusBar({
       >
         {pa > 0 && (
           <div
-            className="bg-gradient-to-r from-tt-green to-tt-deep-green"
+            className="bg-tt-green"
             style={{ width: `${pa}%` }}
           />
         )}
         {ps > 0 && <div className="bg-tt-gray30" style={{ width: `${ps}%` }} />}
         {pb > 0 && (
           <div
-            className="bg-gradient-to-r from-tt-deep-coral to-tt-coral"
+            className="bg-tt-coral"
             style={{ width: `${pb}%` }}
           />
         )}

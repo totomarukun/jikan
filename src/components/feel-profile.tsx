@@ -55,7 +55,7 @@ function FeelRow({ statement: s }: { statement: FeelStatement }) {
       <div className="rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5">
         <div className="flex items-baseline justify-between">
           <span className="text-xs font-bold text-tt-gray70">{s.label}</span>
-          <span className="font-mono text-[10px] text-tt-gray70">
+          <span className="font-mono text-[11px] text-tt-gray70">
             n={s.tally.n}
           </span>
         </div>
@@ -79,7 +79,7 @@ function FeelRow({ statement: s }: { statement: FeelStatement }) {
     <div className="rounded-xl bg-tt-offwhite p-3 ring-1 ring-black/5">
       <div className="flex items-baseline justify-between">
         <span className="text-xs font-bold text-tt-gray70">{s.label}</span>
-        <span className="font-mono text-[10px] text-tt-gray70">
+        <span className="font-mono text-[11px] text-tt-gray70">
           n={s.tally.n}
           {s.tally.bothOnly && " (両方使った人)"}
         </span>
@@ -122,7 +122,7 @@ function FeelRow({ statement: s }: { statement: FeelStatement }) {
           <div className="bg-tt-coral/70" style={{ width: `${morePct}%` }} />
         )}
       </div>
-      <div className="mt-0.5 flex justify-between text-[10px] text-tt-gray70">
+      <div className="mt-0.5 flex justify-between text-[11px] text-tt-gray70">
         <span>{s.lessLabel}</span>
         <span>{s.moreLabel}</span>
       </div>

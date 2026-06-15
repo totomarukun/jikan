@@ -219,7 +219,7 @@ export default async function CompareViewPage({
       <div className="relative grid grid-cols-2 gap-3">
         <Link
           href={`/equipment/${equipA.id}`}
-          className="rounded-2xl bg-gradient-to-br from-tt-soft-green to-white p-4 shadow-sm ring-1 ring-tt-green/25 transition hover:-translate-y-0.5 hover:shadow-md"
+          className="rounded-2xl bg-tt-soft-green/50 p-4 shadow-sm ring-1 ring-tt-green/25 transition hover:-translate-y-0.5 hover:shadow-md"
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-tt-green font-mono text-xs font-bold text-white">
             A
@@ -238,7 +238,7 @@ export default async function CompareViewPage({
         </Link>
         <Link
           href={`/equipment/${equipB.id}`}
-          className="rounded-2xl bg-gradient-to-br from-tt-soft-coral to-white p-4 text-right shadow-sm ring-1 ring-tt-coral/25 transition hover:-translate-y-0.5 hover:shadow-md"
+          className="rounded-2xl bg-tt-soft-coral/50 p-4 text-right shadow-sm ring-1 ring-tt-coral/25 transition hover:-translate-y-0.5 hover:shadow-md"
         >
           <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-tt-coral font-mono text-xs font-bold text-white">
             B
@@ -314,7 +314,7 @@ export default async function CompareViewPage({
         <div className="mt-3 flex gap-2">
           <button
             type="submit"
-            className="h-9 flex-1 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
+            className="h-9 flex-1 rounded-full bg-tt-green text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
           >
             この条件で見る
           </button>
@@ -333,7 +333,7 @@ export default async function CompareViewPage({
           <div className="flex items-center gap-2">
             <p className="text-sm font-bold text-tt-deep-green">あなたの判定</p>
             {myExperienced && (
-              <span className="rounded-full bg-tt-green px-2 py-0.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-tt-green px-2 py-0.5 text-[11px] font-bold text-white">
                 両方使用
               </span>
             )}
@@ -413,7 +413,7 @@ export default async function CompareViewPage({
                 className="rounded-xl bg-tt-offwhite p-3 text-sm ring-1 ring-black/5"
               >
                 <p className="leading-6">「{v.comment}」</p>
-                <p className="mt-1 text-[10px] text-tt-gray70">
+                <p className="mt-1 text-[11px] text-tt-gray70">
                   {v.both ? "両方使った人" : "イメージ"}
                 </p>
               </li>
@@ -527,7 +527,7 @@ export default async function CompareViewPage({
       <div className="mt-8 space-y-3 text-center">
         <Link
           href="/play"
-          className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+          className="block rounded-full bg-tt-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
         >
           この対決に答える
         </Link>
