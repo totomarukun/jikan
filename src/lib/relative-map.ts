@@ -382,12 +382,13 @@ export async function buildSwitchCandidates(
   const baseCat = byId.get(baseId)?.category ?? "";
   if (!isRubberCategory(baseCat)) return { baseRanked: false, candidates: [] };
 
-  // 確信度(comparisons)は「基準↔候補の直接比較本数」を出所にする。
-  // 位置(scoreDelta)は推移律で疎データでも出せるが、それを直接データと同じ確信度で
-  // 見せると、直接比較ゼロの候補まで断定的に見え信頼を損なう(/compareは正直に「データ不足」と
-  // 出すため不整合になる)。直接本数を渡し、UI側の n<3 グレー縮約・参考バッジを正しく効かせる。
+  // 確信度(comparisons)と直接支持率は「両方使った人(BOTH)の直接比較」だけを出所にする。
+  // /compare?exp=both と同じ母集団に揃えるため hasActualExperience:"BOTH" に限定する
+  // (ONE=片側だけ使った人の回答を「両方使った人」として数えると、/compareの分布と矛盾する)。
+  // 位置(scoreDelta)は推移律で疎データでも出せるが、確信度・支持率は直接BOTHデータに統一する。
   const baseRows = (await prisma.comparison.findMany({
     where: {
+      hasActualExperience: "BOTH",
       OR: [
         { optionAEquipmentId: baseId },
         { optionBEquipmentId: baseId },

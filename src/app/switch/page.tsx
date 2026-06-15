@@ -114,6 +114,43 @@ const SWITCH_AXIS_LABEL: Record<string, string> = {
   tackiness: "粘着",
 };
 
+const LOW = 3;
+
+// 軸チップの表示(方向▲▼≈・支持率%)を「両方使った人(BOTH)の直接投票」から導く。
+// /compare と同じ母集団・同じ総数ベースに揃える(SAMEが多数なら≈、%は総数ベース)。
+// 直接BOTHが LOW 未満なら推移律の方向のみ・%なし・グレー(確信度が乗っていない)。
+function directChipInfo(a: SwitchCandidate["axes"][number]) {
+  const total = a.directHigher + a.directLower + a.directSame;
+  if (total < LOW) {
+    const sym = a.diff === "up" ? "▲" : a.diff === "down" ? "▼" : "≈";
+    return { low: true, dir: a.diff, sym, pct: null as number | null };
+  }
+  // 多数派が「同じくらい」なら断定せず ≈
+  if (a.directSame >= a.directHigher && a.directSame >= a.directLower) {
+    return {
+      low: false,
+      dir: "even" as const,
+      sym: "≈",
+      pct: Math.round((a.directSame / total) * 100),
+    };
+  }
+  const up = a.directHigher > a.directLower;
+  return {
+    low: false,
+    dir: up ? ("up" as const) : ("down" as const),
+    sym: up ? "▲" : "▼",
+    pct: Math.round(((up ? a.directHigher : a.directLower) / total) * 100),
+  };
+}
+
+function dirColor(d: string) {
+  return d === "up"
+    ? "text-tt-deep-green"
+    : d === "down"
+      ? "text-tt-deep-coral"
+      : "text-tt-gray70";
+}
+
 // 相対マップ(推移律)から、基準に対する候補を軸別差分つきで出す。
 // 直接対決がなくても他の比較経由で「基準よりスピード上/球持ち同等」が出るため、
 // コールドスタートでも「集計中」で固まらず、必ず手応えのある候補が並ぶ。
@@ -159,17 +196,6 @@ async function RelativeCandidates({
 }
 
 function RelativeCandidateRow({ c }: { c: SwitchCandidate }) {
-  const sym = (d: string) =>
-    d === "up" ? "▲" : d === "down" ? "▼" : "≈";
-  const color = (d: string) =>
-    d === "up"
-      ? "text-tt-deep-green"
-      : d === "down"
-        ? "text-tt-deep-coral"
-        : "text-tt-gray70";
-  // 支持が薄い軸は「量」を信用できない(疎データの飽和値)。確信度が乗るまで
-  // 数値を出さず方向のみ・グレーに縮約する。閾値=実比較3件。
-  const LOW = 3;
   return (
     <li>
       <Link
@@ -204,26 +230,21 @@ function RelativeCandidateRow({ c }: { c: SwitchCandidate }) {
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {c.axes.map((a) => {
-            const low = a.comparisons < LOW;
+            const info = directChipInfo(a);
             return (
               <span
                 key={a.axis}
                 className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${
-                  low ? "bg-tt-gray30/20 text-tt-gray70" : `bg-white ${color(a.diff)}`
+                  info.low
+                    ? "bg-tt-gray30/20 text-tt-gray70"
+                    : `bg-white ${dirColor(info.dir)}`
                 }`}
               >
-                {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym(a.diff)}
-                {/* 直接データが十分なときは「両方使った人の支持率%」を出す。
-                    推移律の位置差(scoreDelta)より、頭打ちの強さが意思決定に直結する。 */}
-                {!low &&
-                  (() => {
-                    const decisive = a.directHigher + a.directLower;
-                    if (decisive < 3) return null; // 決着票が薄い(同じが多い)ときは%を出さず方向のみ
-                    const pct = Math.round(
-                      (Math.max(a.directHigher, a.directLower) / decisive) * 100,
-                    );
-                    return <span className="ml-0.5 font-mono">{pct}%</span>;
-                  })()}
+                {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {info.sym}
+                {/* 直接BOTHが十分なときだけ、両方使った人の支持率%(総数ベース)を出す */}
+                {info.pct !== null && (
+                  <span className="ml-0.5 font-mono">{info.pct}%</span>
+                )}
               </span>
             );
           })}
@@ -510,11 +531,16 @@ async function SwitchBoard({
                   cand.price != null && current.price != null
                     ? cand.price - current.price
                     : null;
+                // 表の方向も「両方使った人の直接投票」から導く(チップと一致させる)
                 const topDiffs = (diffMap.get(cand.id) ?? [])
-                  .filter((a) => a.diff !== "even" && a.comparisons >= 3)
-                  .sort(
-                    (a, b) => Math.abs(b.scoreDelta) - Math.abs(a.scoreDelta),
+                  .map((a) => ({ axis: a.axis, info: directChipInfo(a) }))
+                  .filter(
+                    (x) =>
+                      !x.info.low &&
+                      x.info.dir !== "even" &&
+                      x.info.pct !== null,
                   )
+                  .sort((a, b) => (b.info.pct ?? 0) - (a.info.pct ?? 0))
                   .slice(0, 3);
                 return (
                   <tr key={cand.id} className="border-t border-tt-gray30/30">
@@ -531,17 +557,17 @@ async function SwitchBoard({
                         <span className="text-tt-gray70">集計中</span>
                       ) : (
                         <span className="flex flex-wrap gap-x-1.5">
-                          {topDiffs.map((a) => (
+                          {topDiffs.map((x) => (
                             <span
-                              key={a.axis}
+                              key={x.axis}
                               className={`font-bold ${
-                                a.diff === "up"
+                                x.info.dir === "up"
                                   ? "text-tt-deep-green"
                                   : "text-tt-deep-coral"
                               }`}
                             >
-                              {SWITCH_AXIS_LABEL[a.axis] ?? a.axis}
-                              {a.diff === "up" ? "▲" : "▼"}
+                              {SWITCH_AXIS_LABEL[x.axis] ?? x.axis}
+                              {x.info.sym}
                             </span>
                           ))}
                         </span>
@@ -673,35 +699,20 @@ function CandidateCard({
         ) : (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {axisDiffs.map((a) => {
-              const low = a.comparisons < 3;
-              const color =
-                a.diff === "up"
-                  ? "text-tt-deep-green"
-                  : a.diff === "down"
-                    ? "text-tt-deep-coral"
-                    : "text-tt-gray70";
-              const sym =
-                a.diff === "up" ? "▲" : a.diff === "down" ? "▼" : "≈";
+              const info = directChipInfo(a);
               return (
                 <span
                   key={a.axis}
                   className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-black/5 ${
-                    low
+                    info.low
                       ? "bg-tt-gray30/20 text-tt-gray70"
-                      : `bg-tt-offwhite ${color}`
+                      : `bg-tt-offwhite ${dirColor(info.dir)}`
                   }`}
                 >
-                  {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {sym}
-                  {!low &&
-                    (() => {
-                      const decisive = a.directHigher + a.directLower;
-                      if (decisive < 3) return null; // 決着票が薄い(同じが多い)ときは%を出さず方向のみ
-                      const pct = Math.round(
-                        (Math.max(a.directHigher, a.directLower) / decisive) *
-                          100,
-                      );
-                      return <span className="ml-0.5 font-mono">{pct}%</span>;
-                    })()}
+                  {SWITCH_AXIS_LABEL[a.axis] ?? a.axis} {info.sym}
+                  {info.pct !== null && (
+                    <span className="ml-0.5 font-mono">{info.pct}%</span>
+                  )}
                 </span>
               );
             })}
