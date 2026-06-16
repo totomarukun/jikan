@@ -64,7 +64,7 @@ const HARDNESS_BANDS: Array<{ label: string; min: number; max: number }> = [
 type Kind = "all" | "rubber" | "blade";
 // "popular" | "name" | "priceAsc" | "priceDesc" | "hardness" | "near" | 軸キー
 type Sort = string;
-type View = "list" | "map" | "compare";
+type View = "list" | "map" | "cost" | "compare";
 
 export function CatalogExplorer({
   items,
@@ -276,11 +276,12 @@ export function CatalogExplorer({
 
       {/* ビュー切替: 一覧(表) / 分布(マップ) / くらべる (ラバーのみ) */}
       {kind !== "blade" && (
-        <div className="mt-3 grid grid-cols-3 gap-1 rounded-full bg-tt-offwhite p-1">
+        <div className="mt-3 grid grid-cols-4 gap-1 rounded-full bg-tt-offwhite p-1">
           {(
             [
               ["list", "一覧"],
               ["map", "分布"],
+              ["cost", "コスパ"],
               ["compare", "くらべる"],
             ] as const
           ).map(([v, label]) => (
@@ -373,7 +374,7 @@ export function CatalogExplorer({
 
       {/* 並べ替え + 絞り込み開閉 */}
       <div className="mt-2 flex gap-2">
-        {view === "map" ? (
+        {view === "map" || view === "cost" ? (
           <select
             value={mapAxis}
             onChange={(e) => setMapAxis(e.target.value)}
@@ -381,7 +382,7 @@ export function CatalogExplorer({
           >
             {STRIP_AXES.map((a) => (
               <option key={a.key} value={a.key}>
-                {a.label}で並べる
+                {view === "cost" ? `価格×${a.label}` : `${a.label}で並べる`}
               </option>
             ))}
           </select>
@@ -666,6 +667,16 @@ export function CatalogExplorer({
         />
       )}
 
+      {/* コスパ: 価格×選んだ軸スコアの2軸散布(価格は確定値なので疎データでも団子化しない) */}
+      {view === "cost" && (
+        <CostScatter
+          items={filtered}
+          axisKey={mapAxis}
+          baseId={baseId}
+          currentSet={currentSet}
+        />
+      )}
+
       {/* くらべる: 選んだ2本を軸ごとに見比べる */}
       {view === "compare" && (
         <CompareView
@@ -909,6 +920,135 @@ function BasePicker({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// コスパ(価格×軸)ビュー: 横軸=価格(確定値)、縦軸=選んだ軸スコア(使った人の比較)。
+// 片軸が確定値の価格なので疎データでも団子化しない(planning-anchor)。
+// 左上(安くて強い)がコスパ良し。価格と比較データが両方ある用具のみ。
+function CostScatter({
+  items,
+  axisKey,
+  baseId,
+  currentSet,
+}: {
+  items: CatalogItem[];
+  axisKey: string;
+  baseId: string | null;
+  currentSet: Set<string>;
+}) {
+  const meta = STRIP_AXES.find((a) => a.key === axisKey);
+  const pts = items
+    .filter((e) => e.category.startsWith("RUBBER_"))
+    .map((e) => ({ e, price: e.price, score: e.scores?.[axisKey] }))
+    .filter(
+      (x): x is { e: CatalogItem; price: number; score: number } =>
+        typeof x.price === "number" && typeof x.score === "number",
+    );
+  if (pts.length < 2) {
+    return (
+      <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
+        この軸はまだ比較データが少なく、コスパの散布を出せません。
+        <br />
+        比較に答えると、価格と特徴の地図が育ちます。
+      </div>
+    );
+  }
+  const prices = pts.map((p) => p.price);
+  const pmin = Math.min(...prices);
+  const pmax = Math.max(...prices);
+  const xOf = (p: number) => (pmax === pmin ? 50 : ((p - pmin) / (pmax - pmin)) * 100);
+  // コスパ = 高スコア & 低価格。安いほど・強いほど上位。
+  const ranked = [...pts].sort(
+    (a, b) => b.score - xOf(b.price) * 0.6 - (a.score - xOf(a.price) * 0.6),
+  );
+  return (
+    <div className="mt-3 pb-20">
+      <p className="mb-2 text-[11px] leading-5 text-tt-gray70">
+        横軸=価格、縦軸={meta?.label ?? ""}。
+        <span className="font-bold text-tt-deep-green">左上＝安くて{meta?.high ?? "強い"}</span>
+        ＝コスパ良し。価格は確定値、{meta?.label ?? ""}は使った人の比較から推定（
+        <span className="text-tt-gray30">少</span>はデータ少なめ）。
+      </p>
+      {/* 散布図 */}
+      <div className="relative h-56 rounded-xl bg-tt-offwhite ring-1 ring-tt-gray30/30">
+        {/* 左上=コスパ良しの淡い強調 */}
+        <div className="pointer-events-none absolute left-0 top-0 h-1/2 w-1/2 rounded-tl-xl bg-tt-soft-green/40" />
+        {pts.map(({ e, price, score }) => {
+          const x = xOf(price);
+          const y = score;
+          const isBase = e.id === baseId;
+          const isCur = currentSet.has(e.id);
+          const low = e.comparisons < 3;
+          return (
+            <Link
+              key={e.id}
+              href={`/equipment/${e.id}`}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${x}%`, top: `${100 - y}%` }}
+              title={`${e.name} ¥${price.toLocaleString()} / ${meta?.label}${Math.round(score)}`}
+            >
+              <span
+                className={`block h-2.5 w-2.5 rounded-full ring-2 ring-white ${
+                  isBase
+                    ? "bg-tt-deep-green"
+                    : isCur
+                      ? "bg-tt-charcoal"
+                      : low
+                        ? "bg-tt-gray30"
+                        : "bg-tt-green"
+                }`}
+              />
+            </Link>
+          );
+        })}
+        <span className="absolute bottom-1 left-2 text-[10px] text-tt-gray70">
+          ← 安い
+        </span>
+        <span className="absolute bottom-1 right-2 text-[10px] text-tt-gray70">
+          高い →
+        </span>
+        <span className="absolute left-2 top-1 text-[10px] font-bold text-tt-deep-green">
+          {meta?.high ?? "強い"} ↑
+        </span>
+      </div>
+      {/* コスパ上位リスト(散布の名前を補う) */}
+      <p className="mt-3 text-xs font-bold">
+        コスパ上位（安くて{meta?.high ?? "強い"}）
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {ranked.slice(0, 6).map(({ e, price, score }) => {
+          const low = e.comparisons < 3;
+          return (
+            <li key={e.id}>
+              <Link
+                href={`/equipment/${e.id}`}
+                className="flex items-center gap-2 rounded-lg bg-white p-2.5 text-sm ring-1 ring-tt-gray30/40 transition hover:bg-tt-soft-green"
+              >
+                <EquipmentVisual
+                  category={e.category}
+                  manufacturer={e.manufacturer}
+                  imageUrl={e.imageUrl}
+                  name={e.name}
+                  size={22}
+                />
+                <span className="min-w-0 flex-1 truncate font-bold">
+                  {e.name}
+                </span>
+                <span className="shrink-0 font-mono text-xs text-tt-gray70">
+                  ¥{price.toLocaleString()} ・ {meta?.label}
+                  {low ? (
+                    <span className="text-tt-gray30">少</span>
+                  ) : (
+                    Math.round(score)
+                  )}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

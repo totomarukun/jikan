@@ -14,7 +14,9 @@ export default async function CatalogPage({
 }) {
   const sp = await searchParams;
   const initialView =
-    sp.view === "map" || sp.view === "compare" ? sp.view : "list";
+    sp.view === "map" || sp.view === "compare" || sp.view === "cost"
+      ? sp.view
+      : "list";
   const sessionId = await getSessionId();
   const [rows, scores, gearItems] = await Promise.all([
     prisma.equipment.findMany({
