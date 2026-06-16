@@ -1127,6 +1127,8 @@ function TradeoffScatter({
   items: CatalogItem[];
   baseId: string | null;
 }) {
+  // 候補リストの並び: トレードオフ(標準より回転ロスが小さい順) or 速い順(速度差)。
+  const [pickSort, setPickSort] = useState<"tradeoff" | "speed">("tradeoff");
   const baseItem = baseId ? items.find((e) => e.id === baseId) : null;
   const bSpeed = baseItem?.scores?.speed;
   const bSpin = baseItem?.scores?.spin;
@@ -1158,7 +1160,11 @@ function TradeoffScatter({
   });
   const picks = enriched
     .filter((p) => p.keepsSpin)
-    .sort((a, b) => b.dx + b.dy - (a.dx + a.dy));
+    .sort((a, b) =>
+      pickSort === "speed"
+        ? b.dx - a.dx // 速い順(速度差)
+        : b.dx + b.dy - (a.dx + a.dy), // トレードオフ順(標準より回転ロスが小さい)
+    );
   const baseName = baseItem?.name ?? "現用";
   return (
     <div className="mt-3 pb-20">
@@ -1166,7 +1172,7 @@ function TradeoffScatter({
         中央＝
         <span className="font-bold text-tt-deep-green">「{baseName}」</span>
         。右＝速い／上＝回転が強い。点線（標準トレードオフ）より
-        <span className="font-bold text-tt-deep-green">右上＝速さの割に回転が残る</span>
+        <span className="font-bold text-tt-deep-green">右上＝速くなる割に回転の落ちが小さい</span>
         候補（緑）。
         {pending > 0 && (
           <>
@@ -1227,9 +1233,34 @@ function TradeoffScatter({
         <span className="absolute bottom-1 left-2 text-[10px] text-tt-gray70">← 遅い</span>
         <span className="absolute right-2 top-1 text-[10px] font-bold text-tt-deep-green">回転 ↑</span>
       </div>
-      <p className="mt-3 text-xs font-bold">
-        速さの割に回転が残る候補（標準トレードオフより上）
-      </p>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-bold">
+          速くなる割に回転の落ちが小さい候補
+        </p>
+        {picks.length > 1 && (
+          <div className="flex shrink-0 rounded-full bg-tt-offwhite p-0.5 text-[10px] font-bold">
+            {(
+              [
+                ["tradeoff", "回転キープ順"],
+                ["speed", "速い順"],
+              ] as const
+            ).map(([s, label]) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setPickSort(s)}
+                className={`rounded-full px-2 py-1 transition ${
+                  pickSort === s
+                    ? "bg-white text-tt-deep-green shadow-sm"
+                    : "text-tt-gray70"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       {picks.length > 0 ? (
         <ul className="mt-2 space-y-1.5">
           {picks.slice(0, 6).map(({ e, dx, dy, low }) => (
@@ -1257,7 +1288,7 @@ function TradeoffScatter({
         </ul>
       ) : (
         <p className="mt-1 rounded-lg bg-tt-offwhite p-3 text-xs leading-5 text-tt-gray70">
-          いまのところ「{baseName}」より速くて、標準トレードオフより回転が残る候補は
+          いまのところ「{baseName}」より速くて、標準より回転の落ちが小さい候補は
           出ていません。比較が増えると変わります。
         </p>
       )}
