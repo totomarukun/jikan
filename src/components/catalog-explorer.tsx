@@ -74,6 +74,7 @@ export function CatalogExplorer({
   initialView = "list",
   initialCat = null,
   initialMapAxis = "speed",
+  initialMapMode = "distance",
 }: {
   items: CatalogItem[];
   currentIds?: string[];
@@ -82,11 +83,14 @@ export function CatalogExplorer({
   initialView?: View;
   initialCat?: string | null;
   initialMapAxis?: string;
+  initialMapMode?: "distance" | "tradeoff";
 }) {
   const [view, setView] = useState<View>(initialView);
   const [mapAxis, setMapAxis] = useState<string>(initialMapAxis);
   // 分布ビューの表示: 距離(1軸) or 速度×回転のトレードオフ(2軸)。
-  const [mapMode, setMapMode] = useState<"distance" | "tradeoff">("distance");
+  const [mapMode, setMapMode] = useState<"distance" | "tradeoff">(
+    initialMapMode,
+  );
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
   const [baseId, setBaseId] = useState<string | null>(initialBaseId);
