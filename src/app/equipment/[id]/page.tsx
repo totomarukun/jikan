@@ -378,7 +378,9 @@ function MakerSpecSection({
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
       <h2 className="font-bold">メーカー公称スペック</h2>
       <p className="mt-0.5 text-xs text-tt-gray70">
-        各社の自社基準の数値です（メーカーをまたいだ比較はできません）。使った人の評価は「用具マップ」で。
+        <strong className="text-tt-charcoal">同じメーカー内の比較の目安</strong>
+        になります（各社の自社基準のため、メーカーをまたいだ比較はできません）。
+        使った人の体感は「用具マップ」で。
       </p>
       <ul className="mt-3 space-y-2">
         {rows.map(([label, v]) =>
