@@ -932,6 +932,15 @@ function MapBars({
     .filter((x): x is { e: CatalogItem; v: number } => typeof x.v === "number")
     .sort((a, b) => b.v - a.v);
   const pending = rubbers.length - ranked.length;
+  // 現用基準の距離マップ: 基準ラバーにその軸のスコアがあれば、中央=基準として
+  // 「あなたの基準より速い/遅い」を距離で見せる(コア価値=自分基準で相対的に分かる)。
+  const baseItem = baseId ? items.find((e) => e.id === baseId) : null;
+  const baseScore =
+    baseItem && typeof baseItem.scores?.[axisKey] === "number"
+      ? (baseItem.scores![axisKey] as number)
+      : null;
+  const centered = baseScore !== null;
+  const baseName = baseItem?.name ?? "";
 
   if (ranked.length === 0) {
     return (
@@ -945,11 +954,24 @@ function MapBars({
   return (
     <div className="mt-3 pb-20">
       <p className="mb-2 text-[11px] leading-5 text-tt-gray70">
-        この軸で比較データのある{" "}
-        <span className="font-mono font-bold text-tt-charcoal">
-          {ranked.length}
-        </span>
-        本を表示中
+        {centered ? (
+          <>
+            中央の
+            <span className="font-bold text-tt-deep-green">「{baseName}」</span>
+            を基準に、{meta?.label ?? ""}が
+            <span className="font-bold text-tt-deep-green">右＝強い</span> /{" "}
+            <span className="font-bold text-tt-deep-coral">左＝弱い</span>
+            。
+          </>
+        ) : (
+          <>
+            この軸で比較データのある{" "}
+            <span className="font-mono font-bold text-tt-charcoal">
+              {ranked.length}
+            </span>
+            本を表示中
+          </>
+        )}
         {pending > 0 && (
           <>
             （残り
@@ -961,8 +983,14 @@ function MapBars({
       </p>
       {meta && (
         <div className="mb-2 flex justify-between text-[11px] text-tt-gray70">
-          <span>← {meta.low}</span>
-          <span className="font-bold text-tt-deep-green">{meta.high} →</span>
+          <span>
+            ← {centered ? `${baseName}より` : ""}
+            {meta.low}
+          </span>
+          <span className="font-bold text-tt-deep-green">
+            {centered ? `${baseName}より` : ""}
+            {meta.high} →
+          </span>
         </div>
       )}
       <ul className="space-y-2">
@@ -971,6 +999,11 @@ function MapBars({
           const isBase = e.id === baseId;
           const isCur = currentSet.has(e.id);
           const low = e.comparisons < 3;
+          // 距離マップ: 基準との差(delta)。中央50%を基準に左右へ。
+          const delta = centered ? Math.round(v - baseScore!) : 0;
+          const pos = centered
+            ? 50 + Math.max(-100, Math.min(100, v - baseScore!)) / 2
+            : 0;
           return (
             <li key={e.id}>
               <Link
@@ -1002,26 +1035,57 @@ function MapBars({
                       )
                     )}
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-tt-gray70">
+                  <span className="shrink-0 font-mono text-xs">
                     {low ? (
                       <span className="text-tt-gray30" title="データ少なめ">
                         少
                       </span>
+                    ) : centered ? (
+                      <span
+                        className={
+                          delta > 0
+                            ? "text-tt-deep-green"
+                            : delta < 0
+                              ? "text-tt-deep-coral"
+                              : "text-tt-gray70"
+                        }
+                      >
+                        {isBase ? "基準" : delta > 0 ? `+${delta}` : delta}
+                      </span>
                     ) : (
-                      pct
+                      <span className="text-tt-gray70">{pct}</span>
                     )}
                   </span>
                 </div>
-                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-tt-gray30/30">
-                  <div
-                    className={`h-2 rounded-full ${
-                      low
-                        ? "bg-tt-gray30"
-                        : "bg-tt-green"
-                    }`}
-                    style={{ width: `${Math.max(4, pct)}%` }}
-                  />
-                </div>
+                {centered ? (
+                  // 中央=基準。基準より右(緑)=強い / 左(コーラル)=弱い。
+                  <div className="relative mt-1.5 h-2 rounded-full bg-tt-gray30/30">
+                    <div className="absolute left-1/2 top-[-2px] h-3 w-px -translate-x-1/2 bg-tt-gray30" />
+                    {!low && delta !== 0 && (
+                      <div
+                        className={`absolute top-0 h-2 rounded-full ${
+                          delta > 0 ? "bg-tt-green" : "bg-tt-coral"
+                        }`}
+                        style={{
+                          left: delta > 0 ? "50%" : `${pos}%`,
+                          width: `${Math.abs(v - baseScore!) / 2}%`,
+                        }}
+                      />
+                    )}
+                    {isBase && (
+                      <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-tt-deep-green" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-tt-gray30/30">
+                    <div
+                      className={`h-2 rounded-full ${
+                        low ? "bg-tt-gray30" : "bg-tt-green"
+                      }`}
+                      style={{ width: `${Math.max(4, pct)}%` }}
+                    />
+                  </div>
+                )}
               </Link>
             </li>
           );
