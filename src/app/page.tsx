@@ -61,6 +61,12 @@ export default async function LandingPage() {
           <p className="mt-3 text-sm text-tt-gray70">登録なしで見られます</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Link
+              href="/catalog?view=cost"
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
+            >
+              価格と性能でコスパを見る →
+            </Link>
+            <Link
               href="/catalog"
               className={buttonVariants({ variant: "secondary", size: "sm" })}
             >
