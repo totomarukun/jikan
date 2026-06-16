@@ -432,10 +432,10 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold">{meta.label}</span>
                   <span className="font-mono text-tt-gray70">
-                    {p.totalRanked}本中 {p.rank}位 ・ 比較{p.comparisons}件
-                    {p.bothComparisons > 0
-                      ? `（両方使った${p.bothComparisons}）`
-                      : ""}
+                    {p.totalRanked}本中 {p.rank}位 ・{" "}
+                    {p.bothComparisons === p.comparisons
+                      ? `両方使った${p.comparisons}件`
+                      : `比較${p.comparisons}件（両方使った${p.bothComparisons}）`}
                   </span>
                 </div>
                 <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-tt-gray30/30">
@@ -462,6 +462,8 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
         ※右にいくほど強い特徴。メーカーの数値ではなく、使った人の比較に基づきます。
         「比較N件」はこの軸でこのラバーが登場した比較の総数（イメージ回答含む）、
         「両方使った」はそのうち両方を実際に使った人の件数です。
+        「◯本中」は<strong className="text-tt-charcoal">その軸で比較データがある同じ種類のラバー数</strong>で、
+        軸ごとに変わります。
       </p>
     </section>
   );

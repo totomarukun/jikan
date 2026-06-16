@@ -926,11 +926,12 @@ function MapBars({
   currentSet: Set<string>;
 }) {
   const meta = STRIP_AXES.find((a) => a.key === axisKey);
-  const ranked = items
-    .filter((e) => e.category.startsWith("RUBBER_"))
+  const rubbers = items.filter((e) => e.category.startsWith("RUBBER_"));
+  const ranked = rubbers
     .map((e) => ({ e, v: e.scores?.[axisKey] }))
     .filter((x): x is { e: CatalogItem; v: number } => typeof x.v === "number")
     .sort((a, b) => b.v - a.v);
+  const pending = rubbers.length - ranked.length;
 
   if (ranked.length === 0) {
     return (
@@ -943,6 +944,21 @@ function MapBars({
   }
   return (
     <div className="mt-3 pb-20">
+      <p className="mb-2 text-[11px] leading-5 text-tt-gray70">
+        この軸で比較データのある{" "}
+        <span className="font-mono font-bold text-tt-charcoal">
+          {ranked.length}
+        </span>
+        本を表示中
+        {pending > 0 && (
+          <>
+            （残り
+            <span className="font-mono">{pending}</span>
+            本はまだ比較が少なく位置を出せません）
+          </>
+        )}
+        。
+      </p>
       {meta && (
         <div className="mb-2 flex justify-between text-[11px] text-tt-gray70">
           <span>← {meta.low}</span>
