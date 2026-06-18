@@ -9,7 +9,7 @@ export default function TermsPage() {
         <div>
           <h2 className="font-bold">1. サービス概要</h2>
           <p>
-            TacTap（以下「本サービス」）は、卓球用具のAB比較データを収集・集計し、
+            ガチスペ（以下「本サービス」）は、卓球用具のAB比較データを収集・集計し、
             用具選びの参考情報を提供するサービスです。
           </p>
         </div>

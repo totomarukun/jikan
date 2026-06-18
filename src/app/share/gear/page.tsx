@@ -21,9 +21,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const sp = await searchParams;
   const img = ogImage(sp);
-  const title = "私の卓球ギア構成 | TacTap";
+  const title = "私の卓球ギア構成 | ガチスペ";
   const description =
-    "ラケット・フォア・バックの構成。TacTapで用具の特徴を相対的に見て、あなたのギアも登録しよう。";
+    "ラケット・フォア・バックの構成。ガチスペで用具の特徴を相対的に見て、あなたのギアも登録しよう。";
   return {
     title,
     description,
@@ -73,7 +73,7 @@ export default async function ShareGearPage({
         )}
       </div>
       <p className="mt-6 leading-7 text-tt-gray70">
-        TacTapは、両方使った人のAB比較から用具の特徴を相対的に見られるサービス。
+        ガチスペは、両方使った人のAB比較から用具の特徴を相対的に見られるサービス。
         あなたのギアを登録すると、それを基準に乗り換え候補が読めます。
       </p>
       <div className="mt-8">

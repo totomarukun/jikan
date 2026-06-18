@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoMark } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 import {
   HeroCompareIllustration,
   IconRuler,
@@ -31,35 +31,40 @@ export default async function LandingPage() {
 
   return (
     <div className="space-y-12 py-6">
-      {/* ヒーロー */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tt-soft-green via-white to-tt-soft-coral p-8 text-center shadow-sm ring-1 ring-black/5 sm:p-12">
+      {/* ヒーロー: 黒地・ガチで比較。表(公称)→裏(本音)の演出 */}
+      <section className="relative overflow-hidden rounded-3xl bg-tt-charcoal p-8 text-center shadow-lg ring-1 ring-black/20 sm:p-12">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-tt-green/20 blur-3xl"
+        />
         <div className="animate-pop mx-auto w-fit">
-          <LogoMark size={84} />
+          <Wordmark size={56} onDark />
         </div>
-        <h1 className="animate-rise mt-6 text-3xl font-bold leading-snug sm:text-4xl">
-          次の用具選び、
-          <br className="sm:hidden" />
-          もう迷わない。
-        </h1>
-        <p className="animate-rise mt-3 leading-7 text-tt-gray70 [animation-delay:80ms]">
-          「この用具、自分に合うかな？」を、
-          <strong className="text-tt-charcoal">みんなの比較データ</strong>で解決。
-          気になる用具の特徴が、いまの自分の用具と比べて
-          <strong className="text-tt-charcoal">ひと目で分かります</strong>。
+        <p className="animate-rise mt-2 font-mono text-[11px] tracking-[0.34em] text-tt-coral [animation-delay:60ms]">
+          UNVEIL THE TRUE SPEC.
         </p>
-        <HeroCompareIllustration className="animate-rise mx-auto mt-7 w-full max-w-[330px] drop-shadow-[0_12px_28px_rgba(15,110,86,0.16)] [animation-delay:120ms]" />
-        <div className="animate-rise mt-6 [animation-delay:160ms]">
+        <h1 className="animate-rise mt-6 text-3xl font-bold leading-snug text-white [animation-delay:80ms] sm:text-4xl">
+          メーカーの数字じゃない。
+          <br />
+          <span className="text-tt-green">使った人の本音</span>で選ぶ。
+        </h1>
+        <p className="animate-rise mt-3 leading-7 text-white/70 [animation-delay:120ms]">
+          公称スペック（表）と、両方使った人のガチ評価（裏）。
+          いまの自分の用具と比べて、特徴がひと目で分かります。
+        </p>
+        <HeroCompareIllustration className="animate-rise mx-auto mt-7 w-full max-w-[330px] drop-shadow-[0_16px_32px_rgba(0,0,0,0.4)] [animation-delay:140ms]" />
+        <div className="animate-rise mt-7 [animation-delay:180ms]">
           <Link
             href="/catalog?view=map"
-            className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+            className="inline-flex min-h-12 items-center rounded-full bg-tt-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/30 transition hover:bg-tt-deep-coral/0 hover:opacity-90 active:scale-95"
           >
             用具マップを見る
           </Link>
-          <p className="mt-3 text-sm text-tt-gray70">登録なしで見られます</p>
+          <p className="mt-3 text-sm text-white/60">登録なしで見られます</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Link
               href="/catalog"
-              className="inline-block rounded-full bg-white/80 px-6 py-2.5 text-sm font-bold text-tt-charcoal ring-1 ring-black/10 transition hover:bg-white active:scale-95"
+              className="inline-flex min-h-11 items-center rounded-full bg-white/10 px-6 py-2.5 text-sm font-bold text-white ring-1 ring-white/20 transition hover:bg-white/20 active:scale-95"
             >
               用具を名前で探す →
             </Link>
@@ -71,16 +76,16 @@ export default async function LandingPage() {
           className={`mt-8 grid gap-3 text-center ${totalAnswers > 0 ? "grid-cols-2" : "grid-cols-1"}`}
         >
           {totalAnswers > 0 && (
-            <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-              <dt className="text-xs text-tt-gray70">集まった比較データ</dt>
-              <dd className="font-mono text-2xl font-bold text-tt-deep-green">
+            <div className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+              <dt className="text-xs text-white/60">集まった本音データ</dt>
+              <dd className="font-mono text-2xl font-bold text-tt-green">
                 {totalAnswers.toLocaleString()}
               </dd>
             </div>
           )}
-          <div className="rounded-2xl bg-white/70 p-3 ring-1 ring-black/5">
-            <dt className="text-xs text-tt-gray70">収録用具</dt>
-            <dd className="font-mono text-2xl font-bold text-tt-deep-coral">
+          <div className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+            <dt className="text-xs text-white/60">収録用具</dt>
+            <dd className="font-mono text-2xl font-bold text-tt-coral">
               {equipmentCount.toLocaleString()}
             </dd>
           </div>

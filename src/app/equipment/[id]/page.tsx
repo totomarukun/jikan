@@ -339,7 +339,7 @@ export default async function EquipmentPage({
           この用具で対決を作る
         </Link>
         <ShareLinkButton
-          text={`${equipment.name} (${equipment.manufacturer}) の相対マップ上の位置 #TacTap`}
+          text={`${equipment.name} (${equipment.manufacturer}) の相対マップ上の位置 #ガチスペ`}
           label="この用具カードをシェア"
         />
         <Link href="/battles" className="block text-sm text-tt-gray70 underline">

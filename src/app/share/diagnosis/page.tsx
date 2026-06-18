@@ -24,7 +24,7 @@ export async function generateMetadata({
   const img = ogImage(sp);
   const title = `卓球用具スタイル診断: ${type}`;
   const description =
-    "TacTapのAB比較で分かる、あなたの卓球用具スタイル。あなたも診断してみよう。";
+    "ガチスペのAB比較で分かる、あなたの卓球用具スタイル。あなたも診断してみよう。";
   return {
     title,
     description,
@@ -67,7 +67,7 @@ export default async function ShareDiagnosisPage({
         </p>
       )}
       <p className="mt-6 leading-7 text-tt-gray70">
-        TacTapは、両方使った人のAB比較から、用具の特徴を相対的に見られるサービス。
+        ガチスペは、両方使った人のAB比較から、用具の特徴を相対的に見られるサービス。
         数問答えるだけで、あなたの用具スタイルと、合いそうな1本がわかります。
       </p>
       <div className="mt-8">
