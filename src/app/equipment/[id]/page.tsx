@@ -334,7 +334,7 @@ export default async function EquipmentPage({
           ))}
         <Link
           href="/compare/select"
-          className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+          className="block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
         >
           この用具で対決を作る
         </Link>
@@ -440,7 +440,7 @@ function RelativePositionSection({ positions }: { positions: AxisPosition[] }) {
                     className={`h-2.5 rounded-full ${
                       low
                         ? "bg-tt-gray30"
-                        : "bg-gradient-to-r from-tt-green to-tt-deep-green"
+                        : "bg-gradient-to-r from-tt-green to-gs-red-strong"
                     }`}
                     style={{ width: `${Math.max(4, pct)}%` }}
                   />

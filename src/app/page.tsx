@@ -171,7 +171,7 @@ export default async function LandingPage() {
         <div className="mt-6 text-center">
           <Link
             href={hasSession ? "/play" : "/onboarding"}
-            className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-10 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+            className="inline-block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-10 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
             いますぐ始める
           </Link>

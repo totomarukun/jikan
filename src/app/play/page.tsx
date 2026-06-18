@@ -42,7 +42,7 @@ function GearGate() {
         </p>
         <Link
           href="/gear"
-          className="mt-6 inline-block w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
+          className="mt-6 inline-block w-full rounded-xl bg-gradient-to-r from-tt-green to-gs-red-strong py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
         >
           ラバーを登録する
         </Link>

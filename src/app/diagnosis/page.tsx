@@ -38,7 +38,7 @@ export default async function DiagnosisPage() {
         </p>
         <Link
           href="/play"
-          className="mt-6 inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
+          className="mt-6 inline-block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-8 py-3 font-bold text-white shadow-lg shadow-tt-green/25"
         >
           比較に答える
         </Link>
@@ -137,7 +137,7 @@ export default async function DiagnosisPage() {
                   </div>
                   <div className="mt-1 h-2.5 rounded-full bg-tt-gray30/30">
                     <div
-                      className="bar-grow h-2.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
+                      className="bar-grow h-2.5 rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong"
                       style={{ width: `${Math.min(row.value * 33, 100)}%` }}
                     />
                   </div>
@@ -164,7 +164,7 @@ export default async function DiagnosisPage() {
                   <span
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-mono text-sm font-bold ${
                       i === 0
-                        ? "bg-gradient-to-br from-tt-green to-tt-deep-green text-white"
+                        ? "bg-gradient-to-br from-tt-green to-gs-red-strong text-white"
                         : "bg-tt-gray30/30 text-tt-gray70"
                     }`}
                   >
@@ -196,14 +196,14 @@ export default async function DiagnosisPage() {
         {userId ? (
           <Link
             href="/me"
-            className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+            className="block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
             マイページで見る
           </Link>
         ) : (
           <Link
             href="/signup"
-            className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+            className="block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
           >
             登録して詳細レポートを見る
           </Link>

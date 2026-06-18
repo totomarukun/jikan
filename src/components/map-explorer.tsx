@@ -270,7 +270,7 @@ function PositionBar({
           className={`h-2.5 rounded-full ${
             lowConfidence
               ? "bg-tt-gray30"
-              : "bg-gradient-to-r from-tt-green to-tt-deep-green"
+              : "bg-gradient-to-r from-tt-green to-gs-red-strong"
           }`}
           style={{ width: `${Math.max(4, pct)}%` }}
         />

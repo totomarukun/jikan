@@ -79,7 +79,7 @@ export default async function ShareGearPage({
       <div className="mt-8">
         <Link
           href="/onboarding"
-          className="inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+          className="inline-block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-12 py-4 text-lg font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
         >
           あなたのギアを登録する（無料）
         </Link>

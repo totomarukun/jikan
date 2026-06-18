@@ -679,7 +679,7 @@ export function CatalogExplorer({
             {picked.length === 2 ? (
               <Link
                 href={`/compare/${picked[0].id}/vs/${picked[1].id}`}
-                className="shrink-0 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-4 py-2 text-xs font-bold text-white"
+                className="shrink-0 rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-4 py-2 text-xs font-bold text-white"
               >
                 比較する →
               </Link>
@@ -719,7 +719,7 @@ function ScoreStrip({
             <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-tt-gray30/30">
               {has && (
                 <span
-                  className="block h-1.5 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green"
+                  className="block h-1.5 rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong"
                   style={{ width: `${Math.max(4, Math.round(v))}%` }}
                 />
               )}
@@ -961,7 +961,7 @@ function MapBars({
                     className={`h-2 rounded-full ${
                       low
                         ? "bg-tt-gray30"
-                        : "bg-gradient-to-r from-tt-green to-tt-deep-green"
+                        : "bg-gradient-to-r from-tt-green to-gs-red-strong"
                     }`}
                     style={{ width: `${Math.max(4, pct)}%` }}
                   />
@@ -1001,7 +1001,7 @@ function CompareView({
         <button
           type="button"
           onClick={onGoList}
-          className="mt-3 inline-block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-5 py-2 text-xs font-bold text-white"
+          className="mt-3 inline-block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-5 py-2 text-xs font-bold text-white"
         >
           一覧から選ぶ →
         </button>
@@ -1060,7 +1060,7 @@ function CompareView({
       <div className="mt-4 flex gap-2">
         <Link
           href={`/compare/${a.id}/vs/${b.id}`}
-          className="flex-1 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green py-2.5 text-center text-sm font-bold text-white"
+          className="flex-1 rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong py-2.5 text-center text-sm font-bold text-white"
         >
           くわしく比較（みんなの回答・声）→
         </Link>
@@ -1085,7 +1085,7 @@ function CompareBar({ value, side }: { value?: number; side: "a" | "b" }) {
           <span
             className={`block h-2.5 rounded-full ${
               side === "a"
-                ? "bg-gradient-to-r from-tt-green to-tt-deep-green"
+                ? "bg-gradient-to-r from-tt-green to-gs-red-strong"
                 : "bg-gradient-to-r from-tt-deep-coral to-tt-coral"
             }`}
             style={{ width: `${Math.max(4, Math.round(value))}%` }}

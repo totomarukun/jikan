@@ -33,7 +33,7 @@ export function VersusBar({
       >
         {pa > 0 && (
           <div
-            className="bg-gradient-to-r from-tt-green to-tt-deep-green"
+            className="bg-gradient-to-r from-tt-green to-gs-red-strong"
             style={{ width: `${pa}%` }}
           />
         )}

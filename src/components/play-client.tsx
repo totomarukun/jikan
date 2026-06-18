@@ -161,7 +161,7 @@ export function PlayClient({ initial }: { initial: QuestionPayload }) {
             <button
               disabled={busy}
               onClick={() => answer("A")}
-              className="rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+              className="rounded-xl bg-gradient-to-r from-tt-green to-gs-red-strong py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
             >
               Aを選ぶ
             </button>
@@ -273,7 +273,7 @@ function RevealPanel({
         onClick={onNext}
         disabled={busy}
         autoFocus
-        className="mt-4 w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+        className="mt-4 w-full rounded-xl bg-gradient-to-r from-tt-green to-gs-red-strong py-3.5 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
       >
         次の質問へ
       </button>

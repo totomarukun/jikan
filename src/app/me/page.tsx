@@ -155,7 +155,7 @@ export default async function MyPage() {
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Link
           href="/compare/select"
-          className="rounded-2xl bg-gradient-to-br from-tt-green to-tt-deep-green p-4 text-center font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
+          className="rounded-2xl bg-gradient-to-br from-tt-green to-gs-red-strong p-4 text-center font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
         >
           新しい対決を作成
         </Link>

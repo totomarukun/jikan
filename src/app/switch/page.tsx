@@ -728,7 +728,7 @@ function CandidateCard({
       <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
         <Link
           href={`/compare/${current.id}/vs/${candidate.id}`}
-          className="rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-5 py-2 font-bold text-white shadow shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
+          className="rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-5 py-2 font-bold text-white shadow shadow-tt-green/20 transition hover:opacity-90 active:scale-95"
         >
           詳細比較を見る
         </Link>

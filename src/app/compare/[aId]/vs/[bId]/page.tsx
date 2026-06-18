@@ -314,7 +314,7 @@ export default async function CompareViewPage({
         <div className="mt-3 flex gap-2">
           <button
             type="submit"
-            className="h-9 flex-1 rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
+            className="h-9 flex-1 rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
           >
             この条件で見る
           </button>
@@ -527,7 +527,7 @@ export default async function CompareViewPage({
       <div className="mt-8 space-y-3 text-center">
         <Link
           href="/play"
-          className="block rounded-full bg-gradient-to-r from-tt-green to-tt-deep-green px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
+          className="block rounded-full bg-gradient-to-r from-tt-green to-gs-red-strong px-8 py-3.5 font-bold text-white shadow-lg shadow-tt-green/25 transition hover:opacity-90 active:scale-95"
         >
           この対決に答える
         </Link>

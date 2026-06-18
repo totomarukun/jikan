@@ -133,7 +133,7 @@ function SuggestRubber({
         <button
           onClick={submit}
           disabled={busy}
-          className="flex-1 rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-2.5 font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+          className="flex-1 rounded-xl bg-gradient-to-r from-tt-green to-gs-red-strong py-2.5 font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50"
         >
           {busy ? "追加中..." : "追加する"}
         </button>
@@ -405,7 +405,7 @@ export function GearForm({
           <button
             onClick={submit}
             disabled={busy}
-            className="w-full rounded-xl bg-gradient-to-r from-tt-green to-tt-deep-green py-3 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+            className="w-full rounded-xl bg-gradient-to-r from-tt-green to-gs-red-strong py-3 font-bold text-white shadow-lg shadow-tt-green/20 transition hover:opacity-90 active:scale-95 disabled:opacity-50"
           >
             {busy ? "追加中..." : submitLabel}
           </button>
