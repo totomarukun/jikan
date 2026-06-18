@@ -4,7 +4,7 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# TacTap プロジェクトガイド
+# ガチスペ プロジェクトガイド
 
 - サービス仕様の一次資料は `docs/tactap-plan-v1.0.md`（企画書 v1.0）。機能・画面・データモデルの判断はこれに従う。
 - DB は Prisma 6 + SQLite（ローカル）。SQLite が enum 非対応のため、enum 相当は String + `src/lib/types.ts` の Zod スキーマで検証する。新しい enum 値を足すときは両方を更新すること。

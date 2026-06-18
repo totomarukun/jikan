@@ -397,7 +397,7 @@ function shareGear(gear: GearEntry[]) {
   const bladeW = cur.find((g) => g.bladeWeightGrams != null)?.bladeWeightGrams;
   if (rubberSum > 0) q.set("tw", String(rubberSum + (bladeW ?? 0)));
   const url = `${window.location.origin}/share/gear?${q.toString()}`;
-  const text = "私の卓球ギア構成 #TacTap";
+  const text = "私の卓球ギア構成 #ガチスペ";
   if (typeof navigator !== "undefined" && navigator.share) {
     navigator.share({ text, url }).catch(() => {});
     return;

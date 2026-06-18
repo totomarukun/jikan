@@ -12,7 +12,7 @@ function row(label: string, value: string | null) {
           width: "120px",
           fontSize: "30px",
           fontWeight: 700,
-          color: "#0f6e56",
+          color: "#0e0e10",
         }}
       >
         {label}
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
           flexDirection: "column",
           justifyContent: "center",
           background:
-            "linear-gradient(135deg, #e1f5ee 0%, #fafaf7 55%, #faece7 100%)",
+            "linear-gradient(135deg, #fdecee 0%, #ffffff 55%, #e7f1f8 100%)",
           padding: "72px",
           fontFamily: "sans-serif",
         }}
@@ -57,11 +57,11 @@ export async function GET(request: Request) {
               width: "40px",
               height: "40px",
               borderRadius: "12px",
-              background: "#0f6e56",
+              background: "#0e0e10",
             }}
           />
-          <div style={{ fontSize: "32px", fontWeight: 700, color: "#0f6e56" }}>
-            TacTap
+          <div style={{ fontSize: "32px", fontWeight: 700, color: "#0e0e10" }}>
+            ガチスペ
           </div>
           <div style={{ fontSize: "26px", color: "#5f5e5a" }}>私のギア構成</div>
         </div>
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
                 style={{
                   fontSize: "30px",
                   fontWeight: 700,
-                  color: "#d85a30",
+                  color: "#0b6fb8",
                 }}
               >
                 {totalWeight}
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
             color: "#5f5e5a",
           }}
         >
-          用具の特徴を相対的に。あなたのギアも登録しよう。 #TacTap
+          用具の特徴を相対的に。あなたのギアも登録しよう。 #ガチスペ
         </div>
       </div>
     ),

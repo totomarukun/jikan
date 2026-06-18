@@ -1,21 +1,51 @@
 @import "tailwindcss";
 
-/* TacTap ブランドカラー (企画書 10.3) */
+/* ガチスペ ブランドトークン
+   ベース=赤・黒（卓球ラバー公式色）＋差し色=卓球台ブルー。
+   既存の tt-* 命名は維持し、意味（役割）に合わせて値を再マッピングする:
+   - tt-green       → ガチ・レッド #E5132B（主役/CTA/A面/強調）
+   - tt-coral       → 卓球台ブルー #0B6FB8（差し色/B面/サブ強調）
+   - tt-deep-green  → スペ・インク #0E0E10（見出し/本文/構造）
+   - tt-charcoal    → インク #0E0E10
+   versus バー等は A=赤 / B=青 / 同等=グレー の高コントラストになる。 */
 @theme {
-  --color-tt-green: #1a8917;
-  --color-tt-coral: #d85a30;
-  --color-tt-deep-green: #0f6e56;
-  --color-tt-deep-coral: #993c1d;
-  --color-tt-soft-green: #e1f5ee;
-  --color-tt-soft-coral: #faece7;
-  --color-tt-charcoal: #1a1a1a;
-  --color-tt-gray70: #5f5e5a;
-  --color-tt-gray30: #b4b2a9;
-  --color-tt-offwhite: #fafaf7;
+  /* 役割ベースの新トークン */
+  --color-gs-red: #e5132b;
+  --color-gs-red-strong: #c20f23;
+  --color-gs-red-press: #a00c1d;
+  --color-gs-ink: #0e0e10;
+  --color-gs-blue: #0b6fb8;
+  --color-gs-blue-strong: #0b5a96;
+  --color-gs-paper: #ffffff;
+
+  /* 既存 tt-* を新パレットへ写像（全画面が一括で再スキンされる） */
+  --color-tt-green: #e5132b; /* 主役/CTA/A面 */
+  --color-tt-coral: #0b6fb8; /* 差し色/B面 */
+  --color-tt-deep-green: #0e0e10; /* 見出し/強調テキスト */
+  --color-tt-deep-coral: #0b5a96; /* 濃い差し色 */
+  --color-tt-soft-green: #fdecee; /* 淡い赤の面（ハイライト背景） */
+  --color-tt-soft-coral: #e7f1f8; /* 淡い青の面 */
+  --color-tt-charcoal: #0e0e10;
+  --color-tt-gray70: #57575a;
+  --color-tt-gray30: #b9b9bd;
+  --color-tt-offwhite: #f7f7f5;
 
   --font-sans: var(--font-inter), var(--font-noto-sans-jp), system-ui,
     sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
+
+  /* ディスプレイ用の流動タイポ（見出し/ヒーロー。本文の既定スケールは温存） */
+  --text-display: clamp(2.1rem, 7vw, 3.4rem);
+  --text-display-lg: clamp(2.6rem, 9vw, 4.6rem);
+  --text-eyebrow: clamp(0.7rem, 2.6vw, 0.8rem);
+
+  /* 角丸・影・フォーカスリング */
+  --radius-card: 1rem;
+  --radius-pill: 9999px;
+  --shadow-soft: 0 1px 2px rgba(14, 14, 16, 0.06),
+    0 1px 3px rgba(14, 14, 16, 0.05);
+  --shadow-card: 0 4px 14px rgba(14, 14, 16, 0.08);
+  --shadow-lift: 0 10px 30px rgba(14, 14, 16, 0.14);
 
   --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -53,26 +83,44 @@
   }
 }
 
+@keyframes ballbounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-22%);
+  }
+}
+
 body {
   background: var(--color-tt-offwhite);
   color: var(--color-tt-charcoal);
   font-family: var(--font-sans);
 }
 
-/* バーが左端から伸びるアニメーション用 */
+/* バーが左端から伸びるアニメーション */
 .bar-grow {
   transform-origin: left;
   animation: var(--animate-grow);
 }
 
-/* アクセシビリティ: モーション削減設定を尊重する (design.md §1.6) */
+/* キーボード操作時のフォーカスを明確に（A11y） */
+:focus-visible {
+  outline: 2px solid var(--color-gs-blue);
+  outline-offset: 2px;
+}
+
+/* モーション控えめ設定を尊重 */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+  .bar-grow {
+    transform: none;
   }
 }

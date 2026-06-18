@@ -3,6 +3,7 @@ import { Inter, Noto_Sans_JP, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import { LogoHorizontal } from "@/components/logo";
+import { NavLinks } from "@/components/nav-links";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -25,14 +26,14 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   ),
   title: {
-    default: "TacTap | 卓球用具を、比較で選ぶ。",
-    template: "%s | TacTap",
+    default: "ガチスペ | スペックの裏まで、ガチで比較。",
+    template: "%s | ガチスペ",
   },
   description:
-    "両方使った人の比較から、卓球用具の特徴がわかる。データで、用具選びの後悔を減らす。",
+    "メーカーの公称スペックだけじゃない。両方使った人の本音で、卓球用具をガチ比較。データで、用具選びの後悔を減らす。",
   openGraph: {
-    title: "TacTap | 卓球用具を、比較で選ぶ。",
-    description: "両方使った人の比較から、卓球用具の特徴がわかる。",
+    title: "ガチスペ | スペックの裏まで、ガチで比較。",
+    description: "両方使った人の本音から、卓球用具の“真のスペック”がわかる。",
   },
   twitter: { card: "summary_large_image" },
 };
@@ -51,17 +52,7 @@ export default function RootLayout({
         <header className="sticky top-0 z-20 border-b border-tt-gray30/30 bg-white/85 backdrop-blur">
           <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
             <LogoHorizontal />
-            <nav className="flex items-center gap-4 text-sm font-medium text-tt-gray70 sm:gap-6">
-              <Link href="/catalog" className="transition hover:text-tt-green">
-                用具をみる
-              </Link>
-              <Link href="/play" className="transition hover:text-tt-green">
-                答える
-              </Link>
-              <Link href="/me" className="transition hover:text-tt-green">
-                マイページ
-              </Link>
-            </nav>
+            <NavLinks />
           </div>
         </header>
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
@@ -69,9 +60,9 @@ export default function RootLayout({
         </main>
         <footer className="border-t border-tt-gray30/30 bg-white">
           <div className="mx-auto w-full max-w-3xl px-4 py-8">
-            <p className="text-sm font-bold">TacTap — 卓球用具を、比較で選ぶ。</p>
+            <p className="text-sm font-bold">ガチスペ — スペックの裏まで、ガチで比較。</p>
             <p className="mt-1 text-xs text-tt-gray70">
-              データで、用具選びの後悔を減らす。
+              メーカーの数字じゃない。使った人の本音で選ぶ。
             </p>
             <nav className="mt-4 flex flex-wrap gap-4 text-xs text-tt-gray70">
               <Link href="/play" className="hover:text-tt-green">

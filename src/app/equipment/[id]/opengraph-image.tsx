@@ -7,7 +7,7 @@ import { isRubberCategory } from "@/lib/types";
 // 「相対マップ上の位置」が1枚で伝わる。卓球コミュニティの「用具を見せる/参照する」
 // 文化に乗せる狙い。flexbox のみ・Node ランタイム(Prisma利用)。
 
-export const alt = "TacTap 用具カード";
+export const alt = "ガチスペ 用具カード";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -47,7 +47,7 @@ export default async function Image({
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(135deg, #e1f5ee 0%, #fafaf7 55%, #faece7 100%)",
+          background: "linear-gradient(135deg, #fdecee 0%, #ffffff 55%, #e7f1f8 100%)",
           padding: "64px",
           fontFamily: "sans-serif",
         }}
@@ -58,11 +58,11 @@ export default async function Image({
               width: "40px",
               height: "40px",
               borderRadius: "12px",
-              background: "#0f6e56",
+              background: "#0e0e10",
             }}
           />
-          <div style={{ fontSize: "32px", fontWeight: 700, color: "#0f6e56" }}>
-            TacTap
+          <div style={{ fontSize: "32px", fontWeight: 700, color: "#0e0e10" }}>
+            ガチスペ
           </div>
           <div style={{ fontSize: "24px", color: "#5f5e5a" }}>
             用具マップ上の位置
@@ -123,7 +123,7 @@ export default async function Image({
                       width: `${Math.max(4, Math.round(p.score))}%`,
                       height: "28px",
                       borderRadius: "14px",
-                      background: "#1a8917",
+                      background: "#e5132b",
                     }}
                   />
                 </div>

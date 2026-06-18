@@ -19,7 +19,7 @@ export async function GET(request: Request) {
           flexDirection: "column",
           justifyContent: "center",
           background:
-            "linear-gradient(135deg, #e1f5ee 0%, #fafaf7 55%, #faece7 100%)",
+            "linear-gradient(135deg, #fdecee 0%, #ffffff 55%, #e7f1f8 100%)",
           padding: "72px",
           fontFamily: "sans-serif",
         }}
@@ -30,11 +30,11 @@ export async function GET(request: Request) {
               width: "40px",
               height: "40px",
               borderRadius: "12px",
-              background: "#0f6e56",
+              background: "#0e0e10",
             }}
           />
-          <div style={{ fontSize: "32px", fontWeight: 700, color: "#0f6e56" }}>
-            TacTap
+          <div style={{ fontSize: "32px", fontWeight: 700, color: "#0e0e10" }}>
+            ガチスペ
           </div>
         </div>
 
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
             marginTop: "8px",
             fontSize: "92px",
             fontWeight: 800,
-            color: "#0f6e56",
+            color: "#0e0e10",
             lineHeight: 1.05,
           }}
         >
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
             color: "#5f5e5a",
           }}
         >
-          AB比較から、あなたに合う用具を相対的に。 #TacTap
+          AB比較から、あなたに合う用具を相対的に。 #ガチスペ
         </div>
       </div>
     ),
