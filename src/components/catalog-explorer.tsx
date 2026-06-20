@@ -1276,11 +1276,21 @@ function TradeoffScatter({
                   name={e.name}
                   size={22}
                 />
-                <span className="min-w-0 flex-1 truncate font-bold">{e.name}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold">{e.name}</span>
+                  <span
+                    className={`block text-[10px] ${
+                      low ? "text-tt-deep-coral" : "text-tt-gray70"
+                    }`}
+                  >
+                    {low
+                      ? `比較${e.comparisons}件・参考程度`
+                      : `比較${e.comparisons}件`}
+                  </span>
+                </span>
                 <span className="shrink-0 font-mono text-xs">
                   <span className="text-tt-deep-green">速度+{Math.round(dx)}</span>
                   <span className="text-tt-gray70"> / 回転{dy >= 0 ? "+" : ""}{Math.round(dy)}</span>
-                  {low && <span className="text-tt-gray30"> 少</span>}
                 </span>
               </Link>
             </li>
