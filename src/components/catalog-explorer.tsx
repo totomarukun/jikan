@@ -64,7 +64,7 @@ const HARDNESS_BANDS: Array<{ label: string; min: number; max: number }> = [
 type Kind = "all" | "rubber" | "blade";
 // "popular" | "name" | "priceAsc" | "priceDesc" | "hardness" | "near" | 軸キー
 type Sort = string;
-type View = "list" | "map" | "compare";
+type View = "list" | "map" | "cost" | "compare";
 
 export function CatalogExplorer({
   items,
@@ -74,6 +74,7 @@ export function CatalogExplorer({
   initialView = "list",
   initialCat = null,
   initialMapAxis = "speed",
+  initialMapMode = "distance",
 }: {
   items: CatalogItem[];
   currentIds?: string[];
@@ -82,9 +83,14 @@ export function CatalogExplorer({
   initialView?: View;
   initialCat?: string | null;
   initialMapAxis?: string;
+  initialMapMode?: "distance" | "tradeoff";
 }) {
   const [view, setView] = useState<View>(initialView);
   const [mapAxis, setMapAxis] = useState<string>(initialMapAxis);
+  // 分布ビューの表示: 距離(1軸) or 速度×回転のトレードオフ(2軸)。
+  const [mapMode, setMapMode] = useState<"distance" | "tradeoff">(
+    initialMapMode,
+  );
   const [kind, setKind] = useState<Kind>("rubber");
   const [query, setQuery] = useState("");
   const [baseId, setBaseId] = useState<string | null>(initialBaseId);
@@ -276,11 +282,12 @@ export function CatalogExplorer({
 
       {/* ビュー切替: 一覧(表) / 分布(マップ) / くらべる (ラバーのみ) */}
       {kind !== "blade" && (
-        <div className="mt-3 grid grid-cols-3 gap-1 rounded-full bg-tt-offwhite p-1">
+        <div className="mt-3 grid grid-cols-4 gap-1 rounded-full bg-tt-offwhite p-1">
           {(
             [
               ["list", "一覧"],
               ["map", "分布"],
+              ["cost", "コスパ"],
               ["compare", "くらべる"],
             ] as const
           ).map(([v, label]) => (
@@ -373,7 +380,11 @@ export function CatalogExplorer({
 
       {/* 並べ替え + 絞り込み開閉 */}
       <div className="mt-2 flex gap-2">
-        {view === "map" ? (
+        {view === "map" && mapMode === "tradeoff" && baseId ? (
+          <div className="flex min-w-0 flex-1 items-center rounded-full border border-tt-gray30/50 bg-white px-3 py-2 text-sm text-tt-gray70">
+            速度×回転（現用基準）
+          </div>
+        ) : view === "map" || view === "cost" ? (
           <select
             value={mapAxis}
             onChange={(e) => setMapAxis(e.target.value)}
@@ -381,7 +392,7 @@ export function CatalogExplorer({
           >
             {STRIP_AXES.map((a) => (
               <option key={a.key} value={a.key}>
-                {a.label}で並べる
+                {view === "cost" ? `価格×${a.label}` : `${a.label}で並べる`}
               </option>
             ))}
           </select>
@@ -658,7 +669,47 @@ export function CatalogExplorer({
 
       {/* 分布 (マップ): 選んだ軸でラバーを相対位置に並べる。基準ラバーを強調 */}
       {view === "map" && (
-        <MapBars
+        <>
+          {/* 基準があれば 距離(1軸) / 速度×回転トレードオフ(2軸) を切替 */}
+          {baseId && (
+            <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-tt-offwhite p-1">
+              {(
+                [
+                  ["distance", "距離（1軸）"],
+                  ["tradeoff", "速度×回転"],
+                ] as const
+              ).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMapMode(m)}
+                  className={`rounded-full py-1.5 text-xs font-bold transition ${
+                    mapMode === m
+                      ? "bg-white text-tt-deep-green shadow-sm"
+                      : "text-tt-gray70"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {baseId && mapMode === "tradeoff" ? (
+            <TradeoffScatter items={filtered} baseId={baseId} />
+          ) : (
+            <MapBars
+              items={filtered}
+              axisKey={mapAxis}
+              baseId={baseId}
+              currentSet={currentSet}
+            />
+          )}
+        </>
+      )}
+
+      {/* コスパ: 価格×選んだ軸スコアの2軸散布(価格は確定値なので疎データでも団子化しない) */}
+      {view === "cost" && (
+        <CostScatter
           items={filtered}
           axisKey={mapAxis}
           baseId={baseId}
@@ -913,6 +964,348 @@ function BasePicker({
   );
 }
 
+// コスパ(価格×軸)ビュー: 横軸=価格(確定値)、縦軸=選んだ軸スコア(使った人の比較)。
+// 片軸が確定値の価格なので疎データでも団子化しない(planning-anchor)。
+// 左上(安くて強い)がコスパ良し。価格と比較データが両方ある用具のみ。
+function CostScatter({
+  items,
+  axisKey,
+  baseId,
+  currentSet,
+}: {
+  items: CatalogItem[];
+  axisKey: string;
+  baseId: string | null;
+  currentSet: Set<string>;
+}) {
+  const meta = STRIP_AXES.find((a) => a.key === axisKey);
+  const pts = items
+    .filter((e) => e.category.startsWith("RUBBER_"))
+    .map((e) => ({ e, price: e.price, score: e.scores?.[axisKey] }))
+    .filter(
+      (x): x is { e: CatalogItem; price: number; score: number } =>
+        typeof x.price === "number" && typeof x.score === "number",
+    );
+  if (pts.length < 2) {
+    return (
+      <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
+        この軸はまだ比較データが少なく、コスパの散布を出せません。
+        <br />
+        比較に答えると、価格と特徴の地図が育ちます。
+      </div>
+    );
+  }
+  const prices = pts.map((p) => p.price);
+  const pmin = Math.min(...prices);
+  const pmax = Math.max(...prices);
+  const xOf = (p: number) => (pmax === pmin ? 50 : ((p - pmin) / (pmax - pmin)) * 100);
+  // コスパ = 高スコア & 低価格。安いほど・強いほど上位。
+  const ranked = [...pts].sort(
+    (a, b) => b.score - xOf(b.price) * 0.6 - (a.score - xOf(a.price) * 0.6),
+  );
+  // 現用(基準)の価格。乗り換えは「現用より安い」が絶対条件になりがちなので、
+  // 基準価格が分かれば『現用以下』に絞ってコスパ上位を出す(高級機が先頭に来る違和感を解消)。
+  const baseItem = baseId ? items.find((e) => e.id === baseId) : null;
+  const basePrice =
+    baseItem && typeof baseItem.price === "number" ? baseItem.price : null;
+  const cheaper = basePrice !== null ? ranked.filter((p) => p.price <= basePrice) : [];
+  const budgetMode = basePrice !== null && cheaper.length >= 1;
+  const listed = budgetMode ? cheaper : ranked;
+  return (
+    <div className="mt-3 pb-20">
+      <p className="mb-2 text-[11px] leading-5 text-tt-gray70">
+        横軸=価格、縦軸={meta?.label ?? ""}。
+        <span className="font-bold text-tt-deep-green">左上＝安くて{meta?.high ?? "強い"}</span>
+        ＝コスパ良し。
+        {budgetMode && (
+          <>
+            縦線＝現用（¥{basePrice!.toLocaleString()}）。
+            <span className="font-bold text-tt-charcoal">左＝現用より安い</span>。
+          </>
+        )}
+        価格は確定値、{meta?.label ?? ""}は使った人の比較から推定（
+        <span className="text-tt-gray30">少</span>はデータ少なめ）。
+      </p>
+      {/* 散布図 */}
+      <div className="relative h-56 rounded-xl bg-tt-offwhite ring-1 ring-tt-gray30/30">
+        {/* 左上=コスパ良しの淡い強調 */}
+        <div className="pointer-events-none absolute left-0 top-0 h-1/2 w-1/2 rounded-tl-xl bg-tt-soft-green/40" />
+        {/* 現用価格の境界線(これより左=安い) */}
+        {budgetMode && (
+          <div
+            className="pointer-events-none absolute top-0 h-full w-px bg-tt-charcoal/50"
+            style={{ left: `${xOf(basePrice!)}%` }}
+          />
+        )}
+        {pts.map(({ e, price, score }) => {
+          const x = xOf(price);
+          const y = score;
+          const isBase = e.id === baseId;
+          const isCur = currentSet.has(e.id);
+          const low = e.comparisons < 3;
+          return (
+            <Link
+              key={e.id}
+              href={`/equipment/${e.id}`}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${x}%`, top: `${100 - y}%` }}
+              title={`${e.name} ¥${price.toLocaleString()} / ${meta?.label}${Math.round(score)}`}
+            >
+              <span
+                className={`block h-2.5 w-2.5 rounded-full ring-2 ring-white ${
+                  isBase
+                    ? "bg-tt-deep-green"
+                    : isCur
+                      ? "bg-tt-charcoal"
+                      : low
+                        ? "bg-tt-gray30"
+                        : "bg-tt-green"
+                }`}
+              />
+            </Link>
+          );
+        })}
+        <span className="absolute bottom-1 left-2 text-[10px] text-tt-gray70">
+          ← 安い
+        </span>
+        <span className="absolute bottom-1 right-2 text-[10px] text-tt-gray70">
+          高い →
+        </span>
+        <span className="absolute left-2 top-1 text-[10px] font-bold text-tt-deep-green">
+          {meta?.high ?? "強い"} ↑
+        </span>
+      </div>
+      {/* コスパ上位リスト(散布の名前を補う) */}
+      <p className="mt-3 text-xs font-bold">
+        {budgetMode
+          ? `現用より安いコスパ上位（安くて${meta?.high ?? "強い"}）`
+          : `コスパ上位（安くて${meta?.high ?? "強い"}）`}
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {listed.slice(0, 6).map(({ e, price, score }) => {
+          const low = e.comparisons < 3;
+          return (
+            <li key={e.id}>
+              <Link
+                href={`/equipment/${e.id}`}
+                className="flex items-center gap-2 rounded-lg bg-white p-2.5 text-sm ring-1 ring-tt-gray30/40 transition hover:bg-tt-soft-green"
+              >
+                <EquipmentVisual
+                  category={e.category}
+                  manufacturer={e.manufacturer}
+                  imageUrl={e.imageUrl}
+                  name={e.name}
+                  size={22}
+                />
+                <span className="min-w-0 flex-1 truncate font-bold">
+                  {e.name}
+                </span>
+                <span className="shrink-0 font-mono text-xs text-tt-gray70">
+                  ¥{price.toLocaleString()} ・ {meta?.label}
+                  {low ? (
+                    <span className="text-tt-gray30">少</span>
+                  ) : (
+                    Math.round(score)
+                  )}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// 速度×回転トレードオフビュー: 現用を原点に、各候補が「速さ」「回転」でどっちへ離れるかを2次元表示。
+// 対角線(標準トレードオフ=速さを得ると回転が落ちる)より右上に外れる「速くても回転を保つ」候補を濃く強調
+// (planning-anchor: 論点は2軸か否かでなく"何を原点に・何を強調するか"。価格は軸に載せない=1ビュー1問)。
+function TradeoffScatter({
+  items,
+  baseId,
+}: {
+  items: CatalogItem[];
+  baseId: string | null;
+}) {
+  // 候補リストの並び: トレードオフ(標準より回転ロスが小さい順) or 速い順(速度差)。
+  const [pickSort, setPickSort] = useState<"tradeoff" | "speed">("tradeoff");
+  const baseItem = baseId ? items.find((e) => e.id === baseId) : null;
+  const bSpeed = baseItem?.scores?.speed;
+  const bSpin = baseItem?.scores?.spin;
+  if (typeof bSpeed !== "number" || typeof bSpin !== "number") {
+    return (
+      <div className="mt-4 rounded-xl border-2 border-dashed border-tt-gray30/50 p-8 text-center text-sm leading-6 text-tt-gray70">
+        速度×回転の2軸は、基準ラバーに速度・回転の比較データが要ります。
+        <br />
+        基準を設定し、比較が増えると現用基準のトレードオフが見えます。
+      </div>
+    );
+  }
+  const rubbers = items.filter((e) => e.category.startsWith("RUBBER_"));
+  const pts = rubbers
+    .map((e) => ({ e, sp: e.scores?.speed, sn: e.scores?.spin }))
+    .filter(
+      (x): x is { e: CatalogItem; sp: number; sn: number } =>
+        typeof x.sp === "number" && typeof x.sn === "number",
+    );
+  const pending = rubbers.length - pts.length;
+  const clamp = (v: number) => Math.max(-100, Math.min(100, v));
+  const enriched = pts.map(({ e, sp, sn }) => {
+    const dx = sp - bSpeed;
+    const dy = sn - bSpin;
+    const isBase = e.id === baseId;
+    // 速くて(dx>0)かつ標準トレードオフ(対角線 dx+dy=0)を上回って回転を保つ外れ値
+    const keepsSpin = !isBase && dx > 3 && dx + dy > 3;
+    return { e, dx, dy, isBase, keepsSpin, low: e.comparisons < 3 };
+  });
+  const picks = enriched
+    .filter((p) => p.keepsSpin)
+    .sort((a, b) =>
+      pickSort === "speed"
+        ? b.dx - a.dx // 速い順(速度差)
+        : b.dx + b.dy - (a.dx + a.dy), // トレードオフ順(標準より回転ロスが小さい)
+    );
+  const baseName = baseItem?.name ?? "現用";
+  return (
+    <div className="mt-3 pb-20">
+      <p className="mb-2 text-[11px] leading-5 text-tt-gray70">
+        中央＝
+        <span className="font-bold text-tt-deep-green">「{baseName}」</span>
+        。右＝速い／上＝回転が強い。点線（標準トレードオフ）より
+        <span className="font-bold text-tt-deep-green">右上＝速くなる割に回転の落ちが小さい</span>
+        候補（緑）。
+        {pending > 0 && (
+          <>
+            （残り<span className="font-mono">{pending}</span>
+            本は速度か回転の比較が少なく置けません）
+          </>
+        )}
+      </p>
+      <div className="relative h-64 overflow-hidden rounded-xl bg-tt-offwhite ring-1 ring-tt-gray30/30">
+        <svg
+          className="absolute inset-0 h-full w-full"
+          preserveAspectRatio="none"
+          viewBox="0 0 100 100"
+        >
+          {/* 右上(速くても回転を保つ)ゾーンの淡い強調 */}
+          <polygon points="0,0 100,0 100,100" className="fill-tt-soft-green/50" />
+          {/* 軸の十字(現用=原点) */}
+          <line x1="50" y1="0" x2="50" y2="100" className="stroke-tt-gray30" strokeWidth="0.4" />
+          <line x1="0" y1="50" x2="100" y2="50" className="stroke-tt-gray30" strokeWidth="0.4" />
+          {/* 標準トレードオフの対角線 */}
+          <line x1="0" y1="0" x2="100" y2="100" className="stroke-tt-gray70" strokeWidth="0.4" strokeDasharray="2 2" />
+        </svg>
+        {enriched.map(({ e, dx, dy, isBase, keepsSpin, low }) => {
+          const x = 50 + clamp(dx) / 2;
+          const y = 50 - clamp(dy) / 2;
+          return (
+            <Link
+              key={e.id}
+              href={`/equipment/${e.id}`}
+              className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1"
+              style={{ left: `${x}%`, top: `${y}%` }}
+              title={`${e.name}（速度${dx >= 0 ? "+" : ""}${Math.round(dx)} / 回転${dy >= 0 ? "+" : ""}${Math.round(dy)}）`}
+            >
+              <span
+                className={`block rounded-full ring-2 ring-white ${
+                  isBase
+                    ? "h-3 w-3 bg-tt-deep-green"
+                    : keepsSpin
+                      ? "h-2.5 w-2.5 bg-tt-green"
+                      : low
+                        ? "h-2 w-2 bg-tt-gray30"
+                        : "h-2 w-2 bg-tt-gray70"
+                }`}
+              />
+              {(isBase || keepsSpin) && (
+                <span
+                  className={`max-w-[84px] truncate rounded px-1 text-[9px] font-bold ${
+                    isBase ? "bg-tt-deep-green text-white" : "bg-white/90 text-tt-charcoal"
+                  }`}
+                >
+                  {e.name}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+        <span className="absolute bottom-1 right-2 text-[10px] font-bold text-tt-deep-green">速い →</span>
+        <span className="absolute bottom-1 left-2 text-[10px] text-tt-gray70">← 遅い</span>
+        <span className="absolute right-2 top-1 text-[10px] font-bold text-tt-deep-green">回転 ↑</span>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-bold">
+          速くなる割に回転の落ちが小さい候補
+        </p>
+        {picks.length > 1 && (
+          <div className="flex shrink-0 rounded-full bg-tt-offwhite p-0.5 text-[10px] font-bold">
+            {(
+              [
+                ["tradeoff", "回転キープ順"],
+                ["speed", "速い順"],
+              ] as const
+            ).map(([s, label]) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setPickSort(s)}
+                className={`rounded-full px-2 py-1 transition ${
+                  pickSort === s
+                    ? "bg-white text-tt-deep-green shadow-sm"
+                    : "text-tt-gray70"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {picks.length > 0 ? (
+        <ul className="mt-2 space-y-1.5">
+          {picks.slice(0, 6).map(({ e, dx, dy, low }) => (
+            <li key={e.id}>
+              <Link
+                href={`/equipment/${e.id}`}
+                className="flex items-center gap-2 rounded-lg bg-white p-2.5 text-sm ring-1 ring-tt-gray30/40 transition hover:bg-tt-soft-green"
+              >
+                <EquipmentVisual
+                  category={e.category}
+                  manufacturer={e.manufacturer}
+                  imageUrl={e.imageUrl}
+                  name={e.name}
+                  size={22}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold">{e.name}</span>
+                  <span
+                    className={`block text-[10px] ${
+                      low ? "text-tt-deep-coral" : "text-tt-gray70"
+                    }`}
+                  >
+                    {low
+                      ? `比較${e.comparisons}件・参考程度`
+                      : `比較${e.comparisons}件`}
+                  </span>
+                </span>
+                <span className="shrink-0 font-mono text-xs">
+                  <span className="text-tt-deep-green">速度+{Math.round(dx)}</span>
+                  <span className="text-tt-gray70"> / 回転{dy >= 0 ? "+" : ""}{Math.round(dy)}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 rounded-lg bg-tt-offwhite p-3 text-xs leading-5 text-tt-gray70">
+          いまのところ「{baseName}」より速くて、標準より回転の落ちが小さい候補は
+          出ていません。比較が増えると変わります。
+        </p>
+      )}
+    </div>
+  );
+}
+
 // 分布(マップ)ビュー: 選んだ軸でラバーを相対位置(0-100)に並べる。基準は太枠で強調。
 function MapBars({
   items,
@@ -932,6 +1325,15 @@ function MapBars({
     .filter((x): x is { e: CatalogItem; v: number } => typeof x.v === "number")
     .sort((a, b) => b.v - a.v);
   const pending = rubbers.length - ranked.length;
+  // 現用基準の距離マップ: 基準ラバーにその軸のスコアがあれば、中央=基準として
+  // 「あなたの基準より速い/遅い」を距離で見せる(コア価値=自分基準で相対的に分かる)。
+  const baseItem = baseId ? items.find((e) => e.id === baseId) : null;
+  const baseScore =
+    baseItem && typeof baseItem.scores?.[axisKey] === "number"
+      ? (baseItem.scores![axisKey] as number)
+      : null;
+  const centered = baseScore !== null;
+  const baseName = baseItem?.name ?? "";
 
   if (ranked.length === 0) {
     return (
@@ -945,11 +1347,24 @@ function MapBars({
   return (
     <div className="mt-3 pb-20">
       <p className="mb-2 text-[11px] leading-5 text-tt-gray70">
-        この軸で比較データのある{" "}
-        <span className="font-mono font-bold text-tt-charcoal">
-          {ranked.length}
-        </span>
-        本を表示中
+        {centered ? (
+          <>
+            中央の
+            <span className="font-bold text-tt-deep-green">「{baseName}」</span>
+            を基準に、{meta?.label ?? ""}が
+            <span className="font-bold text-tt-deep-green">右＝強い</span> /{" "}
+            <span className="font-bold text-tt-deep-coral">左＝弱い</span>
+            。
+          </>
+        ) : (
+          <>
+            この軸で比較データのある{" "}
+            <span className="font-mono font-bold text-tt-charcoal">
+              {ranked.length}
+            </span>
+            本を表示中
+          </>
+        )}
         {pending > 0 && (
           <>
             （残り
@@ -961,8 +1376,14 @@ function MapBars({
       </p>
       {meta && (
         <div className="mb-2 flex justify-between text-[11px] text-tt-gray70">
-          <span>← {meta.low}</span>
-          <span className="font-bold text-tt-deep-green">{meta.high} →</span>
+          <span>
+            ← {centered ? `${baseName}より` : ""}
+            {meta.low}
+          </span>
+          <span className="font-bold text-tt-deep-green">
+            {centered ? `${baseName}より` : ""}
+            {meta.high} →
+          </span>
         </div>
       )}
       <ul className="space-y-2">
@@ -971,6 +1392,11 @@ function MapBars({
           const isBase = e.id === baseId;
           const isCur = currentSet.has(e.id);
           const low = e.comparisons < 3;
+          // 距離マップ: 基準との差(delta)。中央50%を基準に左右へ。
+          const delta = centered ? Math.round(v - baseScore!) : 0;
+          const pos = centered
+            ? 50 + Math.max(-100, Math.min(100, v - baseScore!)) / 2
+            : 0;
           return (
             <li key={e.id}>
               <Link
@@ -1002,26 +1428,57 @@ function MapBars({
                       )
                     )}
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-tt-gray70">
+                  <span className="shrink-0 font-mono text-xs">
                     {low ? (
                       <span className="text-tt-gray30" title="データ少なめ">
                         少
                       </span>
+                    ) : centered ? (
+                      <span
+                        className={
+                          delta > 0
+                            ? "text-tt-deep-green"
+                            : delta < 0
+                              ? "text-tt-deep-coral"
+                              : "text-tt-gray70"
+                        }
+                      >
+                        {isBase ? "基準" : delta > 0 ? `+${delta}` : delta}
+                      </span>
                     ) : (
-                      pct
+                      <span className="text-tt-gray70">{pct}</span>
                     )}
                   </span>
                 </div>
-                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-tt-gray30/30">
-                  <div
-                    className={`h-2 rounded-full ${
-                      low
-                        ? "bg-tt-gray30"
-                        : "bg-tt-green"
-                    }`}
-                    style={{ width: `${Math.max(4, pct)}%` }}
-                  />
-                </div>
+                {centered ? (
+                  // 中央=基準。基準より右(緑)=強い / 左(コーラル)=弱い。
+                  <div className="relative mt-1.5 h-2 rounded-full bg-tt-gray30/30">
+                    <div className="absolute left-1/2 top-[-2px] h-3 w-px -translate-x-1/2 bg-tt-gray30" />
+                    {!low && delta !== 0 && (
+                      <div
+                        className={`absolute top-0 h-2 rounded-full ${
+                          delta > 0 ? "bg-tt-green" : "bg-tt-coral"
+                        }`}
+                        style={{
+                          left: delta > 0 ? "50%" : `${pos}%`,
+                          width: `${Math.abs(v - baseScore!) / 2}%`,
+                        }}
+                      />
+                    )}
+                    {isBase && (
+                      <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-tt-deep-green" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-tt-gray30/30">
+                    <div
+                      className={`h-2 rounded-full ${
+                        low ? "bg-tt-gray30" : "bg-tt-green"
+                      }`}
+                      style={{ width: `${Math.max(4, pct)}%` }}
+                    />
+                  </div>
+                )}
               </Link>
             </li>
           );

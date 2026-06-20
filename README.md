@@ -16,7 +16,7 @@
 | F4 | 回答進捗・アンロック報酬（5 / 10 / 20 / 30問） | `/unlock/[milestone]` |
 | F5 | ユーザー登録・匿名→登録のデータ引き継ぎ | `/signup` `/login` |
 | F6 | 用具対決ビュー（フィルタ付き集計） | `/compare/[aId]/vs/[bId]` |
-| F7 | 用具マスタ（実在の人気129製品をシード済み） | `prisma/seed.ts` |
+| F7 | 用具マスタ（実在の人気356製品をシード済み） | `prisma/seed.ts` |
 | F8 | マイページ | `/me` |
 | — | スタイル診断（30問達成）+ 似た人の支持用具 | `/diagnosis` |
 | — | 乗り換え検討ハブ（現用ラバー基準の候補比較） | `/switch` |
@@ -38,7 +38,7 @@ pnpm install
 cp .env.example .env        # DATABASE_URL="file:./dev.db" のままでOK
 pnpm prisma generate
 pnpm db:push                # スキーマをDBへ反映
-pnpm db:seed                # 用具マスタ129製品を投入
+pnpm db:seed                # 用具マスタ356製品を投入
 pnpm dev                    # http://localhost:3000
 ```
 
@@ -82,7 +82,11 @@ next build までを自動実行**する。手作業は以下の3ステップの
 ### 3. スマホで開く
 
 発行された `https://<project>.vercel.app` をスマホで開けば完了。
-ビルド時に用具マスタ129製品が自動投入される（シードは upsert なので再デプロイしても重複しない）。
+ビルド時に用具マスタ356製品が自動投入される（シードは upsert なので再デプロイしても重複しない）。
+
+デプロイ後は **[`docs/smoke-test.md`](docs/smoke-test.md)（O1: 本番スモークテスト）**
+で動作を確認する。コア機能とデータ正直さの不変条件（種類分離・n<3の非断定・
+/switch と /compare の母集団一致 等）を約10分で上から順にチェックする。
 
 > 補足: Neon 等の他のPostgreSQLでも動く。プーラーを使わない場合は
 > `DIRECT_URL` に `DATABASE_URL` と同じ値を設定すればよい。
@@ -109,7 +113,7 @@ Connect すると、接続情報 (`POSTGRES_PRISMA_URL` /
 ```
 prisma/
   schema.prisma          # データモデル（User / Equipment / Comparison / SessionProgress）
-  seed.ts                # 用具マスタ129製品
+  seed.ts                # 用具マスタ356製品
 src/
   app/                   # 画面（M1〜M6, L1, L2, C1）+ API Route Handlers
   components/            # ロゴ、ABカード等のUI

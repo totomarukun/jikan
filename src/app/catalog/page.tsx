@@ -14,7 +14,9 @@ export default async function CatalogPage({
 }) {
   const sp = await searchParams;
   const initialView =
-    sp.view === "map" || sp.view === "compare" ? sp.view : "list";
+    sp.view === "map" || sp.view === "compare" || sp.view === "cost"
+      ? sp.view
+      : "list";
   const sessionId = await getSessionId();
   const [rows, scores, gearItems] = await Promise.all([
     prisma.equipment.findMany({
@@ -93,6 +95,8 @@ export default async function CatalogPage({
     typeof sp.axis === "string" && MAP_AXES.includes(sp.axis)
       ? sp.axis
       : "speed";
+  // 分布ビューの表示モード(?mode=tradeoff で速度×回転をディープリンク可能に)
+  const initialMapMode = sp.mode === "tradeoff" ? "tradeoff" : "distance";
   // 基準ラバー: 明示の ?base= が最優先。次に種類指定(?category=)があるときは
   // 現用ラバーの自動基準を当てない (種類フィルタと別グループの自動基準が衝突して
   // 空リストになるのを避ける)。どちらも無ければ現用を自動基準にする。
@@ -114,6 +118,7 @@ export default async function CatalogPage({
           initialView={initialView}
           initialCat={initialCat}
           initialMapAxis={initialMapAxis}
+          initialMapMode={initialMapMode}
         />
       </div>
     </div>
