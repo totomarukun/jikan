@@ -1,6 +1,7 @@
 "use client";
 
-import { BLADE } from "@/lib/racket";
+import { BLADE, type RacketPose } from "@/lib/racket";
+import type { ReceiveResult } from "@/lib/receive";
 import { BALL, TABLE, positionAt, swingDirection, type SimResult } from "@/lib/serve-sim";
 import { add, cross, dot, norm, scale, sub, unit, type Vec3 } from "@/lib/vec3";
 
@@ -55,11 +56,14 @@ function ring(center: Vec3, radius: number, a: Vec3, b: Vec3, steps = 24): Vec3[
 export function ServeViewport({
   result,
   ghost,
+  receive,
   time,
   camera,
 }: {
   result: SimResult;
   ghost: SimResult | null;
+  /** 相手のレシーブ（打球点・ラケット・返球） */
+  receive: ReceiveResult | null;
   time: number;
   camera: CameraId;
 }) {
@@ -83,8 +87,9 @@ export function ServeViewport({
       })
       .join(" ");
 
-  // ボール（時刻に応じた位置）と台面上の影
-  const ballPos = positionAt(result.points, time);
+  // ボール（時刻に応じた位置）と台面上の影。レシーブ後は返球の軌跡をたどる
+  const servePoints = receive ? result.points.filter((pt) => pt.t <= receive.hitTime) : result.points;
+  const ballPos = receive && time > receive.hitTime ? positionAt(receive.points, time) : positionAt(servePoints, time);
   const [bx, by, bz] = project(ballPos);
   const ballR = Math.max(3, (cam.focal * BALL.radius) / bz);
   const shadowOnTable =
@@ -99,13 +104,6 @@ export function ServeViewport({
   const tauMax = Math.min(0.08, 0.8 / w);
   const tau = Math.min(tauMax, Math.max(tauMin, time - result.contactTime));
   const pose = kin.poseAt(tau);
-  const blade = ring(pose.center, 1, scale(pose.side, BLADE.halfWidth), scale(pose.handle, BLADE.halfLength), 32);
-  const handleStart = add(pose.center, scale(pose.handle, BLADE.halfLength * 0.92));
-  const handleEnd = add(pose.center, scale(pose.handle, BLADE.halfLength + BLADE.handleLength));
-  const hw2 = scale(pose.side, 0.0125);
-  const handlePoly = [add(handleStart, hw2), add(handleEnd, hw2), sub(handleEnd, hw2), sub(handleStart, hw2)];
-  // カメラ側を向いている面の色: 打つ面（赤ラバー）か裏面（黒ラバー）か
-  const facingCamera = dot(pose.normal, sub(cam.pos, pose.center)) > 0;
   // スイング軌道（ブレード中心の通り道）
   const trail = Array.from({ length: 41 }, (_, i) => kin.poseAt(tauMin + ((tauMax - tauMin) * i) / 40).center);
   const swing = swingDirection(result.params);
@@ -164,9 +162,15 @@ export function ServeViewport({
         strokeWidth={1.5}
       />
 
-      {/* トス（打点まで）と打球後の軌道 */}
+      {/* トス（打点まで）と打球後の軌道。レシーブがあれば打球点まで */}
       <path d={pathD(result.points, 0, result.contactTime)} stroke="#8fd3ff" strokeWidth={1.5} strokeDasharray="2 4" fill="none" />
-      <path d={pathD(result.points, result.contactTime)} stroke="#ffd166" strokeWidth={2.5} strokeDasharray="7 5" fill="none" />
+      <path d={pathD(servePoints, result.contactTime)} stroke="#ffd166" strokeWidth={2.5} strokeDasharray="7 5" fill="none" />
+      {receive && (
+        <>
+          <path d={pathD(receive.points, receive.hitTime)} stroke="#7cd4ff" strokeWidth={2.5} strokeDasharray="7 5" fill="none" />
+          <RacketShape pose={receive.poseAt(Math.max(-0.06, Math.min(0.05, time - receive.hitTime)))} project={project} camPos={cam.pos} tone="receiver" />
+        </>
+      )}
 
       {bounceMarks.map((e, i) => {
         const [x, y] = project(e.p);
@@ -186,15 +190,7 @@ export function ServeViewport({
 
       {/* スイング軌道・ラケット（柄＋ブレード）・打球の瞬間のスイング方向 */}
       <polyline points={poly(project, trail)} fill="none" stroke="#ffd166" strokeOpacity={0.45} strokeWidth={2} />
-      <g>
-        <polygon points={poly(project, handlePoly)} fill="#c9a36b" stroke="#6b5230" strokeWidth={1} />
-        <polygon
-          points={poly(project, blade)}
-          fill={facingCamera ? "var(--color-gs-red)" : "#1f1f24"}
-          stroke={facingCamera ? "#ff8a95" : "#6a6a72"}
-          strokeWidth={1.5}
-        />
-      </g>
+      <RacketShape pose={pose} project={project} camPos={cam.pos} tone="server" />
       {Math.abs(tau) < 0.01 && (
         <line x1={s0x} y1={s0y} x2={s1x} y2={s1y} stroke="#ffd166" strokeWidth={2} markerEnd="url(#arrow)" />
       )}
@@ -202,5 +198,38 @@ export function ServeViewport({
       {/* ボール */}
       <circle cx={bx} cy={by} r={ballR} fill="#fff" stroke="#f3a712" strokeWidth={1} />
     </svg>
+  );
+}
+
+/** ラケット（柄＋ブレード）。カメラ側を向いている面の色で、打つ面（赤）か裏面（黒）かが分かる。 */
+function RacketShape({
+  pose,
+  project,
+  camPos,
+  tone,
+}: {
+  pose: RacketPose;
+  project: (p: Vec3) => [number, number, number];
+  camPos: Vec3;
+  tone: "server" | "receiver";
+}) {
+  const blade = ring(pose.center, 1, scale(pose.side, BLADE.halfWidth), scale(pose.handle, BLADE.halfLength), 32);
+  const handleStart = add(pose.center, scale(pose.handle, BLADE.halfLength * 0.92));
+  const handleEnd = add(pose.center, scale(pose.handle, BLADE.halfLength + BLADE.handleLength));
+  const hw = scale(pose.side, 0.0125);
+  const handlePoly = [add(handleStart, hw), add(handleEnd, hw), sub(handleEnd, hw), sub(handleStart, hw)];
+  const facingCamera = dot(pose.normal, sub(camPos, pose.center)) > 0;
+  const face = tone === "server" ? "var(--color-gs-red)" : "#e0e4ea";
+  const faceStroke = tone === "server" ? "#ff8a95" : "#9aa4b1";
+  return (
+    <g>
+      <polygon points={poly(project, handlePoly)} fill="#c9a36b" stroke="#6b5230" strokeWidth={1} />
+      <polygon
+        points={poly(project, blade)}
+        fill={facingCamera ? face : "#1f1f24"}
+        stroke={facingCamera ? faceStroke : "#6a6a72"}
+        strokeWidth={1.5}
+      />
+    </g>
   );
 }

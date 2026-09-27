@@ -39,6 +39,22 @@ export const BALL_MASS = 0.0027;
 const INERTIA = (2 / 3) * BALL_MASS * BALL_RADIUS ** 2;
 const G = v(0, 0, -9.81);
 
+/** 手首のスナップの持続時間の目安 (秒)。打球の前後これくらいの間だけ速く動く【推定】。 */
+export const SNAP_BURST_S = 0.012;
+
+/** 前腕のひねり込みの持続時間の目安 (秒)。打球の前後これくらいの間だけ面が回る【推定】。 */
+export const ROLL_BURST_S = 0.02;
+
+/** 誤差関数（Abramowitz & Stegun 7.1.26, 誤差 1.5e-7 以下）。 */
+function erf(x: number) {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * ax);
+  const y =
+    1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-ax * ax);
+  return sign * y;
+}
+
 /** ブレードの大きさ（一般的なシェークハンド: 幅約150mm × 高さ約157mm）。 */
 export const BLADE = { halfWidth: 0.075, halfLength: 0.079, handleLength: 0.1 } as const;
 
@@ -67,6 +83,13 @@ export type RacketMotionParams = {
   hitAlong: number;
   /** 打球位置: ブレード中心から横方向へ (m) */
   hitAcross: number;
+  /**
+   * 手首のスナップ（打球の瞬間だけの速い動き）: 面に沿ってこする方向の速さ (m/s)。
+   * + = スイング方向にさらにこする。腕の動き（見える部分）は変えない。
+   */
+  snapBrush?: number;
+  /** 手首のスナップ: ボールを押す方向（面の向き）の速さ (m/s)。+ = 押し込む、− = 引く */
+  snapPush?: number;
 };
 
 export type RubberContactProps = {
@@ -148,22 +171,42 @@ export function buildRacketKinematics(p: RacketMotionParams, hitPoint: Vec3): Ra
   const pivotVel = scale(h, along);
   const vPerp = sub(vCenter, pivotVel);
   const omegaArc = scale(cross(vPerp, h), 1 / rho);
-  const omega = add(omegaArc, scale(h, rad(p.forearmRoll)));
-  const wMag = norm(omega);
-  const axis = wMag > 1e-9 ? scale(omega, 1 / wMag) : v(0, 0, 1);
+  const rollRate = rad(p.forearmRoll);
+  // 打球の瞬間の角速度（接触の1msの間はこれでほぼ一定）
+  const omega = add(omegaArc, scale(h, rollRate));
+  const wArc = norm(omegaArc);
+  const arcAxis = wArc > 1e-9 ? scale(omegaArc, 1 / wArc) : v(0, 0, 1);
+  // 前腕のひねりは打球の前後だけの短い「ひねり込み」（幅 ROLL_BURST_S のベル型）。
+  // 腕の弧は打球の前後で続く。
+  const rollAngle = (tau: number) => rollRate * ROLL_BURST_S * (Math.sqrt(Math.PI) / 2) * erf(tau / ROLL_BURST_S);
+  const rollRateAt = (tau: number) => rollRate * Math.exp(-((tau / ROLL_BURST_S) ** 2));
+
+  // 手首のスナップ: 打球の前後 SNAP_BURST_S 程度だけ、ラケット全体に速度を足す（ベル型）
+  const brushDir = (() => {
+    const along = sub(vCenter, scale(n, dot(vCenter, n)));
+    return norm(along) > 1e-6 ? unit(along) : s;
+  })();
+  const snapVel = add(scale(brushDir, p.snapBrush ?? 0), scale(n, p.snapPush ?? 0));
+  const snapShift = (tau: number) => scale(snapVel, SNAP_BURST_S * (Math.sqrt(Math.PI) / 2) * erf(tau / SNAP_BURST_S));
+  const snapVelAt = (tau: number) => scale(snapVel, Math.exp(-((tau / SNAP_BURST_S) ** 2)));
 
   const poseAt = (tau: number): RacketPose => {
-    const pivot = add(pivot0, scale(pivotVel, tau));
-    const ang = wMag * tau;
+    const pivot = add(add(pivot0, scale(pivotVel, tau)), snapShift(tau));
+    const roll = rollAngle(tau);
+    const ang = wArc * tau;
+    const turn = (a: Vec3) => rotate(rotate(a, h, roll), arcAxis, ang);
     return {
-      center: add(pivot, rotate(sub(center, pivot0), axis, ang)),
-      normal: rotate(n, axis, ang),
-      handle: rotate(h, axis, ang),
-      side: rotate(s, axis, ang),
+      center: add(pivot, turn(sub(center, pivot0))),
+      normal: turn(n),
+      handle: turn(h),
+      side: turn(s),
     };
   };
   const pointVelocity = (pt: Vec3, tau: number) =>
-    add(pivotVel, cross(omega, sub(pt, add(pivot0, scale(pivotVel, tau)))));
+    add(
+      add(pivotVel, snapVelAt(tau)),
+      cross(add(omegaArc, scale(h, rollRateAt(tau))), sub(pt, add(add(pivot0, scale(pivotVel, tau)), snapShift(tau)))),
+    );
 
   return { pose0, pivot0, pivotVel, omega, poseAt, pointVelocity };
 }
@@ -210,13 +253,15 @@ export type ContactResult = {
 
 /**
  * ボールとラバーの接触を時間分解して計算する。
- * ballPos0 は接触開始時のボール中心（面に触れた位置）、ballVel0 は入射速度。
+ * ballPos0 は接触開始時のボール中心（面に触れた位置）、ballVel0 は入射速度、
+ * ballOmega0 は入射時の回転（レシーブでは相手のサーブの回転が乗っている）。
  */
 export function simulateRacketContact(
   kin: RacketKinematics,
   rubber: RubberContactProps,
   ballPos0: Vec3,
   ballVel0: Vec3,
+  ballOmega0: Vec3 = v(0, 0, 0),
   dt = 1e-6,
 ): ContactResult {
   const hitPoint = sub(ballPos0, scale(kin.pose0.normal, BALL_RADIUS));
@@ -225,7 +270,7 @@ export function simulateRacketContact(
   const empty: ContactResult = {
     hit: false,
     vel: ballVel0,
-    omega: v(0, 0, 0),
+    omega: ballOmega0,
     exitPos: ballPos0,
     duration: 0,
     travelOnRubber: 0,
@@ -251,7 +296,7 @@ export function simulateRacketContact(
 
   let pos = ballPos0;
   let vel = ballVel0;
-  let omega = v(0, 0, 0);
+  let omega = ballOmega0;
   let spring = v(0, 0, 0); // ラバー表面の横たわみ
   let t = 0;
   let slipTime = 0;

@@ -6,7 +6,7 @@ import {
   simulateRacketContact,
   type RacketMotionParams,
 } from "../racket";
-import { DEFAULT_PARAMS, RUBBERS, simulateServe } from "../serve-sim";
+import { DEFAULT_PARAMS, RUBBER, simulateServe } from "../serve-sim";
 import { add, scale, v } from "../vec3";
 
 const still: RacketMotionParams = {
@@ -23,11 +23,19 @@ const still: RacketMotionParams = {
 };
 
 /** 止まったラケット（面は +x 向き）に、ボールを真正面からぶつける。 */
-function dropOnStillRacket(speed: number, rubber = RUBBERS.tension) {
+function dropOnStillRacket(speed: number, rubber = RUBBER) {
   const hit = v(0, 0, 0.2);
   const kin = buildRacketKinematics(still, hit);
   const ball0 = add(hit, scale(kin.pose0.normal, BALL_RADIUS));
   return simulateRacketContact(kin, rubber, ball0, v(-speed, 0, 0));
+}
+
+/** 止まったラケットに、面に沿う速さ tangential・押し込む速さ 1m/s でボールを当てる。 */
+function obliqueOnStillRacket(tangential: number, rubber = RUBBER) {
+  const hit = v(0, 0, 0.2);
+  const kin = buildRacketKinematics(still, hit);
+  const ball0 = add(hit, scale(kin.pose0.normal, BALL_RADIUS));
+  return simulateRacketContact(kin, rubber, ball0, v(-1, 0, tangential));
 }
 
 describe("ボールとラバーの接触（時間分解）", () => {
@@ -41,7 +49,7 @@ describe("ボールとラバーの接触（時間分解）", () => {
     for (const speed of [3, 8, 12]) {
       const r = dropOnStillRacket(speed);
       const e = r.vel.x / speed;
-      expect(e).toBeCloseTo(racketRestitution(RUBBERS.tension.restitution, speed), 1);
+      expect(e).toBeCloseTo(racketRestitution(RUBBER.restitution, speed), 1);
     }
   });
 
@@ -63,9 +71,9 @@ describe("ボールとラバーの接触（時間分解）", () => {
     expect(r.contact.impact!.overspinRatio).toBeGreaterThan(1);
   });
 
-  it("摩擦の小さい粒高は接触中ほとんど滑っている", () => {
-    const r = simulateServe({ ...DEFAULT_PARAMS, rubber: "longPips" });
-    expect(r.contact.impact!.slipFraction).toBeGreaterThan(0.8);
+  it("摩擦が小さいと接触中ほとんど滑る", () => {
+    const r = obliqueOnStillRacket(6, { ...RUBBER, friction: 0.25 });
+    expect(r.slipFraction).toBeGreaterThan(0.8);
   });
 });
 
@@ -85,11 +93,11 @@ describe("ラケットの動き", () => {
   });
 
   it("滑っている間は、こする速さを上げても回転は摩擦×押す力で頭打ち", () => {
-    const base = { ...DEFAULT_PARAMS, rubber: "longPips" as const, faceTilt: 88, swingPitch: 0 };
-    const slow = simulateServe({ ...base, swingSpeed: 6 });
-    const fast = simulateServe({ ...base, swingSpeed: 9 });
-    expect(slow.contact.impact!.slipFraction).toBeGreaterThan(0.9);
-    expect(fast.contact.spin.total / slow.contact.spin.total).toBeLessThan(9 / 6);
+    const slippery = { ...RUBBER, friction: 0.25 };
+    const slow = obliqueOnStillRacket(6, slippery);
+    const fast = obliqueOnStillRacket(9, slippery);
+    const rps = (o: { x: number; y: number; z: number }) => Math.hypot(o.x, o.y, o.z) / (2 * Math.PI);
+    expect(rps(fast.omega) / rps(slow.omega)).toBeLessThan(1.2);
   });
 
   it("ブレード中心の速さは、回転半径を変えてもスイングの速さのまま", () => {

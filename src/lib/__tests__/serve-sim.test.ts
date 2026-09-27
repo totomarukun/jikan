@@ -36,13 +36,6 @@ describe("simulateServe", () => {
     expect(fast.contact.spin.total).toBeGreaterThan(slow.contact.spin.total);
   });
 
-  it("摩擦の小さいラバーは回転がかかりにくい", () => {
-    const tension = simulateServe({ ...DEFAULT_PARAMS, rubber: "tension" });
-    const pips = simulateServe({ ...DEFAULT_PARAMS, rubber: "longPips" });
-    expect(pips.contact.spin.total).toBeLessThan(tension.contact.spin.total);
-    expect(pips.contact.slipped).toBe(true);
-  });
-
   it("横回転の向きに合わせて飛行中に進路が曲がる", () => {
     // 空気抵抗は進行方向に沿うので、水平面での向きを変えるのは横回転（マグヌス力）だけ
     const heading = (r: ReturnType<typeof simulateServe>) => {

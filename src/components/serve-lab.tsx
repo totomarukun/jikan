@@ -1,19 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DisguisePanel } from "@/components/serve-disguise";
+import { InversePanel } from "@/components/serve-inverse";
+import { ReceivePanel } from "@/components/serve-receive";
 import { CAMERAS, ServeViewport, type CameraId } from "@/components/serve-viewport";
+import { readSpin, receiveState, simulateReceive, type ReceiveTiming, type SpinRead, type Technique } from "@/lib/receive";
+import type { DisguiseResult } from "@/lib/serve-search";
 import {
   DEFAULT_PARAMS,
   MODEL_SOURCES,
   PRESETS,
   PRO_SERVE_SPIN,
-  RUBBERS,
   faceNormal,
   serveInsights,
   simulateServe,
   swingDirection,
-  type RubberType,
   type ServeParams,
   type SimResult,
   type SpinBreakdown,
@@ -23,8 +26,17 @@ import { norm } from "@/lib/vec3";
 
 const SPEEDS = [0.1, 0.25, 0.5, 1] as const;
 
+type Tab = "serve" | "receive" | "inverse" | "disguise";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "serve", label: "サーブ" },
+  { id: "receive", label: "相手の打球点・レシーブ" },
+  { id: "inverse", label: "逆算" },
+  { id: "disguise", label: "フォーム研究" },
+];
+
 type SliderDef = {
-  key: Exclude<keyof ServeParams, "rubber">;
+  key: keyof ServeParams;
   label: string;
   min: number;
   max: number;
@@ -60,6 +72,13 @@ const GROUPS: { title: string; sliders: SliderDef[] }[] = [
     ],
   },
   {
+    title: "手首のスナップ（打球の瞬間だけ）",
+    sliders: [
+      { key: "snapBrush", label: "こする", min: -4, max: 4, step: 0.1, unit: "m/s", hint: "打球の前後 約12ms だけ面に沿って速く動かす。＋でスイング方向にさらにこする。腕の動き（見える部分）は変わらない" },
+      { key: "snapPush", label: "押す", min: -2, max: 3, step: 0.1, unit: "m/s", hint: "打球の瞬間だけボールを押し込む（＋）/ 引く（−）。押すほど回転より速さになる" },
+    ],
+  },
+  {
     title: "ラケットのどこに当てるか",
     sliders: [
       { key: "hitAlong", label: "先端 ⇔ 根元", min: -0.06, max: 0.07, step: 0.005, unit: "mm", display: 1000, hint: "ブレード中心から先端方向へ。先端ほど速く動いている" },
@@ -87,9 +106,36 @@ export function ServeLab() {
   const [time, setTime] = useState(0);
   const [activePreset, setActivePreset] = useState<string | null>(PRESETS[0].id);
 
-  const result = useMemo(() => simulateServe(params), [params]);
+  const [tab, setTab] = useState<Tab>("serve");
+  const [timing, setTiming] = useState<ReceiveTiming>("apex");
+  const [technique, setTechnique] = useState<Technique>("push");
+  const [read, setRead] = useState<SpinRead>("actual");
+  // フォーム研究の B は、どのサーブ（A）に対して探したかと一緒に持つ。A を変えたら自動で無効になる
+  const [found, setFound] = useState<{ base: ServeParams; d: DisguiseResult } | null>(null);
+  const [showingRaw, setShowing] = useState<"A" | "B">("A");
+  const variant = found && found.base === params ? found.d : null;
+  const showing = variant ? showingRaw : "A";
+
+  const baseResult = useMemo(() => simulateServe(params), [params]);
+  // フォーム研究で B を表示しているときは B を主役に、A を比較用（灰色）にする
+  const result = variant && showing === "B" ? variant.result : baseResult;
+  const compare = variant && showing === "B" ? baseResult : ghost;
   const insights = useMemo(() => serveInsights(result), [result]);
-  const endTime = result.points[result.points.length - 1]?.t ?? 1;
+
+  // 相手のレシーブ（サーブの計算より重いので、入力中は少し遅れて追いかける）
+  const deferred = useDeferredValue({ result, timing, technique, read, tab });
+  const receiveBall = useMemo(() => receiveState(deferred.result.receiverSide, deferred.timing), [deferred.result, deferred.timing]);
+  const receive = useMemo(() => {
+    if (!receiveBall || deferred.tab === "serve" || deferred.tab === "inverse") return null;
+    const readOmega = readSpin(receiveBall.omega, receiveBall.vel, deferred.read);
+    return simulateReceive(receiveBall, deferred.technique, readOmega);
+  }, [receiveBall, deferred.technique, deferred.read, deferred.tab]);
+  const shownReceive = receive && deferred.result === result ? receive : null;
+
+  const serveEnd = result.points[result.points.length - 1]?.t ?? 1;
+  const endTime = shownReceive ? Math.max(serveEnd, shownReceive.points[shownReceive.points.length - 1].t) : serveEnd;
+
+
 
   // 再生ループ（requestAnimationFrame で時刻を進める）
   const raf = useRef<number | null>(null);
@@ -181,7 +227,7 @@ export function ServeLab() {
             ))}
           </div>
         </div>
-        <ServeViewport result={result} ghost={ghost} time={time} camera={camera} />
+        <ServeViewport result={result} ghost={compare} receive={shownReceive} time={time} camera={camera} />
 
         {/* 再生コントロール */}
         <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-3 py-2 text-white">
@@ -230,6 +276,78 @@ export function ServeLab() {
         </div>
       </div>
 
+      <div role="tablist" aria-label="研究の切り替え" className="-mb-2 flex gap-1 overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            type="button"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-bold transition ${
+              tab === t.id ? "bg-tt-charcoal text-white" : "bg-white text-tt-charcoal ring-1 ring-tt-gray30/60 hover:bg-tt-offwhite"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "receive" && (
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <ReceivePanel
+            result={result}
+            state={receiveBall && deferred.result === result ? receiveBall : receiveState(result.receiverSide, timing)}
+            timing={timing}
+            onTiming={setTiming}
+            technique={technique}
+            onTechnique={setTechnique}
+            read={read}
+            onRead={setRead}
+            receive={shownReceive}
+          />
+        </section>
+      )}
+      {tab === "inverse" && (
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <InversePanel
+            params={params}
+            timing={timing}
+            onApply={(p) => {
+              setParams(p);
+              setActivePreset(null);
+              setTime(0);
+              setPlaying(true);
+            }}
+          />
+        </section>
+      )}
+      {tab === "disguise" && (
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
+          <p className="mb-3 text-xs text-tt-gray70">
+            相手が打つタイミング: {timing === "apex" ? "頂点" : timing === "rising" ? "早め（上昇中）" : "遅め（落ち際）"}
+            （「相手の打球点・レシーブ」で変えられます）
+          </p>
+          <DisguisePanel
+            params={params}
+            timing={timing}
+            variant={variant}
+            onVariant={(d) => {
+              setFound(d ? { base: params, d } : null);
+              if (d) setShowing("B");
+            }}
+            showing={showing}
+            onShowing={setShowing}
+            onAdopt={(p) => {
+              setParams(p);
+              setActivePreset(null);
+            }}
+          />
+        </section>
+      )}
+
+      {tab === "serve" && (
+      <>
       {/* 判定と数値 */}
       <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -306,35 +424,12 @@ export function ServeLab() {
               <legend className="px-1 text-sm font-bold">{g.title}</legend>
               <div className="space-y-3">
                 {g.sliders.map((s) => (
-                  <Slider key={s.key} def={s} value={params[s.key]} onChange={(val) => update({ [s.key]: val })} />
+                  <Slider key={s.key} def={s} value={(params[s.key] as number | undefined) ?? 0} onChange={(val) => update({ [s.key]: val })} />
                 ))}
               </div>
             </fieldset>
           ))}
-          <fieldset className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-            <legend className="px-1 text-sm font-bold">ラバー（面の性質）</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {(Object.keys(RUBBERS) as RubberType[]).map((k) => (
-                <label
-                  key={k}
-                  className={`flex min-h-11 cursor-pointer flex-col justify-center rounded-lg px-3 py-2 text-sm ring-1 ${
-                    params.rubber === k ? "bg-tt-soft-coral ring-tt-coral" : "ring-tt-gray30/60 hover:bg-tt-offwhite"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 font-bold">
-                    <input
-                      type="radio"
-                      name="rubber"
-                      checked={params.rubber === k}
-                      onChange={() => update({ rubber: k })}
-                    />
-                    {RUBBERS[k].label}
-                  </span>
-                  <span className="ml-6 text-xs text-tt-gray70">{RUBBERS[k].note}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+
         </div>
 
         <div className="space-y-4">
@@ -342,6 +437,9 @@ export function ServeLab() {
           <BladeHitPicker params={params} onChange={(hitAlong, hitAcross) => update({ hitAlong, hitAcross })} />
         </div>
       </section>
+
+      </>
+      )}
 
       <ModelBasis />
     </div>
