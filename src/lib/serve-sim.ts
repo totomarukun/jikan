@@ -5,9 +5,13 @@
 //   y = 左右。+ = サーバーから見て左
 //   z = 高さ。0 = 台の上面
 //
-// モデルはあえて単純化している（打球は一瞬の衝突、ラバーは「反発係数」と
-// 「摩擦係数」の2値で表す）。定量値は傾向を見るための目安であり、実測値ではない。
-
+// 物理モデルの出典（MODEL_SOURCES にも同じ内容を持ち、画面に表示する）:
+//   - 飛行・台バウンド: Dürr et al., "Outplaying elite table tennis players with an
+//     autonomous robot", Nature 652 (2026) の Methods（トップ選手と対戦したロボット Ace の
+//     学習用シミュレーター）。空気抵抗 c_d=0.55、速度/回転比に依存するマグヌス係数、
+//     台の反発 ε=0.98−0.02·v_z、摩擦 μ=0.25、滑り/転がりの切り替え。
+//   - ラケット: Ace と同じ撃力モデルの形。ただし論文はラバーの係数を公開していないため、
+//     反発の速度依存（衝突速度 1m/s あたり約 0.019 低下, ISJOS v15）以外は推定値。
 export const TABLE = {
   length: 2.74,
   width: 1.525,
@@ -24,20 +28,37 @@ export const BALL = {
 } as const;
 
 const G = 9.81;
-const AIR_DENSITY = 1.2;
-const DRAG_COEF = 0.5;
-const MAGNUS_COEF = 1.0;
-// ITTF: 30cm から落として約23cm 弾む → e ≈ √(23/30)
-const TABLE_RESTITUTION = 0.88;
+// Ace: 室温・標準気圧の乾燥空気
+const AIR_DENSITY = 1.204;
+// Ace: 抗力係数
+const DRAG_COEF = 0.55;
+// Ace: c_M = 0.1·|v|/(r|ω|) − 0.001
+const MAGNUS_A = 0.1;
+const MAGNUS_B = 0.001;
+// Ace の式は回転が小さい領域でも一定の揚力を出す（トップ選手のラリーで同定した式のため）。
+// ナックル付近では揚力が回転比 S=rω/v に比例して 0 に近づくよう、低回転側だけ
+// 揚力係数 C_L ≈ 1.5·S（野球ボールの低回転域の近似, Sawicki et al. 2003）でつなぐ【推定】。
+const LOW_SPIN_LIFT_SLOPE = 1.5;
+// Ace: 台の動摩擦係数
 const TABLE_FRICTION = 0.25;
 // ITTF: トスは手のひらから 16cm 以上
 export const MIN_TOSS = 0.16;
 
 const AREA = Math.PI * BALL.radius ** 2;
 const K_DRAG = (0.5 * AIR_DENSITY * DRAG_COEF * AREA) / BALL.mass;
-const K_MAGNUS = (0.5 * MAGNUS_COEF * AIR_DENSITY * AREA * BALL.radius) / BALL.mass;
+const K_MAGNUS_BASE = ((4 / 3) * Math.PI * AIR_DENSITY * BALL.radius ** 3) / BALL.mass;
 // 中空球の慣性モーメント係数（I = 2/3 m r²）
 const INERTIA_FACTOR = 2 / 3;
+
+/** Ace: 台の反発係数は衝突速度で下がる（v_z は m/s の大きさ）。 */
+export function tableRestitution(vzIn: number) {
+  return Math.min(0.98, Math.max(0.5, 0.98 - 0.02 * Math.abs(vzIn)));
+}
+
+/** ラバーの反発係数。衝突速度 1m/s あたり 0.019 下がる（ISJOS v15, 1.4〜20.2m/s で線形）。 */
+export function racketRestitution(base: number, vnIn: number) {
+  return Math.max(0.3, base - 0.019 * Math.abs(vnIn));
+}
 
 export type Vec3 = { x: number; y: number; z: number };
 
@@ -51,6 +72,52 @@ const cross = (a: Vec3, b: Vec3) =>
 const norm = (a: Vec3) => Math.hypot(a.x, a.y, a.z);
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
+/** 画面に出すモデルの根拠。status: sourced = 論文・規格の値 / estimated = 推定値。 */
+export const MODEL_SOURCES: { part: string; detail: string; source: string; status: "sourced" | "estimated" }[] = [
+  {
+    part: "空気抵抗",
+    detail: "抗力係数 0.55・空気密度 1.204kg/m³",
+    source: "Dürr et al., Nature 652 (2026) Methods",
+    status: "sourced",
+  },
+  {
+    part: "回転による曲がり（マグヌス力）",
+    detail: "c_M = 0.1·|v|/(r|ω|) − 0.001（速度と回転の比で変わる）",
+    source: "Dürr et al., Nature 652 (2026) Methods",
+    status: "sourced",
+  },
+  {
+    part: "低回転（ナックル付近）の曲がり",
+    detail: "回転比に比例して0に近づくよう補正（上の式はプロのラリーで同定されたため）",
+    source: "野球ボールの低回転域の近似（Sawicki et al., 2003）を流用",
+    status: "estimated",
+  },
+  {
+    part: "台でのバウンド",
+    detail: "反発 0.98 − 0.02·v_z、摩擦 0.25、滑り/転がりの切り替え",
+    source: "Dürr et al., Nature 652 (2026) Methods ／ ITTF の台の検査（30cm→約23〜26cm）で検証",
+    status: "sourced",
+  },
+  {
+    part: "ラバーの反発の速度依存",
+    detail: "衝突が速いほど反発が下がる（1m/s あたり 0.019）",
+    source: "Impact Velocity and COR of a Table Tennis Ball, ISJOS v15",
+    status: "sourced",
+  },
+  {
+    part: "ラバーごとの反発・摩擦の基準値",
+    detail: "テンション/粘着/表/粒高の数値そのもの",
+    source: "公開値が見つからず推定（Ace の論文もラバー係数は非公開）",
+    status: "estimated",
+  },
+  {
+    part: "較正の基準",
+    detail: "プリセットの回転数をプロの試合の実測に合わせた",
+    source: "Tamaki & Yoshida (2025), Tリーグのサーブ 1773本",
+    status: "sourced",
+  },
+];
+
 export type RubberType = "tension" | "tacky" | "shortPips" | "longPips";
 
 // 用具の「面の性質」を2値に落としたもの。製品名ではなく一般的な傾向。
@@ -62,25 +129,25 @@ export const RUBBERS: Record<
     label: "裏ソフト（テンション系）",
     restitution: 0.85,
     friction: 0.9,
-    note: "よく弾み、よく引っかかる",
+    note: "よく弾み、よく引っかかる（数値は推定）",
   },
   tacky: {
     label: "裏ソフト（粘着系）",
     restitution: 0.75,
     friction: 1.1,
-    note: "弾みは控えめ、回転がかけやすい",
+    note: "弾みは控えめ、回転がかけやすい（数値は推定）",
   },
   shortPips: {
     label: "表ソフト",
     restitution: 0.85,
     friction: 0.5,
-    note: "弾くが回転はかかりにくい",
+    note: "弾くが回転はかかりにくい（数値は推定）",
   },
   longPips: {
     label: "粒高",
     restitution: 0.6,
     friction: 0.25,
-    note: "自分からは回転がかかりにくい",
+    note: "自分からは回転がかかりにくい（数値は推定）",
   },
 };
 
@@ -165,15 +232,17 @@ export type SimResult = {
   contactTime: number;
 };
 
+// プリセットは実測に合わせて較正: Tリーグのサーブ（Tamaki & Yoshida 2025, 1773本）の
+// 回転数の中央値は ショート 46.4rps（男子）/38.9rps（女子）、ロング 50.9/47.6rps。
 export const DEFAULT_PARAMS: ServeParams = {
   tossHeight: 0.4,
   contactHeight: 0.18,
   contactBehind: 0.2,
   contactSide: 0.35,
-  swingSpeed: 6.5,
-  swingPitch: -5,
+  swingSpeed: 9,
+  swingPitch: -10,
   swingYaw: -5,
-  faceTilt: 85,
+  faceTilt: 80,
   faceYaw: 0,
   rubber: "tension",
 };
@@ -189,10 +258,11 @@ export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
     label: "横下回転",
     params: {
       ...DEFAULT_PARAMS,
-      swingSpeed: 5.5,
-      swingYaw: -40,
-      faceTilt: 65,
-      faceYaw: 25,
+      swingSpeed: 8,
+      swingPitch: -5,
+      swingYaw: -45,
+      faceTilt: 56,
+      faceYaw: 30,
       contactSide: 0.45,
     },
   },
@@ -202,7 +272,8 @@ export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
     params: {
       ...DEFAULT_PARAMS,
       swingSpeed: 2,
-      faceTilt: 45,
+      swingPitch: 0,
+      faceTilt: 44,
     },
   },
   {
@@ -211,12 +282,18 @@ export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
     params: {
       ...DEFAULT_PARAMS,
       contactHeight: 0.14,
-      swingSpeed: 13.5,
-      swingPitch: 20,
-      faceTilt: -45,
+      swingSpeed: 10,
+      swingPitch: 25,
+      faceTilt: -40,
     },
   },
 ];
+
+/** 実測の比較基準（Tリーグのサーブの回転数・中央値, rps）。 */
+export const PRO_SERVE_SPIN = {
+  short: { men: 46.4, women: 38.9 },
+  long: { men: 50.9, women: 47.6 },
+} as const;
 
 function toRps(omega: number) {
   return omega / (2 * Math.PI);
@@ -263,19 +340,21 @@ export function swingDirection(p: ServeParams): Vec3 {
 /**
  * 接触面での衝突（法線方向は反発係数、接線方向は摩擦の上限つきで「転がり」に向かう）。
  * surfaceVel = 接触面の速度、n = 接触面から球へ向く法線。
+ * Ace の台/ラケット接触モデル（滑り: α=μ(1+ε)v_n/|v_T|、転がり: α=2/5）と同じ式を
+ * 撃力の形で書いたもの。restitution は衝突速度（法線方向の大きさ）の関数。
  */
 function collide(
   vel: Vec3,
   omega: Vec3,
   n: Vec3,
   surfaceVel: Vec3,
-  restitution: number,
+  restitution: (normalSpeed: number) => number,
   friction: number,
 ) {
   const rel = sub(vel, surfaceVel);
   const un = dot(rel, n);
   if (un >= 0) return null; // 近づいていない
-  const jn = BALL.mass * (1 + restitution) * -un;
+  const jn = BALL.mass * (1 + restitution(-un)) * -un;
   const rc = scale(n, -BALL.radius); // 球の中心から接触点
   const relT = sub(rel, scale(n, un));
   const slip = add(relT, cross(omega, rc));
@@ -293,11 +372,40 @@ function collide(
   return { vel: newVel, omega: newOmega, slipped };
 }
 
+/**
+ * マグヌス係数 c_M（f_M = c_M·(4/3)πρr³·(ω×v)）。
+ * Ace の式に、低回転域だけ揚力が回転比に比例して消えるよう補正をかける。
+ */
+export function magnusCoefficient(speed: number, spin: number) {
+  if (speed < 1e-9 || spin < 1e-9) return 0;
+  const S = (BALL.radius * spin) / speed;
+  const ace = MAGNUS_A / S - MAGNUS_B;
+  // Ace の式を揚力係数に直すと C_L = (8/3)·c_M·S
+  const aceLift = (8 / 3) * ace * S;
+  const lowSpinLift = LOW_SPIN_LIFT_SLOPE * S;
+  return aceLift > lowSpinLift ? ace * (lowSpinLift / aceLift) : ace;
+}
+
 function accel(vel: Vec3, omega: Vec3): Vec3 {
   const s = norm(vel);
   const drag = scale(vel, -K_DRAG * s);
-  const magnus = scale(cross(omega, vel), K_MAGNUS);
+  const cm = magnusCoefficient(s, norm(omega));
+  const magnus = scale(cross(omega, vel), K_MAGNUS_BASE * cm);
   return add(add(drag, magnus), v(0, 0, -G));
+}
+
+/** 4次のルンゲ＝クッタ法で1ステップ進める（Ace と同じく飛行中の回転は一定とみなす）。 */
+function rk4(pos: Vec3, vel: Vec3, omega: Vec3, dt: number) {
+  const a1 = accel(vel, omega);
+  const v2 = add(vel, scale(a1, dt / 2));
+  const a2 = accel(v2, omega);
+  const v3 = add(vel, scale(a2, dt / 2));
+  const a3 = accel(v3, omega);
+  const v4 = add(vel, scale(a3, dt));
+  const a4 = accel(v4, omega);
+  const nextVel = add(vel, scale(add(add(a1, scale(add(a2, a3), 2)), a4), dt / 6));
+  const nextPos = add(pos, scale(add(add(vel, scale(add(v2, v3), 2)), v4), dt / 6));
+  return { pos: nextPos, vel: nextVel };
 }
 
 function inOwnCourt(p: Vec3) {
@@ -319,7 +427,7 @@ const VERDICT_LABEL: Record<Verdict, string> = {
   whiff: "ラケットに当たらない（面とスイングの向きを見直す）",
 };
 
-export function simulateServe(params: ServeParams, dt = 0.0005): SimResult {
+export function simulateServe(params: ServeParams, dt = 0.001): SimResult {
   const rubber = RUBBERS[params.rubber];
   const warnings: string[] = [];
   if (params.tossHeight < MIN_TOSS) {
@@ -350,7 +458,14 @@ export function simulateServe(params: ServeParams, dt = 0.0005): SimResult {
   const inVel = v(0, 0, -G * tDrop);
 
   const n = faceNormal(params);
-  const hitRes = collide(inVel, v(0, 0, 0), n, scale(swingDirection(params), params.swingSpeed), rubber.restitution, rubber.friction);
+  const hitRes = collide(
+    inVel,
+    v(0, 0, 0),
+    n,
+    scale(swingDirection(params), params.swingSpeed),
+    (vn) => racketRestitution(rubber.restitution, vn),
+    rubber.friction,
+  );
 
   const nb = scale(n, -1);
   const contactOnBall = {
@@ -401,10 +516,9 @@ export function simulateServe(params: ServeParams, dt = 0.0005): SimResult {
   const maxT = contactTime + 3;
 
   while (t < maxT) {
-    // 半陰的オイラー（dt=0.5ms で十分に安定）
-    const a = accel(vel, omega);
-    vel = add(vel, scale(a, dt));
-    const next = add(pos, scale(vel, dt));
+    const step = rk4(pos, vel, omega, dt);
+    const next = step.pos;
+    vel = step.vel;
     t += dt;
 
     // ネット面（x = netX）の通過判定
@@ -428,7 +542,7 @@ export function simulateServe(params: ServeParams, dt = 0.0005): SimResult {
     if (next.z < BALL.radius && pos.z >= BALL.radius && onTable(next)) {
       const p = v(next.x, next.y, BALL.radius);
       const side = next.x <= TABLE.netX ? "own" : "opponent";
-      const r = collide(vel, omega, v(0, 0, 1), v(0, 0, 0), TABLE_RESTITUTION, TABLE_FRICTION);
+      const r = collide(vel, omega, v(0, 0, 1), v(0, 0, 0), tableRestitution, TABLE_FRICTION);
       if (r) {
         vel = r.vel;
         omega = r.omega;
@@ -482,6 +596,35 @@ export function simulateServe(params: ServeParams, dt = 0.0005): SimResult {
     warnings,
     contactTime,
   };
+}
+
+/**
+ * ITTF の台の検査（30cm から落として何cm弾むか）を再現する。モデル検証用。
+ * 戻り値は跳ね返りの最高点（台面からボール下端まで, m）。
+ */
+export function dropTestBounceHeight(dropHeight = 0.3, dt = 0.0005): number {
+  let pos = v(1, 0, dropHeight + BALL.radius);
+  let vel = v(0, 0, 0);
+  const omega = v(0, 0, 0);
+  let bounced = false;
+  let peak = 0;
+  for (let t = 0; t < 2; t += dt) {
+    const step = rk4(pos, vel, omega, dt);
+    if (!bounced && step.pos.z < BALL.radius) {
+      const r = collide(step.vel, omega, v(0, 0, 1), v(0, 0, 0), tableRestitution, TABLE_FRICTION);
+      vel = r ? r.vel : step.vel;
+      pos = v(step.pos.x, step.pos.y, BALL.radius);
+      bounced = true;
+      continue;
+    }
+    pos = step.pos;
+    vel = step.vel;
+    if (bounced) {
+      peak = Math.max(peak, pos.z - BALL.radius);
+      if (vel.z < 0) break;
+    }
+  }
+  return peak;
 }
 
 /** 時刻 t におけるボール位置（軌跡を線形補間）。 */

@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { CAMERAS, ServeViewport, type CameraId } from "@/components/serve-viewport";
 import {
   DEFAULT_PARAMS,
+  MODEL_SOURCES,
   PRESETS,
+  PRO_SERVE_SPIN,
   RUBBERS,
   faceNormal,
   serveInsights,
@@ -247,6 +249,10 @@ export function ServeLab() {
           <SpinTable title="相手コートでバウンドした後" spin={result.spinAtOpponent} />
         </div>
 
+        {(result.verdict === "short" || result.verdict === "long") && (
+          <ProComparison kind={result.verdict} spin={contact.spin.total} />
+        )}
+
         {insights.length > 0 && (
           <ul className="mt-4 space-y-2 rounded-xl bg-tt-offwhite p-3 text-sm leading-6">
             {insights.map((t) => (
@@ -317,10 +323,7 @@ export function ServeLab() {
         </div>
       </section>
 
-      <p className="text-xs leading-6 text-tt-gray70">
-        ※ 物理モデルは簡略化しています（打球は一瞬の衝突、ラバーは「反発」と「摩擦」の2つの値、空気抵抗とマグヌス力は一定係数）。
-        数値は傾向をつかむための目安で、実測値ではありません。
-      </p>
+      <ModelBasis />
     </div>
   );
 }
@@ -455,5 +458,71 @@ function ContactDial({ params }: { params: ServeParams }) {
         の矢印がこする向き。中心から離れた位置を長くこするほど回転が増えます。
       </p>
     </div>
+  );
+}
+
+/** プロの試合の実測（Tリーグ）と、いまのサーブの回転数を並べる。 */
+function ProComparison({ kind, spin }: { kind: "short" | "long"; spin: number }) {
+  const ref = PRO_SERVE_SPIN[kind];
+  const max = 70;
+  const pct = (x: number) => `${Math.min(100, (x / max) * 100)}%`;
+  return (
+    <div className="mt-4 rounded-xl ring-1 ring-tt-gray30/50 p-3">
+      <p className="text-xs font-bold">
+        プロの試合との比較（{kind === "short" ? "ショート" : "ロング"}サーブの回転数）
+      </p>
+      <div className="relative mt-6 h-3 rounded-full bg-tt-offwhite">
+        <div className="absolute inset-y-0 left-0 rounded-full bg-tt-green/80" style={{ width: pct(spin) }} />
+        {[
+          { label: "女子", v: ref.women },
+          { label: "男子", v: ref.men },
+        ].map((m) => (
+          <div key={m.label} className="absolute -top-5 -translate-x-1/2 text-center" style={{ left: pct(m.v) }}>
+            <span className="block text-[10px] leading-none text-tt-gray70">
+              {m.label} {m.v}
+            </span>
+            <span className="mx-auto mt-0.5 block h-6 w-px bg-tt-charcoal" />
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-tt-gray70">
+        このサーブは <span className="font-mono font-bold text-tt-charcoal">{spin.toFixed(1)}rps</span>。
+        縦線はTリーグの試合で実測されたサーブの回転数の中央値（Tamaki & Yoshida, 2025）。
+      </p>
+    </div>
+  );
+}
+
+/** 物理モデルの根拠。どこが論文の値で、どこが推定かを隠さず見せる。 */
+function ModelBasis() {
+  return (
+    <details className="rounded-2xl bg-white p-4 text-sm shadow-sm ring-1 ring-black/5">
+      <summary className="cursor-pointer font-bold">物理モデルの根拠（どこまで現実に近いか）</summary>
+      <p className="mt-3 text-xs leading-6 text-tt-gray70">
+        飛び方と台でのバウンドは、トップ選手と試合をした卓球ロボットの研究で使われた物理モデルに合わせています。
+        ラバーごとの数値は公開データがないため推定です。
+      </p>
+      <ul className="mt-3 space-y-2">
+        {MODEL_SOURCES.map((m) => (
+          <li key={m.part} className="rounded-lg bg-tt-offwhite p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold">{m.part}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  m.status === "sourced" ? "bg-tt-soft-coral text-tt-deep-coral" : "bg-tt-soft-green text-tt-green"
+                }`}
+              >
+                {m.status === "sourced" ? "論文・規格の値" : "推定"}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-5">{m.detail}</p>
+            <p className="mt-1 text-[11px] leading-5 text-tt-gray70">出典: {m.source}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs leading-6 text-tt-gray70">
+        まだ入っていないもの: ラケットの材質の影響（しなり）、ボールの変形、打球の「球持ち」（接触時間）。
+      </p>
+    </details>
   );
 }
