@@ -1,0 +1,11 @@
+/* 単体版のスタイル: アプリの globals.css（ブランドトークン）をそのまま使う。
+   next/font が注入するフォント変数だけ、Google Fonts の実名で補う。 */
+@import "../../src/app/globals.css";
+@source "../../src/components";
+@source "./entry.tsx";
+
+:root {
+  --font-inter: "Inter";
+  --font-noto-sans-jp: "Noto Sans JP";
+  --font-jetbrains-mono: "JetBrains Mono";
+}
