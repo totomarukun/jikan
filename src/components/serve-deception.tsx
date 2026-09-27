@@ -11,7 +11,7 @@ import {
   HIDDEN_WINDOW_S,
   VISIBLE_WINDOW_S,
   compareDeception,
-  searchMostDeceptive,
+  searchMostDeceptiveOverall,
   type DeceptionCandidate,
   type DisguiseLimits,
 } from "@/lib/serve-search";
@@ -19,7 +19,10 @@ import { PRESETS } from "@/lib/serve-sim";
 import type { BallState } from "@/lib/flight";
 import { norm } from "@/lib/vec3";
 
-export type DeceptionRun = { timing: ReceiveTiming; limits: DisguiseLimits; length: "short" | "long"; list: DeceptionCandidate[] };
+export type DeceptionRun = { limits: DisguiseLimits; list: DeceptionCandidate[]; done: boolean; runs: number };
+
+const sameLimits = (x: DisguiseLimits, y: DisguiseLimits) =>
+  x.visibleCm === y.visibleCm && x.visibleDeg === y.visibleDeg && x.landingCm === y.landingCm && x.netCm === y.netCm;
 
 type SortKey = "misread" | "look" | "spin";
 const SORTS: { id: SortKey; label: string }[] = [
@@ -35,117 +38,94 @@ const SORT_FNS: Record<SortKey, (x: DeceptionCandidate, y: DeceptionCandidate) =
 
 const typeLabel = (id: string) => SERVE_TYPES.find((t) => t.id === id)?.label ?? id;
 
+const lengthLabel = (l: "short" | "long") => (l === "short" ? "ショート" : "ロング");
+const TIMING_LABEL: Record<ReceiveTiming, string> = { rising: "早め", apex: "頂点", falling: "遅め" };
+
+/** 3つのタイミングで確かめた組はその合計、そうでなければ頂点の結果。 */
+export function misreadTotals(c: DeceptionCandidate) {
+  const list = c.byTiming ?? [{ timing: c.timing, failures: c.misreadFailures, chances: c.misreadChances }];
+  return {
+    failures: list.reduce((s, t) => s + t.failures, 0),
+    chances: list.reduce((s, t) => s + t.chances, 0),
+    timings: list.length,
+  };
+}
+
 /**
- * 見誤り探索: サーブの種類ごとに「見た目がほぼ同じで、相手の打球点での回転がいちばん違う 2 本（A・B）」を
- * 基本のフォームごと探し、読み違えでレシーブが崩れる割合の順に並べる。
+ * 見誤り探索: 今のサーブを使わずに、サーブの種類 × 長さ × フォーム（打点の位置まで）を広く探して、
+ * 「相手から見てほぼ同じなのに回転が違う 2 本（A・B）」のうち、読み違えでレシーブがいちばん崩れる組を見つける。
  */
 export function DeceptionPanel({
-  timing,
   run: last,
   onRun,
   selected,
   onSelect,
 }: {
-  timing: ReceiveTiming;
   run: DeceptionRun | null;
   onRun: (r: DeceptionRun | null) => void;
   selected: DeceptionCandidate | null;
   onSelect: (c: DeceptionCandidate) => void;
 }) {
   const [limits, setLimits] = useState<DisguiseLimits>(last?.limits ?? DEFAULT_LIMITS);
-  const [length, setLength] = useState<"short" | "long">(last?.length ?? "short");
   const [progress, setProgress] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const cancel = useRef(false);
+  const runs = useRef(last?.runs ?? 0);
 
-  const start = async () => {
+  // 条件が同じなら、探し直すたびに種類 × 長さごとの良いほうを残して積み上げる
+  const canAdd = !!last?.done && sameLimits(last.limits, limits);
+  const start = async (add: boolean) => {
     cancel.current = false;
     setFailed(false);
-    onRun(null);
+    const previous = add && last ? last.list : undefined;
+    if (!add) onRun(null);
     setProgress(0);
-    const list = await searchMostDeceptive(timing, limits, {
-      length,
+    runs.current = add ? runs.current + 1 : 1;
+    const list = await searchMostDeceptiveOverall(limits, {
+      previous,
+      seed: 20260927 + (runs.current - 1) * 7919,
       onProgress: setProgress,
+      onPartial: (partial) => onRun({ limits, list: partial, done: false, runs: runs.current }),
       isCancelled: () => cancel.current,
     });
     setProgress(null);
     if (!list) return;
     if (list.length === 0) {
       setFailed(true);
+      onRun(null);
       return;
     }
-    onRun({ timing, limits, length, list });
+    onRun({ limits, list, done: true, runs: runs.current });
     onSelect(list[0]);
   };
 
   const [sort, setSort] = useState<SortKey>("misread");
   const sorted = last ? [...last.list].sort(SORT_FNS[sort]) : [];
-  const missing = last ? SERVE_TYPES.filter((t) => !last.list.some((c) => c.serveType === t.id)) : [];
+  const missing = last?.done
+    ? SERVE_TYPES.flatMap((t) => (["short", "long"] as const).map((l) => ({ t, l }))).filter(
+        ({ t, l }) => !last.list.some((c) => c.serveType === t.id && c.length === l),
+      )
+    : [];
+  const best = last?.done ? last.list[0] : null;
 
   return (
     <div className="space-y-4">
       <p className="text-sm leading-6">
-        相手から見て<strong>ほぼ同じフォーム</strong>なのに、相手のラケットに当たる瞬間の回転が<strong>いちばん違う 2 本（A・B）</strong>を、
-        5種類のサーブそれぞれで基本のフォームごと探します。そのうえで相手が片方だと思ってもう片方を受けたとき、
-        <strong>正しく読めば入るレシーブが崩れるか</strong>を計算して並べます。
+        <strong>今のサーブの設定は使いません。</strong>5種類のサーブ × ショート/ロングのすべてで、フォーム（関節の角度・振り幅・鋭さ）と
+        打点の位置まで広く動かし、相手から見て<strong>ほぼ同じに見える 2 本（A・B）</strong>のうち、
+        <strong>読み違えるとレシーブがいちばん崩れる組</strong>を探します。
       </p>
 
       <div className="space-y-3 rounded-xl p-4 ring-1 ring-tt-gray30/50">
-        <div>
-          <p className="text-xs font-bold text-tt-gray70">長さ</p>
-          <Chips
-            items={[
-              { id: "short", label: "ショート" },
-              { id: "long", label: "ロング" },
-            ]}
-            value={length}
-            onChange={setLength}
-          />
-        </div>
-        <LimitSlider
-          id="dec-cm"
-          label="見た目の差の上限（ラケット・腕の位置のずれ）"
-          value={limits.visibleCm}
-          min={0.5}
-          max={5}
-          step={0.5}
-          unit="cm"
-          onChange={(v) => setLimits({ ...limits, visibleCm: v })}
-        />
-        <LimitSlider
-          id="dec-deg"
-          label="見た目の差の上限（面の向きのずれ）"
-          value={limits.visibleDeg}
-          min={1}
-          max={15}
-          step={1}
-          unit="°"
-          onChange={(v) => setLimits({ ...limits, visibleDeg: v })}
-        />
-        <LimitSlider
-          id="dec-land"
-          label="軌道の差の上限（着地点のずれ）"
-          value={limits.landingCm}
-          min={5}
-          max={60}
-          step={5}
-          unit="cm"
-          onChange={(v) => setLimits({ ...limits, landingCm: v })}
-        />
-        <LimitSlider
-          id="dec-net"
-          label="軌道の差の上限（ネット上の高さの差）"
-          value={limits.netCm}
-          min={1}
-          max={20}
-          step={1}
-          unit="cm"
-          onChange={(v) => setLimits({ ...limits, netCm: v })}
-        />
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button size="sm" onClick={start} disabled={progress !== null}>
-            {progress === null ? "見誤りを生みやすいフォームを探す" : `探しています ${Math.round(progress * 100)}%`}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => start(false)} disabled={progress !== null}>
+            {progress === null ? "見誤りがいちばん大きいサーブを探す" : `探しています ${Math.round(progress * 100)}%`}
           </Button>
+          {canAdd && progress === null && (
+            <Button variant="secondary" onClick={() => start(true)}>
+              もう一度探して結果に足す
+            </Button>
+          )}
           {progress !== null && (
             <Button size="sm" variant="ghost" onClick={() => (cancel.current = true)}>
               やめる
@@ -153,19 +133,86 @@ export function DeceptionPanel({
           )}
         </div>
         <p className="text-xs leading-5 text-tt-gray70">
-          5種類ぶん計算するので 30〜60 秒ほどかかります。「見た目の差」は打球の前後 ±{VISIBLE_WINDOW_S * 1000}ms のラケットと腕（肘・手首）の動きの差で、
-          打球の前後 ±{HIDDEN_WINDOW_S * 1000}ms は相手が見分けにくいと仮定して除いています（実験で決めた値ではありません）。
+          10通り（5種類 × 2つの長さ）を順に計算するので 1〜2 分ほどかかります。見つかった順に下の表に加わります。
+          上位3つは、相手が早め・頂点・遅めのどのタイミングで打っても崩れるかを確かめ直します。
+          探索は乱数を使うので、「もう一度探して結果に足す」を繰り返すほど、種類 × 長さごとに良い組が残っていきます。
         </p>
+        <details className="text-sm">
+          <summary className="cursor-pointer text-xs font-bold text-tt-gray70">「相手から見て同じ」とみなす条件（変えなくても探せます）</summary>
+          <div className="mt-2 space-y-3">
+            <LimitSlider
+              id="dec-cm"
+              label="見た目の差の上限（ラケット・腕の位置のずれ）"
+              value={limits.visibleCm}
+              min={0.5}
+              max={5}
+              step={0.5}
+              unit="cm"
+              onChange={(v) => setLimits({ ...limits, visibleCm: v })}
+            />
+            <LimitSlider
+              id="dec-deg"
+              label="見た目の差の上限（面の向きのずれ）"
+              value={limits.visibleDeg}
+              min={1}
+              max={15}
+              step={1}
+              unit="°"
+              onChange={(v) => setLimits({ ...limits, visibleDeg: v })}
+            />
+            <LimitSlider
+              id="dec-land"
+              label="軌道の差の上限（着地点のずれ）"
+              value={limits.landingCm}
+              min={5}
+              max={60}
+              step={5}
+              unit="cm"
+              onChange={(v) => setLimits({ ...limits, landingCm: v })}
+            />
+            <LimitSlider
+              id="dec-net"
+              label="軌道の差の上限（ネット上の高さの差）"
+              value={limits.netCm}
+              min={1}
+              max={20}
+              step={1}
+              unit="cm"
+              onChange={(v) => setLimits({ ...limits, netCm: v })}
+            />
+            <p className="text-xs leading-5 text-tt-gray70">
+              「見た目の差」は打球の前後 ±{VISIBLE_WINDOW_S * 1000}ms のラケットと腕（肘・手首）の動きの差で、打球の前後 ±
+              {HIDDEN_WINDOW_S * 1000}ms は相手が見分けにくいと仮定して除いています（実験で決めた値ではありません）。
+            </p>
+          </div>
+        </details>
       </div>
 
-      {failed && (
-        <p className="rounded-xl bg-tt-soft-green p-3 text-sm">条件を満たす組が見つかりませんでした。上限をゆるめるか、長さを変えてみてください。</p>
+      {failed && <p className="rounded-xl bg-tt-soft-green p-3 text-sm">条件を満たす組が見つかりませんでした。条件をゆるめてみてください。</p>}
+
+      {best && (
+        <div className="rounded-xl bg-tt-charcoal p-4 text-white">
+          <p className="text-xs text-white/70">見誤りがいちばん大きかったサーブ</p>
+          <p className="mt-1 text-lg font-bold">
+            {typeLabel(best.serveType)}（{lengthLabel(best.length)}）
+          </p>
+          <p className="mt-1 text-sm leading-6">
+            相手から見た差は {best.disguise.visible.meanCm.toFixed(1)}cm・{best.disguise.visible.faceDeg.toFixed(0)}° なのに、回転は{" "}
+            {best.disguise.spinA.label} ⇔ {best.disguise.spinB.label}（差 {best.spinGap.toFixed(1)}rps）。
+            読み違えると、正しく読めば入るレシーブが{" "}
+            <strong>
+              {misreadTotals(best).failures}/{misreadTotals(best).chances}
+            </strong>{" "}
+            崩れた
+            {best.byTiming && `（${best.byTiming.map((t) => `${TIMING_LABEL[t.timing]} ${t.failures}/${t.chances}`).join("・")}）`}。
+          </p>
+        </div>
       )}
 
       {last && (
         <div className="space-y-2">
           <p className="text-xs font-bold">
-            サーブの種類ごとの結果（相手が打つタイミング: {last.timing === "apex" ? "頂点" : last.timing === "rising" ? "早め" : "遅め"}）
+            {last.done ? `すべての結果（${last.runs}回ぶん）` : "見つかった順（計算中）"}
           </p>
           <Chips items={SORTS} value={sort} onChange={setSort} />
           <table className="w-full border-separate border-spacing-y-1 text-xs">
@@ -181,19 +228,23 @@ export function DeceptionPanel({
               {sorted.map((c, i) => {
                 const active = selected === c;
                 const cell = active ? "bg-tt-charcoal text-white" : "bg-white hover:bg-tt-offwhite";
+                const tot = misreadTotals(c);
                 return (
-                  <tr key={c.serveType} onClick={() => onSelect(c)} aria-selected={active} className="cursor-pointer">
+                  <tr key={`${c.serveType}-${c.length}`} onClick={() => onSelect(c)} aria-selected={active} className="cursor-pointer">
                     <td className={`rounded-l-lg py-2 pl-2 ${cell}`}>
                       <button type="button" className="text-left text-sm font-bold">
                         {i + 1}. {typeLabel(c.serveType)}
+                        <span className="ml-1 text-xs font-normal">{lengthLabel(c.length)}</span>
                       </button>
                     </td>
                     <td className={`py-2 text-right font-mono tabular-nums ${cell}`}>
                       {c.disguise.visible.meanCm.toFixed(1)}cm・{c.disguise.visible.faceDeg.toFixed(0)}°
+                      {!c.disguise.withinLimits && "*"}
                     </td>
                     <td className={`py-2 text-right font-mono tabular-nums ${cell}`}>{c.spinGap.toFixed(1)}rps</td>
                     <td className={`rounded-r-lg py-2 pr-2 text-right font-mono font-bold tabular-nums ${cell}`}>
-                      {c.misreadFailures}/{c.misreadChances}
+                      {tot.failures}/{tot.chances}
+                      <span className="ml-1 text-[10px] font-normal">{tot.timings === 3 ? "3タイミング" : "頂点"}</span>
                     </td>
                   </tr>
                 );
@@ -202,14 +253,14 @@ export function DeceptionPanel({
           </table>
           {missing.length > 0 && (
             <p className="text-xs text-tt-gray70">
-              {missing.map((t) => t.label).join("・")}: この条件で入る組が見つかりませんでした。
+              {missing.map(({ t, l }) => `${t.label}（${lengthLabel(l)}）`).join("・")}: この条件で入る組が見つかりませんでした。
             </p>
           )}
           <p className="text-xs leading-5 text-tt-gray70">
             どの組も「相手から見てほぼ同じ」（見た目の差が上限以内）になるように探しています。そのうえで
             「見た目の差」は小さいほど見分けにくく、「回転の差」は大きいほど読み違えたときのずれが大きく、
             「崩れる」は正しく読めば入るレシーブ（3技術 × A→B・B→A の2方向）のうち読み違えると入らなかった数です。
-            探索は乱数を使うため、実行ごとに少し結果が変わります。
+            「*」は上限を少し超えた組。探索は乱数を使うため、実行ごとに少し結果が変わります。
           </p>
         </div>
       )}
@@ -264,7 +315,11 @@ function CandidateDetail({ c, limits }: { c: DeceptionCandidate; limits: Disguis
   return (
     <div className="space-y-4 rounded-xl p-4 ring-1 ring-tt-gray30/50">
       <p className="text-sm">
-        <strong>{typeLabel(c.serveType)}</strong> の A と B を、左に<strong>相手の目線</strong>で並べています（打球の瞬間をそろえて同時に再生）。
+        <strong>
+          {typeLabel(c.serveType)}（{lengthLabel(c.length)}）
+        </strong>{" "}
+        の A と B を、左に<strong>相手の目線</strong>で並べています（打球の瞬間をそろえて同時に再生）。
+        この A が「今のサーブ」になっているので、ほかのタブで細かく見られます。
       </p>
 
       <div className="rounded-lg bg-tt-offwhite p-3 text-sm leading-6">
@@ -310,7 +365,12 @@ function CandidateDetail({ c, limits }: { c: DeceptionCandidate; limits: Disguis
       </div>
 
       <div>
-        <p className="text-xs font-bold">読み違えたときのレシーブ</p>
+        <p className="text-xs font-bold">読み違えたときのレシーブ（相手が頂点で打った場合）</p>
+        {c.byTiming && (
+          <p className="mt-1 text-xs text-tt-gray70">
+            打つタイミング別に崩れた数: {c.byTiming.map((t) => `${TIMING_LABEL[t.timing]} ${t.failures}/${t.chances}`).join("・")}
+          </p>
+        )}
         <table className="mt-2 w-full border-separate border-spacing-1 text-center text-xs">
           <thead>
             <tr className="text-tt-gray70">

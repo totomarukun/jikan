@@ -44,7 +44,9 @@ function jointRanges(base: ServeParams, group: "contact" | "sweep", span: number
   });
 }
 
-function scalarRange(key: "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross", min: number, max: number, step: number): Range {
+type ScalarKey = "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross" | "contactHeight" | "contactBehind" | "contactSide";
+
+function scalarRange(key: ScalarKey, min: number, max: number, step: number): Range {
   return { get: (p) => p[key], set: (p, x) => ({ ...p, [key]: x }), min, max, step };
 }
 
@@ -283,6 +285,12 @@ const add3 = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z +
 
 export type DisguiseMode = "more" | "less" | "any";
 
+/**
+ * 見誤り探索で最大化する「回転の違い」。上下の回転の違いを横回転の違いより重く見る【推定】。
+ * このモデルで試すと、レシーブが崩れるかは主に上下の回転の読み違えで決まり、横回転だけの違いでは崩れにくかったため。
+ */
+const MISREAD_SIDE_WEIGHT = 0.5;
+
 export const DISGUISE_MODES: { id: DisguiseMode; label: string }[] = [
   { id: "any", label: "回転を変える（向きも含む）" },
   { id: "less", label: "回転を減らす（ナックル寄り）" },
@@ -325,7 +333,7 @@ function firstReceiverBounce(r: SimResult) {
 type PairRef = { a: SimResult; ra: NonNullable<ReturnType<typeof spinAtReceive>>; landA: Vec3 };
 
 /** A（基準）に対する B の「回転の違い（gain）」と「見た目・軌道の差が上限を超えたぶん（over）」。 */
-function comparePair(ref: PairRef, b: SimResult, timing: ReceiveTiming, mode: DisguiseMode, limits: DisguiseLimits) {
+function comparePair(ref: PairRef, b: SimResult, timing: ReceiveTiming, mode: DisguiseMode | "misread", limits: DisguiseLimits) {
   const { a, ra, landA } = ref;
   const rb = spinAtReceive(b, timing);
   const landB = firstReceiverBounce(b);
@@ -335,7 +343,9 @@ function comparePair(ref: PairRef, b: SimResult, timing: ReceiveTiming, mode: Di
       ? rb.spin.total - ra.spin.total
       : mode === "less"
         ? ra.spin.total - rb.spin.total
-        : Math.hypot(rb.spin.topBack - ra.spin.topBack, rb.spin.side - ra.spin.side);
+        : mode === "misread"
+          ? Math.hypot(rb.spin.topBack - ra.spin.topBack, MISREAD_SIDE_WEIGHT * (rb.spin.side - ra.spin.side))
+          : Math.hypot(rb.spin.topBack - ra.spin.topBack, rb.spin.side - ra.spin.side);
   const vis = visibleDifference(a, b);
   const landingGapCm = Math.hypot(landB.x - landA.x, landB.y - landA.y) * 100;
   const netGapCm = Math.abs((b.netClearance ?? 0) - (a.netClearance ?? 0)) * 100;
@@ -467,17 +477,28 @@ function applyDelta(a: ServeParams, d: Delta): ServeParams {
   };
 }
 
-/** pairRanges のうち先頭の何個が A（基本のフォーム）の変数か */
-const A_RANGE_COUNT = JOINTS.length * 2 + 1;
-
-function pairRanges(base: ServeParams): Range<Pair>[] {
-  // A: 基本のフォーム（打球の瞬間の関節角度・振り幅・鋭さ）をプリセットのまわりで動かす
-  const aRanges: Range<Pair>[] = [
-    ...jointRanges(base, "contact", 12, 3),
-    ...jointRanges(base, "sweep", 18, 5),
-    scalarRange("tempo", base.tempo * 0.8, base.tempo * 1.2, base.tempo * 0.05),
-  ].map((r) => ({ ...r, get: (p: Pair) => r.get(p.a), set: (p: Pair, x: number) => ({ ...p, a: r.set(p.a, x) }) }));
-  // B: A からの差分。「フォーム研究」と同じ幅
+/**
+ * A（基本のフォーム）と B（A からの差分）の探索範囲。
+ * near: プリセットのまわりだけ。wide: 関節は可動域いっぱい近くまで、打点の位置・当てる位置も動かす。
+ */
+function pairRanges(base: ServeParams, wide: boolean): { aRanges: Range<Pair>[]; dRanges: Range<Pair>[] } {
+  const aBase: Range[] = wide
+    ? [
+        ...jointRanges(base, "contact", 30, 6),
+        ...jointRanges(base, "sweep", 40, 8),
+        scalarRange("tempo", base.tempo * 0.75, base.tempo * 1.3, base.tempo * 0.05),
+        scalarRange("contactHeight", 0.08, 0.35, 0.03),
+        scalarRange("contactBehind", 0.05, 0.45, 0.04),
+        scalarRange("contactSide", Math.max(-0.7, base.contactSide - 0.3), Math.min(0.7, base.contactSide + 0.3), 0.05),
+        scalarRange("hitAlong", -0.05, 0.065, 0.01),
+      ]
+    : [
+        ...jointRanges(base, "contact", 12, 3),
+        ...jointRanges(base, "sweep", 18, 5),
+        scalarRange("tempo", base.tempo * 0.8, base.tempo * 1.2, base.tempo * 0.05),
+      ];
+  const aRanges = aBase.map((r) => ({ ...r, get: (p: Pair) => r.get(p.a), set: (p: Pair, x: number) => ({ ...p, a: r.set(p.a, x) }) }));
+  // B: A からの差分。「フォーム研究」と同じ幅（トス・打点の位置は相手に見えるので A と同じ）
   const dj = (group: "contact" | "sweep", span: number, step: number): Range<Pair>[] =>
     JOINTS.map((j) => ({
       get: (p: Pair) => p.d[group][j.key],
@@ -493,8 +514,7 @@ function pairRanges(base: ServeParams): Range<Pair>[] {
     max,
     step,
   });
-  return [
-    ...aRanges,
+  const dRanges = [
     ...dj("contact", 8, 2),
     ...dj("sweep", 15, 4),
     ds("tempoRatio", 0.85, 1.15, 0.05),
@@ -504,6 +524,7 @@ function pairRanges(base: ServeParams): Range<Pair>[] {
     ds("hitAlong", -0.05, 0.05, 0.01),
     ds("hitAcross", -0.05, 0.05, 0.01),
   ];
+  return { aRanges, dRanges };
 }
 
 /** 人が無理なく打てる姿勢か（関節が可動域の端に張り付かない・しゃがみ込みすぎない）。 */
@@ -525,6 +546,11 @@ export type MisreadCheck = {
 
 export type DeceptionCandidate = {
   serveType: ServeType;
+  length: "short" | "long";
+  /** 下の checks を計算した相手の打つタイミング */
+  timing: ReceiveTiming;
+  /** 相手の打つタイミングごとの、読み違えで崩れた数（上位のみ） */
+  byTiming?: TimingCheck[];
   /** 見た目の基準になるサーブ（A） */
   a: ServeParams;
   resultA: SimResult;
@@ -580,9 +606,196 @@ type DeceptionOpts = SearchOpts & {
   length?: "short" | "long";
 };
 
+type PairSearch = {
+  type: ServeType;
+  length: "short" | "long";
+  timing: ReceiveTiming;
+  limits: DisguiseLimits;
+  wide: boolean;
+  budget: number;
+  seed: number;
+  onProgress: (f: number) => void;
+  isCancelled?: () => boolean;
+};
+
 /**
- * サーブの種類ごとに「見た目がほぼ同じで、相手の打球点での回転がいちばん違う A・B の組」を探し、
- * 読み違えでレシーブが崩れる数 → 回転の差 の順に並べる。
+ * 1つのサーブの種類・長さについて、見た目がほぼ同じで相手の打球点での回転がいちばん違う A・B の組を探し、
+ * 上位 2 組の読み違えの影響を確かめて良いほうを返す。やめた場合は null、見つからなければ undefined。
+ */
+async function searchPair(q: PairSearch): Promise<DeceptionCandidate | null | undefined> {
+  const preset = PRESETS.find((p) => p.params.serveType === q.type);
+  if (!preset) return undefined;
+  const { timing, limits, length } = q;
+  // 粗い刻みでは上限の 9 割で見る（細かい刻みで計算し直したときに上限を超えないよう）
+  const coarseLimits: DisguiseLimits = {
+    visibleCm: limits.visibleCm * 0.9,
+    visibleDeg: limits.visibleDeg * 0.9,
+    landingCm: limits.landingCm * 0.9,
+    netCm: limits.netCm * 0.9,
+  };
+  // A の計算は差分（B）だけ動かしている間は同じなので使い回す
+  let lastA: ServeParams | null = null;
+  let lastRef: PairRef | null = null;
+  let lastACost = 0;
+  const cost = (pair: Pair) => {
+    if (pair.a !== lastA) {
+      lastA = pair.a;
+      const a = simulateServe(pair.a, COARSE.dt, COARSE.contactDt);
+      const ra = spinAtReceive(a, timing);
+      const landA = firstReceiverBounce(a);
+      lastRef = a.legal && a.verdict === length && ra && landA ? { a, ra, landA } : null;
+      lastACost = lastRef ? postureCost(a) + Math.max(0, 0.015 - (a.netClearance ?? 0)) * 500 : 0;
+    }
+    if (!lastRef) return 2000;
+    const b = simulateServe(applyDelta(pair.a, pair.d), COARSE.dt, COARSE.contactDt);
+    const m = comparePair(lastRef, b, timing, "misread", coarseLimits);
+    if (!m) return 1000;
+    return -m.gain + m.over + lastACost + postureCost(b);
+  };
+  const start: Pair = {
+    a: preset.params,
+    d: { contact: zeroJoints(), sweep: zeroJoints(), tempoRatio: 1, snapFlex: 0, snapDev: 0, snapPron: 0, hitAlong: 0, hitAcross: 0 },
+  };
+  const { aRanges, dRanges } = pairRanges(preset.params, q.wide);
+  const zero = start.d;
+  const rand = mulberry32(q.seed);
+  let pool: { params: Pair; cost: number }[] = [];
+
+  if (q.wide) {
+    // 広く探すとき: ① 入る A（この長さのサーブになるフォーム）をいくつか見つける
+    const starts: Pair[] = [];
+    if (cost(start) < 1000) starts.push(start);
+    for (let i = 0; i < 400 && starts.length < 5; i++) {
+      if (i % 40 === 0) {
+        if (q.isCancelled?.()) return null;
+        q.onProgress((0.05 * i) / 400);
+        await tick();
+      }
+      let a = start;
+      for (const r of aRanges) a = r.set(a, r.min + rand() * (r.max - r.min));
+      if (cost(a) < 1000) starts.push(a);
+    }
+    if (starts.length === 0) return undefined;
+    // ② それぞれで B の差分を軽く探して見込みを比べ、③ 見込みのある 2 つを深く探す（B → A → B）
+    const screenBudget = Math.floor(q.budget * 0.08);
+    const screened: { params: Pair; cost: number }[] = [];
+    for (const [i, st] of starts.entries()) {
+      const r = await optimize(st, dRanges, cost, {
+        budget: screenBudget,
+        randomShare: 0.5,
+        seed: q.seed + 100 + i,
+        isCancelled: q.isCancelled,
+        onProgress: (f) => q.onProgress((0.05 + ((i + f) / starts.length) * 0.35) * 0.8),
+      });
+      if (!r) return null;
+      screened.push(r[0]);
+    }
+    screened.sort((x, y) => x.cost - y.cost);
+    const deep = screened.slice(0, 2);
+    const each = (q.budget * 0.6) / deep.length;
+    for (const [di, d0] of deep.entries()) {
+      let cur = [d0];
+      const stages = [
+        { ranges: dRanges, share: 0.4, random: 0.3 },
+        { ranges: aRanges, share: 0.3, random: 0.2 },
+        { ranges: dRanges, share: 0.3, random: 0.2 },
+      ];
+      let done = 0;
+      for (const [si, st] of stages.entries()) {
+        const r = await optimize(cur[0].params, st.ranges, cost, {
+          budget: Math.floor(each * st.share),
+          randomShare: st.random,
+          seed: q.seed + 200 + di * 10 + si,
+          isCancelled: q.isCancelled,
+          onProgress: (f) => q.onProgress((0.4 + ((di + done + f * st.share) / deep.length) * 0.6) * 0.8),
+        });
+        if (!r) return null;
+        done += st.share;
+        cur = [...cur, ...r].sort((x, y) => x.cost - y.cost);
+      }
+      pool.push(...cur.slice(0, 2));
+    }
+    pool.sort((x, y) => x.cost - y.cost);
+  } else {
+    // プリセットのまわり: B の差分 → A のフォーム → B の差分 と交互に探す
+    const stages = [
+      { ranges: dRanges, share: 0.4, random: 0.5 },
+      { ranges: aRanges, share: 0.3, random: 0.2 },
+      { ranges: dRanges, share: 0.3, random: 0.2 },
+    ];
+    pool = [{ params: { ...start, d: zero }, cost: cost(start) }];
+    let done = 0;
+    for (const [si, st] of stages.entries()) {
+      const r = await optimize(pool[0].params, st.ranges, cost, {
+        budget: Math.floor(q.budget * st.share),
+        randomShare: st.random,
+        seed: q.seed + si,
+        isCancelled: q.isCancelled,
+        onProgress: (f) => q.onProgress((done + f * st.share) * 0.8),
+      });
+      if (!r) return null;
+      done += st.share;
+      pool = [...pool, ...r].sort((x, y) => x.cost - y.cost).slice(0, 4);
+    }
+  }
+
+  // 細かい刻みで計算し直し、上位 2 組について読み違えの影響を確かめる
+  const fine: { a: ServeParams; resultA: SimResult; d: DisguiseResult; score: number }[] = [];
+  for (const cand of pool) {
+    const a = roundParams(cand.params.a);
+    const resultA = simulateServe(a);
+    const ra = spinAtReceive(resultA, timing);
+    const landA = firstReceiverBounce(resultA);
+    if (!resultA.legal || resultA.verdict !== length || !ra || !landA) continue;
+    const params = roundParams(applyDelta(a, cand.params.d));
+    const b = simulateServe(params);
+    const m = comparePair({ a: resultA, ra, landA }, b, timing, "misread", limits);
+    if (!m) continue;
+    fine.push({
+      a,
+      resultA,
+      score: -m.gain + m.over + postureCost(resultA) + postureCost(b),
+      d: {
+        params,
+        result: b,
+        visible: m.vis,
+        spinA: ra.spin,
+        spinB: m.rb.spin,
+        stateA: ra.state,
+        stateB: m.rb.state,
+        landingGapCm: m.landingGapCm,
+        netGapCm: m.netGapCm,
+        withinLimits: m.over < 1e-9,
+      },
+    });
+  }
+  fine.sort((x, y) => x.score - y.score);
+  let best: DeceptionCandidate | undefined;
+  for (const [i, f] of fine.slice(0, 2).entries()) {
+    if (q.isCancelled?.()) return null;
+    const mc = await misreadChecks(f.d.stateA, f.d.stateB, techniquesFor(f.resultA));
+    q.onProgress(0.8 + 0.1 * (i + 1));
+    const cand: DeceptionCandidate = {
+      serveType: q.type,
+      length,
+      timing,
+      a: f.a,
+      resultA: f.resultA,
+      disguise: f.d,
+      spinGap: Math.hypot(f.d.spinB.topBack - f.d.spinA.topBack, f.d.spinB.side - f.d.spinA.side),
+      checks: mc.checks,
+      misreadFailures: mc.failures,
+      misreadChances: mc.chances,
+    };
+    if (!best || compareDeception(cand, best) < 0) best = cand;
+  }
+  q.onProgress(1);
+  return best;
+}
+
+/**
+ * サーブの種類ごとに「見た目がほぼ同じで、相手の打球点での回転がいちばん違う A・B の組」を
+ * プリセットのまわりで探し、読み違えでレシーブが崩れる数 → 回転の差 の順に並べる。
  */
 export async function searchMostDeceptive(
   timing: ReceiveTiming,
@@ -590,126 +803,120 @@ export async function searchMostDeceptive(
   opts: DeceptionOpts = {},
 ): Promise<DeceptionCandidate[] | null> {
   const types = opts.types ?? SERVE_TYPES.map((t) => t.id);
-  const length = opts.length ?? "short";
-  const coarseLimits: DisguiseLimits = {
-    visibleCm: limits.visibleCm * 0.9,
-    visibleDeg: limits.visibleDeg * 0.9,
-    landingCm: limits.landingCm * 0.9,
-    netCm: limits.netCm * 0.9,
-  };
   const out: DeceptionCandidate[] = [];
   for (const [ti, type] of types.entries()) {
-    const preset = PRESETS.find((p) => p.params.serveType === type);
-    if (!preset) continue;
-    const progress = (f: number) => opts.onProgress?.((ti + f) / types.length);
-    // A の計算は差分（B）だけ動かしている間は同じなので使い回す
-    let lastA: ServeParams | null = null;
-    let lastRef: PairRef | null = null;
-    let lastACost = 0;
-    const cost = (pair: Pair) => {
-      if (pair.a !== lastA) {
-        lastA = pair.a;
-        const a = simulateServe(pair.a, COARSE.dt, COARSE.contactDt);
-        const ra = spinAtReceive(a, timing);
-        const landA = firstReceiverBounce(a);
-        lastRef = a.legal && a.verdict === length && ra && landA ? { a, ra, landA } : null;
-        lastACost = lastRef ? postureCost(a) + Math.max(0, 0.015 - (a.netClearance ?? 0)) * 500 : 0;
-      }
-      if (!lastRef) return 2000;
-      const b = simulateServe(applyDelta(pair.a, pair.d), COARSE.dt, COARSE.contactDt);
-      // 粗い刻みでは上限の 9 割で見る（細かい刻みで計算し直したときに上限を超えないよう）
-      const m = comparePair(lastRef, b, timing, "any", coarseLimits);
-      if (!m) return 1000;
-      return -m.gain + m.over + lastACost + postureCost(b);
-    };
-    const start: Pair = {
-      a: preset.params,
-      d: { contact: zeroJoints(), sweep: zeroJoints(), tempoRatio: 1, snapFlex: 0, snapDev: 0, snapPron: 0, hitAlong: 0, hitAcross: 0 },
-    };
-    // 変数が多い（A と B の差分）ので、交互に探す: B の差分 → A のフォーム → B の差分
-    const ranges = pairRanges(preset.params);
-    const aRanges = ranges.slice(0, A_RANGE_COUNT);
-    const dRanges = ranges.slice(A_RANGE_COUNT);
-    const budget = opts.budgetPerType ?? 1200;
-    const stages: { ranges: Range<Pair>[]; share: number; random: number }[] = [
-      { ranges: dRanges, share: 0.4, random: 0.5 },
-      { ranges: aRanges, share: 0.3, random: 0.2 },
-      { ranges: dRanges, share: 0.3, random: 0.2 },
-    ];
-    let pool: { params: Pair; cost: number }[] = [{ params: start, cost: cost(start) }];
-    let done = 0;
-    for (const [si, st] of stages.entries()) {
-      const r = await optimize(pool[0].params, st.ranges, cost, {
-        budget: Math.floor(budget * st.share),
-        randomShare: st.random,
-        seed: (opts.seed ?? 20260927) + ti * 10 + si,
-        isCancelled: opts.isCancelled,
-        onProgress: (f) => progress((done + f * st.share) * 0.8),
-      });
-      if (!r) return null;
-      done += st.share;
-      pool = [...pool, ...r].sort((x, y) => x.cost - y.cost).slice(0, 4);
-    }
-    const top = pool;
-
-    // 細かい刻みで計算し直し、上位 2 組について読み違えの影響を確かめる
-    const fine: { a: ServeParams; resultA: SimResult; d: DisguiseResult; score: number }[] = [];
-    for (const cand of top) {
-      const a = roundParams(cand.params.a);
-      const resultA = simulateServe(a);
-      const ra = spinAtReceive(resultA, timing);
-      const landA = firstReceiverBounce(resultA);
-      if (!resultA.legal || resultA.verdict !== length || !ra || !landA) continue;
-      const params = roundParams(applyDelta(a, cand.params.d));
-      const b = simulateServe(params);
-      const m = comparePair({ a: resultA, ra, landA }, b, timing, "any", limits);
-      if (!m) continue;
-      fine.push({
-        a,
-        resultA,
-        score: -m.gain + m.over + postureCost(resultA) + postureCost(b),
-        d: {
-          params,
-          result: b,
-          visible: m.vis,
-          spinA: ra.spin,
-          spinB: m.rb.spin,
-          stateA: ra.state,
-          stateB: m.rb.state,
-          landingGapCm: m.landingGapCm,
-          netGapCm: m.netGapCm,
-          withinLimits: m.over < 1e-9,
-        },
-      });
-    }
-    fine.sort((x, y) => x.score - y.score);
-    let best: DeceptionCandidate | null = null;
-    for (const [i, f] of fine.slice(0, 2).entries()) {
-      if (opts.isCancelled?.()) return null;
-      const mc = await misreadChecks(f.d.stateA, f.d.stateB, techniquesFor(f.resultA));
-      progress(0.8 + 0.1 * (i + 1));
-      const cand: DeceptionCandidate = {
-        serveType: type,
-        a: f.a,
-        resultA: f.resultA,
-        disguise: f.d,
-        spinGap: Math.hypot(f.d.spinB.topBack - f.d.spinA.topBack, f.d.spinB.side - f.d.spinA.side),
-        checks: mc.checks,
-        misreadFailures: mc.failures,
-        misreadChances: mc.chances,
-      };
-      if (!best || compareDeception(cand, best) < 0) best = cand;
-    }
-    if (best) out.push(best);
-    progress(1);
+    const c = await searchPair({
+      type,
+      length: opts.length ?? "short",
+      timing,
+      limits,
+      wide: false,
+      budget: opts.budgetPerType ?? 1200,
+      seed: (opts.seed ?? 20260927) + ti * 10,
+      onProgress: (f) => opts.onProgress?.((ti + f) / types.length),
+      isCancelled: opts.isCancelled,
+    });
+    if (c === null) return null;
+    if (c) out.push(c);
   }
   return out.sort(compareDeception);
+}
+
+export type TimingCheck = { timing: ReceiveTiming; failures: number; chances: number };
+
+type GlobalOpts = SearchOpts & {
+  /** 1回（サーブの種類 × 長さ）あたりの探索回数 */
+  budgetPerRun?: number;
+  types?: ServeType[];
+  lengths?: ("short" | "long")[];
+  /** 相手の3つの打つタイミングすべてで確かめる上位の数 */
+  robustTop?: number;
+  /** 途中経過（見つかった順） */
+  onPartial?: (list: DeceptionCandidate[]) => void;
+  /** 前に探した結果。種類 × 長さごとに良いほうを残す（探すたびに結果を積み上げる） */
+  previous?: DeceptionCandidate[];
+};
+
+/** 頂点での読み違えだけで比べる（別々に探した結果を合わせるとき用）。 */
+function compareAtApex(x: DeceptionCandidate, y: DeceptionCandidate) {
+  return compareDeception({ ...x, byTiming: undefined }, { ...y, byTiming: undefined });
+}
+
+function mergeBest(list: DeceptionCandidate[], c: DeceptionCandidate) {
+  const i = list.findIndex((x) => x.serveType === c.serveType && x.length === c.length);
+  if (i < 0) list.push(c);
+  else if (compareAtApex(c, list[i]) < 0) list[i] = c;
+}
+
+/**
+ * 今のサーブを使わずに、見誤りがいちばん大きくなるサーブを探す。
+ * サーブの種類 5 × 長さ 2 のそれぞれで、フォーム・打点の位置まで広く動かして A・B の組を探し、
+ * 読み違えでレシーブが崩れる割合で並べる。上位は相手の打つタイミング（早め・頂点・遅め）すべてで確かめ直す。
+ */
+export async function searchMostDeceptiveOverall(
+  limits: DisguiseLimits = DEFAULT_LIMITS,
+  opts: GlobalOpts = {},
+): Promise<DeceptionCandidate[] | null> {
+  const types = opts.types ?? SERVE_TYPES.map((t) => t.id);
+  const lengths = opts.lengths ?? ["short", "long"];
+  const runs = types.flatMap((type) => lengths.map((length) => ({ type, length })));
+  const robustTop = opts.robustTop ?? 3;
+  // 進み具合: 探索 85%、タイミング別の確かめ 15%
+  const searchShare = robustTop > 0 ? 0.85 : 1;
+  const found: DeceptionCandidate[] = [...(opts.previous ?? [])];
+  for (const [i, run] of runs.entries()) {
+    const c = await searchPair({
+      ...run,
+      timing: "apex",
+      limits,
+      wide: true,
+      budget: opts.budgetPerRun ?? 1000,
+      seed: (opts.seed ?? 20260927) + i * 10,
+      onProgress: (f) => opts.onProgress?.(((i + f) / runs.length) * searchShare),
+      isCancelled: opts.isCancelled,
+    });
+    if (c === null) return null;
+    if (c) {
+      mergeBest(found, c);
+      found.sort(compareDeception);
+      opts.onPartial?.([...found]);
+    }
+  }
+  // 上位は、相手が早め・遅めに打った場合でも読み違えで崩れるかを確かめる（頂点の結果は計算済み）
+  found.sort(compareAtApex);
+  const top = found.slice(0, robustTop);
+  for (const [i, c] of top.entries()) {
+    if (c.byTiming) continue;
+    const byTiming: TimingCheck[] = [{ timing: "apex", failures: c.misreadFailures, chances: c.misreadChances }];
+    for (const timing of ["rising", "falling"] as const) {
+      if (opts.isCancelled?.()) return null;
+      const sa = receiveState(c.resultA.receiverSide, timing);
+      const sb = receiveState(c.disguise.result.receiverSide, timing);
+      if (!sa || !sb) continue;
+      const mc = await misreadChecks(sa, sb, techniquesFor(c.resultA));
+      byTiming.push({ timing, failures: mc.failures, chances: mc.chances });
+    }
+    top[i] = { ...c, byTiming };
+    opts.onProgress?.(searchShare + ((1 - searchShare) * (i + 1)) / top.length);
+  }
+  // 確かめ直した上位から外れた組は、頂点の結果だけで並べる
+  const rest = found.slice(robustTop).map((c) => (c.byTiming ? { ...c, byTiming: undefined } : c));
+  top.sort(compareDeception);
+  const out = [...top, ...rest];
+  opts.onProgress?.(1);
+  return out;
 }
 
 /** 並べ順: 上限を守れた組 → 読み違えで崩れた割合 → 回転の差。 */
 export function compareDeception(x: DeceptionCandidate, y: DeceptionCandidate) {
   if (x.disguise.withinLimits !== y.disguise.withinLimits) return x.disguise.withinLimits ? -1 : 1;
-  const rate = (c: DeceptionCandidate) => (c.misreadChances ? c.misreadFailures / c.misreadChances : 0);
+  // 3つのタイミングで確かめた組どうしはその合計で、そうでなければ頂点で比べる
+  const both = x.byTiming && y.byTiming;
+  const rate = (c: DeceptionCandidate) => {
+    const list = both ? c.byTiming! : [{ failures: c.misreadFailures, chances: c.misreadChances }];
+    const ch = list.reduce((s, t) => s + t.chances, 0);
+    return ch ? list.reduce((s, t) => s + t.failures, 0) / ch : 0;
+  };
   if (rate(x) !== rate(y)) return rate(y) - rate(x);
   return y.spinGap - x.spinGap;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { flyBall, mirrorState, type BallState } from "../flight";
 import { readSpin, receiveState, simulateReceive } from "../receive";
 import { PRESETS, breakdownSpin, simulateServe } from "../serve-sim";
-import { compareDeception, differenceSeries, searchDisguise, searchMostDeceptive, searchServeForSpin, visibleDifference } from "../serve-search";
+import { compareDeception, differenceSeries, searchMostDeceptiveOverall, searchDisguise, searchMostDeceptive, searchServeForSpin, visibleDifference } from "../serve-search";
 import { v } from "../vec3";
 
 const preset = (id: string) => PRESETS.find((p) => p.id === id)!.params;
@@ -124,4 +124,17 @@ describe("研究ツール", () => {
     const mean = seen.reduce((s, x) => s + x.cm, 0) / seen.length;
     expect(mean).toBeCloseTo(visibleDifference(a, b).meanCm, 6);
   });
+
+  it("見誤り探索（今のサーブを使わない）: 種類 × 長さを広く探し、上位はタイミング別にも確かめる", async () => {
+    const list = await searchMostDeceptiveOverall(undefined, { types: ["hook"], lengths: ["short", "long"], budgetPerRun: 300, robustTop: 1 });
+    expect(list).not.toBeNull();
+    expect(list!.length).toBeGreaterThan(0);
+    for (const c of list!) {
+      expect(c.resultA.verdict).toBe(c.length);
+      expect(c.disguise.result.verdict).toBe(c.length);
+    }
+    const top = list![0];
+    expect(top.byTiming?.map((t) => t.timing)).toEqual(["apex", "rising", "falling"]);
+    for (const t of top.byTiming!) expect(t.failures).toBeLessThanOrEqual(t.chances);
+  }, 120000);
 });

@@ -367,12 +367,7 @@ export function ServeLab() {
 
         {tab === "deceive" && (
           <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-            <p className="mb-3 text-xs text-tt-gray70">
-              相手が打つタイミング: {timing === "apex" ? "頂点" : timing === "rising" ? "早め（上昇中）" : "遅め（落ち際）"}
-              （「レシーブ」で変えられます）
-            </p>
             <DeceptionPanel
-              timing={timing}
               run={deception}
               onRun={setDeception}
               selected={selectedDeception}
