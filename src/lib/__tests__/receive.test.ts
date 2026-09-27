@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { flyBall, mirrorState, type BallState } from "../flight";
 import { readSpin, receiveState, simulateReceive } from "../receive";
 import { PRESETS, breakdownSpin, simulateServe } from "../serve-sim";
-import { compareDeception, searchDisguise, searchMostDeceptive, searchServeForSpin, visibleDifference } from "../serve-search";
+import { compareDeception, differenceSeries, searchDisguise, searchMostDeceptive, searchServeForSpin, visibleDifference } from "../serve-search";
 import { v } from "../vec3";
 
 const preset = (id: string) => PRESETS.find((p) => p.id === id)!.params;
@@ -114,4 +114,14 @@ describe("研究ツール", () => {
     // 並び順どおり
     for (let i = 1; i < list!.length; i++) expect(compareDeception(list![i - 1], list![i])).toBeLessThanOrEqual(0);
   }, 60000);
+
+  it("見た目の差の時間ごとの値は、見分けにくい時間を除いて平均すると visibleDifference と一致する", () => {
+    const a = simulateServe(preset("hook"));
+    const b = simulateServe({ ...preset("hook"), snapFlex: 20, sweep: { ...preset("hook").sweep, elbow: preset("hook").sweep.elbow + 6 } });
+    const series = differenceSeries(a, b, 0.005);
+    const seen = series.filter((x) => !x.hidden);
+    expect(seen.length).toBeLessThan(series.length);
+    const mean = seen.reduce((s, x) => s + x.cm, 0) / seen.length;
+    expect(mean).toBeCloseTo(visibleDifference(a, b).meanCm, 6);
+  });
 });

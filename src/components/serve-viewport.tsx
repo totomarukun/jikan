@@ -6,10 +6,11 @@ import type { ReceiveResult } from "@/lib/receive";
 import { BALL, TABLE, positionAt, swingDirection, type SimResult } from "@/lib/serve-sim";
 import { add, cross, dot, scale, sub, unit, type Vec3 } from "@/lib/vec3";
 
-export type CameraId = "racket" | "overview" | "behind" | "side" | "top";
+export type CameraId = "racket" | "receiver" | "overview" | "behind" | "side" | "top";
 
 export const CAMERAS: { id: CameraId; label: string }[] = [
   { id: "racket", label: "打点アップ" },
+  { id: "receiver", label: "相手の目線" },
   { id: "overview", label: "全体" },
   { id: "behind", label: "後ろ" },
   { id: "side", label: "横" },
@@ -21,7 +22,7 @@ const H = 450;
 
 type Camera = { pos: Vec3; target: Vec3; up: Vec3; focal: number };
 
-const CAMERA_DEFS: Record<Exclude<CameraId, "racket">, Camera> = {
+const CAMERA_DEFS: Record<Exclude<CameraId, "racket" | "receiver">, Camera> = {
   overview: { pos: { x: -1.2, y: -1.3, z: 0.95 }, target: { x: 1.0, y: 0.15, z: 0 }, up: { x: 0, y: 0, z: 1 }, focal: 640 },
   behind: { pos: { x: -2.1, y: 0, z: 0.75 }, target: { x: 1.4, y: 0, z: 0 }, up: { x: 0, y: 0, z: 1 }, focal: 760 },
   side: { pos: { x: 1.2, y: -9, z: 0.2 }, target: { x: 1.2, y: 0, z: 0.2 }, up: { x: 0, y: 0, z: 1 }, focal: 2300 },
@@ -70,10 +71,13 @@ export function ServeViewport({
 }) {
   const contact = result.events[0].p;
   // 打点アップ: 打点を斜め後ろ・やや上から見る
+  // 相手の目線: 相手コートのエンドラインの 50cm 後ろ・中央、台面から 45cm の高さ（構えた目の高さの目安・推定）から打点を見る
   const cam: Camera =
     camera === "racket"
       ? { pos: add(contact, { x: -0.55, y: -0.5, z: 0.28 }), target: contact, up: { x: 0, y: 0, z: 1 }, focal: 900 }
-      : CAMERA_DEFS[camera];
+      : camera === "receiver"
+        ? { pos: { x: TABLE.length + 0.5, y: 0, z: 0.45 }, target: add(contact, { x: 0, y: 0, z: 0.2 }), up: { x: 0, y: 0, z: 1 }, focal: 950 }
+        : CAMERA_DEFS[camera];
   const project = makeProjector(cam);
   const hw = TABLE.width / 2;
   const L = TABLE.length;

@@ -1,22 +1,37 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChangeList, LimitSlider, SpinCard } from "@/components/serve-disguise";
-import { Chips, OUTCOME_STYLE, Stat } from "@/components/serve-receive";
+import { Chips, OUTCOME_STYLE } from "@/components/serve-receive";
 import { SERVE_TYPES } from "@/lib/arm";
 import { TECHNIQUES, type ReceiveOutcome, type ReceiveTiming } from "@/lib/receive";
 import {
   DEFAULT_LIMITS,
   HIDDEN_WINDOW_S,
   VISIBLE_WINDOW_S,
+  compareDeception,
   searchMostDeceptive,
   type DeceptionCandidate,
   type DisguiseLimits,
 } from "@/lib/serve-search";
 import { PRESETS } from "@/lib/serve-sim";
+import type { BallState } from "@/lib/flight";
+import { norm } from "@/lib/vec3";
 
 export type DeceptionRun = { timing: ReceiveTiming; limits: DisguiseLimits; length: "short" | "long"; list: DeceptionCandidate[] };
+
+type SortKey = "misread" | "look" | "spin";
+const SORTS: { id: SortKey; label: string }[] = [
+  { id: "misread", label: "読み違えで崩れる順" },
+  { id: "look", label: "見た目が近い順" },
+  { id: "spin", label: "回転の差が大きい順" },
+];
+const SORT_FNS: Record<SortKey, (x: DeceptionCandidate, y: DeceptionCandidate) => number> = {
+  misread: compareDeception,
+  look: (x, y) => x.disguise.visible.meanCm - y.disguise.visible.meanCm,
+  spin: (x, y) => y.spinGap - x.spinGap,
+};
 
 const typeLabel = (id: string) => SERVE_TYPES.find((t) => t.id === id)?.label ?? id;
 
@@ -63,6 +78,8 @@ export function DeceptionPanel({
     onSelect(list[0]);
   };
 
+  const [sort, setSort] = useState<SortKey>("misread");
+  const sorted = last ? [...last.list].sort(SORT_FNS[sort]) : [];
   const missing = last ? SERVE_TYPES.filter((t) => !last.list.some((c) => c.serveType === t.id)) : [];
 
   return (
@@ -150,71 +167,146 @@ export function DeceptionPanel({
           <p className="text-xs font-bold">
             サーブの種類ごとの結果（相手が打つタイミング: {last.timing === "apex" ? "頂点" : last.timing === "rising" ? "早め" : "遅め"}）
           </p>
-          <ol className="space-y-2">
-            {last.list.map((c, i) => {
-              const active = selected === c;
-              return (
-                <li key={c.serveType}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(c)}
-                    aria-pressed={active}
-                    className={`w-full rounded-xl p-3 text-left ring-1 transition-colors ${
-                      active ? "bg-tt-charcoal text-white ring-tt-charcoal" : "bg-white ring-tt-gray30/60 hover:bg-tt-offwhite"
-                    }`}
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-bold">
+          <Chips items={SORTS} value={sort} onChange={setSort} />
+          <table className="w-full border-separate border-spacing-y-1 text-xs">
+            <thead>
+              <tr className="text-left text-tt-gray70">
+                <th className="font-normal">サーブ</th>
+                <th className="text-right font-normal">見た目の差</th>
+                <th className="text-right font-normal">回転の差</th>
+                <th className="text-right font-normal">読み違えで崩れる</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((c, i) => {
+                const active = selected === c;
+                const cell = active ? "bg-tt-charcoal text-white" : "bg-white hover:bg-tt-offwhite";
+                return (
+                  <tr key={c.serveType} onClick={() => onSelect(c)} aria-selected={active} className="cursor-pointer">
+                    <td className={`rounded-l-lg py-2 pl-2 ${cell}`}>
+                      <button type="button" className="text-left text-sm font-bold">
                         {i + 1}. {typeLabel(c.serveType)}
-                      </span>
-                      <span className="font-mono text-sm font-bold tabular-nums">
-                        読み違えで崩れる {c.misreadFailures}/{c.misreadChances}
-                      </span>
-                    </div>
-                    <p className={`mt-1 text-xs ${active ? "text-white/80" : "text-tt-gray70"}`}>
-                      A {c.disguise.spinA.label} {c.disguise.spinA.total.toFixed(0)}rps ⇔ B {c.disguise.spinB.label}{" "}
-                      {c.disguise.spinB.total.toFixed(0)}rps（回転の差 {c.spinGap.toFixed(1)}rps）
-                      {!c.disguise.withinLimits && " ・上限を少し超えた組"}
-                    </p>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
+                      </button>
+                    </td>
+                    <td className={`py-2 text-right font-mono tabular-nums ${cell}`}>
+                      {c.disguise.visible.meanCm.toFixed(1)}cm・{c.disguise.visible.faceDeg.toFixed(0)}°
+                    </td>
+                    <td className={`py-2 text-right font-mono tabular-nums ${cell}`}>{c.spinGap.toFixed(1)}rps</td>
+                    <td className={`rounded-r-lg py-2 pr-2 text-right font-mono font-bold tabular-nums ${cell}`}>
+                      {c.misreadFailures}/{c.misreadChances}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
           {missing.length > 0 && (
             <p className="text-xs text-tt-gray70">
               {missing.map((t) => t.label).join("・")}: この条件で入る組が見つかりませんでした。
             </p>
           )}
           <p className="text-xs leading-5 text-tt-gray70">
-            「崩れる」は、正しく読めば入るレシーブ（払う・止める・はじく など3技術 × A→B・B→A の2方向）のうち、読み違えると入らなかった数です。
-            並びは 上限を守れた組 → 崩れる割合 → 回転の差 の順。探索は乱数を使うため、実行ごとに少し結果が変わります。
+            どの組も「相手から見てほぼ同じ」（見た目の差が上限以内）になるように探しています。そのうえで
+            「見た目の差」は小さいほど見分けにくく、「回転の差」は大きいほど読み違えたときのずれが大きく、
+            「崩れる」は正しく読めば入るレシーブ（3技術 × A→B・B→A の2方向）のうち読み違えると入らなかった数です。
+            探索は乱数を使うため、実行ごとに少し結果が変わります。
           </p>
         </div>
       )}
 
-      {selected && <CandidateDetail c={selected} />}
+      {selected && last && <CandidateDetail c={selected} limits={last.limits} />}
     </div>
   );
 }
 
-function CandidateDetail({ c }: { c: DeceptionCandidate }) {
+const fmtTb = (x: number) => (Math.abs(x) < 1 ? "ほぼなし" : `${x > 0 ? "上" : "下"} ${Math.abs(x).toFixed(1)}`);
+// サーバー基準の +（サーバーから見て左へ曲がる）は、受け手から見ると右へ曲がる
+const fmtSd = (x: number) => (Math.abs(x) < 1 ? "ほぼなし" : `${x > 0 ? "右" : "左"}へ ${Math.abs(x).toFixed(1)}`);
+const kmh = (s: BallState) => (norm(s.vel) * 3.6).toFixed(1);
+
+/** なぜこの組が「読み違えを生む」のかを、見た目・回転・結果の3段で言葉にする。 */
+function whyText(c: DeceptionCandidate, limits: DisguiseLimits) {
+  const d = c.disguise;
+  const look = `相手の目線で見たフォームの差は平均 ${d.visible.meanCm.toFixed(1)}cm・面 ${d.visible.faceDeg.toFixed(1)}°（上限 ${limits.visibleCm}cm・${limits.visibleDeg}°${d.withinLimits ? "の内側" : "を少し超える"}）。軌道も着地点 ${d.landingGapCm.toFixed(0)}cm・ネット上 ${d.netGapCm.toFixed(1)}cm の差しかない。`;
+  const spin = `一方、相手のラケットに当たる瞬間の回転は 上下が ${fmtTb(d.spinA.topBack)} → ${fmtTb(d.spinB.topBack)}rps、横が ${fmtSd(d.spinA.side)} → ${fmtSd(d.spinB.side)}rps と違う（差 ${c.spinGap.toFixed(1)}rps）。`;
+  const fails: string[] = [];
+  for (const k of c.checks) {
+    const t = TECHNIQUES[k.technique].label;
+    if (k.bReadAsB === "in" && k.bReadAsA !== "in") fails.push(`B を A と読んで${t} → ${OUTCOME_STYLE[k.bReadAsA].short}`);
+    if (k.aReadAsA === "in" && k.aReadAsB !== "in") fails.push(`A を B と読んで${t} → ${OUTCOME_STYLE[k.aReadAsB].short}`);
+  }
+  const result =
+    fails.length > 0
+      ? `その結果、正しく読めば返せるのに ${fails.join("、")}（${c.misreadFailures}/${c.misreadChances}）。`
+      : "ただ、この程度の回転の差では、読み違えてもどのレシーブも入った（崩れない）。";
+  return [look, spin, result];
+}
+
+function CandidateDetail({ c, limits }: { c: DeceptionCandidate; limits: DisguiseLimits }) {
   const preset = PRESETS.find((p) => p.params.serveType === c.serveType)!;
   const d = c.disguise;
+  const rows: { group: string; label: string; a: string; b: string; diff: string }[] = [
+    { group: "相手に見えるもの", label: "フォーム（ラケット・腕の位置）", a: "—", b: "—", diff: `平均 ${d.visible.meanCm.toFixed(1)}cm（最大 ${d.visible.maxCm.toFixed(1)}cm）` },
+    { group: "", label: "ラケットの面の向き", a: "—", b: "—", diff: `平均 ${d.visible.faceDeg.toFixed(1)}°` },
+    { group: "", label: "ボールの速さ（相手の打球点）", a: `${kmh(d.stateA)}km/h`, b: `${kmh(d.stateB)}km/h`, diff: `${Math.abs(norm(d.stateB.vel) - norm(d.stateA.vel)) * 3.6 < 0.05 ? "0" : (Math.abs(norm(d.stateB.vel) - norm(d.stateA.vel)) * 3.6).toFixed(1)}km/h` },
+    {
+      group: "",
+      label: "ネットの上を通る高さ",
+      a: `${((c.resultA.netClearance ?? 0) * 100).toFixed(1)}cm`,
+      b: `${((d.result.netClearance ?? 0) * 100).toFixed(1)}cm`,
+      diff: `${d.netGapCm.toFixed(1)}cm`,
+    },
+    { group: "", label: "相手コートの着地点", a: "—", b: "—", diff: `${d.landingGapCm.toFixed(0)}cm ずれ` },
+    { group: "見えないもの（回転）", label: "上回転 / 下回転", a: fmtTb(d.spinA.topBack), b: fmtTb(d.spinB.topBack), diff: `${Math.abs(d.spinB.topBack - d.spinA.topBack).toFixed(1)}rps` },
+    { group: "", label: "横回転（受け手から見て）", a: fmtSd(d.spinA.side), b: fmtSd(d.spinB.side), diff: `${Math.abs(d.spinB.side - d.spinA.side).toFixed(1)}rps` },
+    { group: "", label: "回転の種類", a: d.spinA.label, b: d.spinB.label, diff: `${c.spinGap.toFixed(1)}rps` },
+  ];
   return (
     <div className="space-y-4 rounded-xl p-4 ring-1 ring-tt-gray30/50">
       <p className="text-sm">
-        <strong>{typeLabel(c.serveType)}</strong> の組を左に表示しています（B が主役、A は灰色の点線）。「フォーム研究」で A・B を切り替えられます。
+        <strong>{typeLabel(c.serveType)}</strong> の A と B を、左に<strong>相手の目線</strong>で並べています（打球の瞬間をそろえて同時に再生）。
       </p>
-      <div className="grid grid-cols-2 gap-3">
-        <SpinCard tag="A（見せるフォーム）" spin={d.spinA} />
-        <SpinCard tag="B（同じに見せて違う回転）" spin={d.spinB} />
+
+      <div className="rounded-lg bg-tt-offwhite p-3 text-sm leading-6">
+        <p className="text-xs font-bold text-tt-gray70">なぜこの組が読み違えを生むか</p>
+        <ol className="mt-1 list-decimal space-y-1 pl-5">
+          {whyText(c, limits).map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ol>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="見た目の差（位置）" value={d.visible.meanCm.toFixed(1)} unit="cm" />
-        <Stat label="見た目の差（面）" value={d.visible.faceDeg.toFixed(1)} unit="°" />
-        <Stat label="着地点のずれ" value={d.landingGapCm.toFixed(0)} unit="cm" />
-        <Stat label="ネット上の高さの差" value={d.netGapCm.toFixed(1)} unit="cm" />
+
+      <div>
+        <p className="text-xs font-bold">A と B の比較</p>
+        <table className="mt-2 w-full border-separate border-spacing-y-0.5 text-xs">
+          <thead>
+            <tr className="text-left text-tt-gray70">
+              <th className="font-normal">項目</th>
+              <th className="font-normal">A</th>
+              <th className="font-normal">B</th>
+              <th className="text-right font-normal">差</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <Fragment key={r.label}>
+                {r.group && (
+                  <tr>
+                    <th colSpan={4} className="pt-2 text-left text-[11px] font-bold text-tt-gray70">
+                      {r.group}
+                    </th>
+                  </tr>
+                )}
+                <tr className="border-b border-tt-gray30/30">
+                  <th className="py-1 pr-2 text-left font-normal">{r.label}</th>
+                  <td className="py-1 pr-2 font-mono tabular-nums">{r.a}</td>
+                  <td className="py-1 pr-2 font-mono tabular-nums">{r.b}</td>
+                  <td className="py-1 text-right font-mono font-bold tabular-nums">{r.diff}</td>
+                </tr>
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div>
@@ -241,6 +333,11 @@ function CandidateDetail({ c }: { c: DeceptionCandidate }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <SpinCard tag="A（見せるフォーム）" spin={d.spinA} />
+        <SpinCard tag="B（同じに見せて違う回転）" spin={d.spinB} />
       </div>
 
       <ChangeList from={preset.params} to={c.a} title={`A: 基本の${typeLabel(c.serveType)}から変えたところ`} empty="基本のフォームのまま。" />

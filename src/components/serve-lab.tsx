@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DisguisePanel } from "@/components/serve-disguise";
+import { AbReceiverCompare } from "@/components/serve-ab-compare";
 import { DeceptionPanel, type DeceptionRun } from "@/components/serve-deception";
 import { InversePanel } from "@/components/serve-inverse";
 import { ReceivePanel } from "@/components/serve-receive";
@@ -251,6 +252,19 @@ export function ServeLab() {
             <HudStat label="横の曲がり（2バウンド目）" value={curve.second === null ? "—" : `${curve.second.toFixed(0)}cm`} />
             <HudStat label="ネット上の余裕" value={result.netClearance === null ? "—" : `${(result.netClearance * 100).toFixed(1)}cm`} />
           </div>
+          {variant && (
+            <AbReceiverCompare
+              a={baseResult}
+              b={variant.result}
+              spinA={variant.spinA}
+              spinB={variant.spinB}
+              tau={time - result.contactTime}
+              onSeek={(t) => {
+                setPlaying(false);
+                setTime(result.contactTime + t);
+              }}
+            />
+          )}
         </div>
       </div>
 

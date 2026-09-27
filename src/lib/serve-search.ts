@@ -215,14 +215,10 @@ export type VisibleDifference = {
   faceDeg: number;
 };
 
-/** 2つのサーブの「相手から見えるラケットの動き」がどれだけ違うか。 */
-export function visibleDifference(a: SimResult, b: SimResult): VisibleDifference {
-  let sum = 0;
-  let max = 0;
-  let face = 0;
-  let n = 0;
+/** 打球から tau 秒ずれた瞬間の、2つのサーブの見た目の差（ラケット中心・先端・横の端と肘・手首の位置、面の向き）。 */
+function differenceAt(a: SimResult, b: SimResult, tau: number) {
   // 相手に見えるのはラケットだけでなく腕も。ラケット（中心・先端・横の端）と肘・手首の位置を比べる
-  const pts = (r: SimResult, tau: number) => {
+  const pts = (r: SimResult) => {
     const arm = r.racket.armAt(tau);
     const p = arm.racket;
     return {
@@ -236,19 +232,51 @@ export function visibleDifference(a: SimResult, b: SimResult): VisibleDifference
       ],
     };
   };
+  const pa = pts(a);
+  const pb = pts(b);
+  const cm = pa.points.map((q, i) => norm(sub(q, pb.points[i])) * 100);
+  const faceDeg = (Math.acos(Math.max(-1, Math.min(1, dot(pa.normal, pb.normal)))) * 180) / Math.PI;
+  return { cm, faceDeg };
+}
+
+/** 2つのサーブの「相手から見えるラケットと腕の動き」がどれだけ違うか。 */
+export function visibleDifference(a: SimResult, b: SimResult): VisibleDifference {
+  let sum = 0;
+  let max = 0;
+  let face = 0;
+  let n = 0;
   for (let tau = -VISIBLE_WINDOW_S; tau <= VISIBLE_WINDOW_S + 1e-9; tau += 0.005) {
     if (Math.abs(tau) < HIDDEN_WINDOW_S) continue;
-    const pa = pts(a, tau);
-    const pb = pts(b, tau);
-    for (let i = 0; i < pa.points.length; i++) {
-      const d = norm(sub(pa.points[i], pb.points[i])) * 100;
-      sum += d;
-      max = Math.max(max, d);
+    const d = differenceAt(a, b, tau);
+    for (const x of d.cm) {
+      sum += x;
+      max = Math.max(max, x);
     }
-    face += (Math.acos(Math.max(-1, Math.min(1, dot(pa.normal, pb.normal)))) * 180) / Math.PI;
+    face += d.faceDeg;
     n++;
   }
   return { meanCm: sum / (n * 5), maxCm: max, faceDeg: face / n };
+}
+
+export type DifferenceSample = {
+  /** 打球からの時間 (秒) */
+  tau: number;
+  /** ラケットと腕の位置のずれ（5点の平均, cm） */
+  cm: number;
+  /** 面の向きのずれ (度) */
+  faceDeg: number;
+  /** 相手が見分けにくいとみなして比較から除いた時間か */
+  hidden: boolean;
+};
+
+/** 見た目の差を時間ごとに（グラフ用）。 */
+export function differenceSeries(a: SimResult, b: SimResult, step = 0.0025): DifferenceSample[] {
+  const out: DifferenceSample[] = [];
+  for (let tau = -VISIBLE_WINDOW_S; tau <= VISIBLE_WINDOW_S + 1e-9; tau += step) {
+    const d = differenceAt(a, b, tau);
+    out.push({ tau, cm: d.cm.reduce((x, y) => x + y, 0) / d.cm.length, faceDeg: d.faceDeg, hidden: Math.abs(tau) < HIDDEN_WINDOW_S });
+  }
+  return out;
 }
 
 const add3 = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
