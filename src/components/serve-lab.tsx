@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DisguisePanel } from "@/components/serve-disguise";
+import { DeceptionPanel, type DeceptionRun } from "@/components/serve-deception";
 import { InversePanel } from "@/components/serve-inverse";
 import { ReceivePanel } from "@/components/serve-receive";
 import { CAMERAS, ServeViewport, type CameraId } from "@/components/serve-viewport";
@@ -27,13 +28,14 @@ import { norm } from "@/lib/vec3";
 
 const SPEEDS = [0.1, 0.25, 0.5, 1] as const;
 
-type Tab = "serve" | "receive" | "inverse" | "disguise";
+type Tab = "serve" | "receive" | "inverse" | "disguise" | "deceive";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "serve", label: "サーブ" },
   { id: "receive", label: "レシーブ" },
   { id: "inverse", label: "逆算" },
   { id: "disguise", label: "フォーム研究" },
+  { id: "deceive", label: "見誤り探索" },
 ];
 
 type ScalarKey = "height" | "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross" | "tossHeight" | "contactHeight" | "contactBehind" | "contactSide";
@@ -97,6 +99,9 @@ export function ServeLab() {
   const [found, setFound] = useState<{ base: ServeParams; d: DisguiseResult } | null>(null);
   const [showingRaw, setShowing] = useState<"A" | "B">("A");
   const variant = found && found.base === params ? found.d : null;
+  // 見誤り探索の結果（タブを切り替えても残す）。選んだ組は A を今のサーブ・B をフォーム研究の B にして表示する
+  const [deception, setDeception] = useState<DeceptionRun | null>(null);
+  const selectedDeception = variant ? (deception?.list.find((c) => c.disguise === variant) ?? null) : null;
   const showing = variant ? showingRaw : "A";
 
   const baseResult = useMemo(() => simulateServe(params), [params]);
@@ -341,6 +346,28 @@ export function ServeLab() {
               onAdopt={(p) => {
                 setParams(p);
                 setActivePreset(null);
+              }}
+            />
+          </section>
+        )}
+
+        {tab === "deceive" && (
+          <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <p className="mb-3 text-xs text-tt-gray70">
+              相手が打つタイミング: {timing === "apex" ? "頂点" : timing === "rising" ? "早め（上昇中）" : "遅め（落ち際）"}
+              （「レシーブ」で変えられます）
+            </p>
+            <DeceptionPanel
+              timing={timing}
+              run={deception}
+              onRun={setDeception}
+              selected={selectedDeception}
+              onSelect={(c) => {
+                setParams(c.a);
+                setActivePreset(null);
+                setFound({ base: c.a, d: c.disguise });
+                setShowing("B");
+                restart();
               }}
             />
           </section>

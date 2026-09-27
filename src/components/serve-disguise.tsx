@@ -92,12 +92,6 @@ export function DisguisePanel({
     setProgress(null);
   };
 
-  const diffs = variant
-    ? DIFF_LABELS.map((d) => ({ ...d, delta: (d.get(variant.params) - d.get(params)) * (d.scale ?? 1) })).filter(
-        (d) => Math.abs(d.delta) >= (d.digits === 0 ? 1 : 0.1),
-      )
-    : [];
-
   return (
     <div className="space-y-4">
       <p className="text-sm leading-6">
@@ -188,25 +182,7 @@ export function DisguisePanel({
             <p className="text-xs text-tt-green">上限をすべて満たす候補はなく、いちばん近いものを表示しています。</p>
           )}
 
-          <div>
-            <p className="text-xs font-bold">A → B で変えたところ</p>
-            {diffs.length === 0 ? (
-              <p className="mt-1 text-sm">変えるところが見つかりませんでした（この条件では A の回転は変えにくい）。</p>
-            ) : (
-              <ul className="mt-1 space-y-1 text-sm">
-                {diffs.map((d) => (
-                  <li key={d.id} className="flex justify-between gap-3 border-b border-tt-gray30/30 py-1">
-                    <span>{d.label}</span>
-                    <span className="font-mono tabular-nums">
-                      {d.delta > 0 ? "+" : ""}
-                      {d.delta.toFixed(d.digits ?? 1)}
-                      {d.unit}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ChangeList from={params} to={variant.params} />
 
           {checks && (
             <div>
@@ -251,7 +227,45 @@ export function DisguisePanel({
   );
 }
 
-function SpinCard({ tag, spin }: { tag: string; spin: DisguiseResult["spinA"] }) {
+/** A → B で変えたところを、関節・スナップ・当てる位置の言葉で並べる。 */
+export function ChangeList({
+  from,
+  to,
+  title = "A → B で変えたところ",
+  empty = "変えるところが見つかりませんでした（この条件では A の回転は変えにくい）。",
+}: {
+  from: ServeParams;
+  to: ServeParams;
+  title?: string;
+  empty?: string;
+}) {
+  const diffs = DIFF_LABELS.map((d) => ({ ...d, delta: (d.get(to) - d.get(from)) * (d.scale ?? 1) })).filter(
+    (d) => Math.abs(d.delta) >= (d.digits === 0 ? 1 : 0.1),
+  );
+  return (
+    <div>
+      <p className="text-xs font-bold">{title}</p>
+      {diffs.length === 0 ? (
+        <p className="mt-1 text-sm">{empty}</p>
+      ) : (
+        <ul className="mt-1 space-y-1 text-sm">
+          {diffs.map((d) => (
+            <li key={d.id} className="flex justify-between gap-3 border-b border-tt-gray30/30 py-1">
+              <span>{d.label}</span>
+              <span className="font-mono tabular-nums">
+                {d.delta > 0 ? "+" : ""}
+                {d.delta.toFixed(d.digits ?? 1)}
+                {d.unit}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function SpinCard({ tag, spin }: { tag: string; spin: DisguiseResult["spinA"] }) {
   const t = receiverSpinText(spin);
   return (
     <div className="rounded-lg bg-tt-offwhite p-3">
@@ -267,7 +281,7 @@ function SpinCard({ tag, spin }: { tag: string; spin: DisguiseResult["spinA"] })
   );
 }
 
-function LimitSlider({
+export function LimitSlider({
   id,
   label,
   value,

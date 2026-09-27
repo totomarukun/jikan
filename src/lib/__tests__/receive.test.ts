@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { flyBall, mirrorState, type BallState } from "../flight";
 import { readSpin, receiveState, simulateReceive } from "../receive";
 import { PRESETS, breakdownSpin, simulateServe } from "../serve-sim";
-import { searchDisguise, searchServeForSpin, visibleDifference } from "../serve-search";
+import { compareDeception, searchDisguise, searchMostDeceptive, searchServeForSpin, visibleDifference } from "../serve-search";
 import { v } from "../vec3";
 
 const preset = (id: string) => PRESETS.find((p) => p.id === id)!.params;
@@ -93,4 +93,25 @@ describe("研究ツール", () => {
     expect(simulateReceive(d!.stateB, "flick", d!.stateA.omega).outcome).toBe("out");
     expect(simulateReceive(d!.stateB, "flick", d!.stateB.omega).outcome).toBe("in");
   }, 30000);
+
+  it("見誤り探索: 基本のフォームごと動かして、見た目の差が上限以内で回転が違う A・B の組を見つけ、読み違えの影響を数える", async () => {
+    const limits = { visibleCm: 3, visibleDeg: 10, landingCm: 20, netCm: 5 };
+    const list = await searchMostDeceptive("apex", limits, { types: ["yg", "backhand"], budgetPerType: 400 });
+    expect(list).not.toBeNull();
+    expect(list!.length).toBeGreaterThan(0);
+    for (const c of list!) {
+      const d = c.disguise;
+      expect(c.resultA.legal).toBe(true);
+      expect(c.resultA.verdict).toBe("short");
+      expect(d.result.verdict).toBe("short");
+      expect(c.spinGap).toBeGreaterThan(1);
+      // 表示している差は、細かい刻みで計算し直した A と B の差そのもの
+      expect(visibleDifference(c.resultA, d.result).meanCm).toBeCloseTo(d.visible.meanCm, 6);
+      // 崩れた数は「正しく読めば入った」うちの数
+      expect(c.misreadFailures).toBeLessThanOrEqual(c.misreadChances);
+      expect(c.checks).toHaveLength(3);
+    }
+    // 並び順どおり
+    for (let i = 1; i < list!.length; i++) expect(compareDeception(list![i - 1], list![i])).toBeLessThanOrEqual(0);
+  }, 60000);
 });
