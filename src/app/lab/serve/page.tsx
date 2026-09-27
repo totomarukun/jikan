@@ -10,9 +10,12 @@ export const metadata = {
 // 計算はすべてブラウザ内（src/lib/serve-sim.ts）で完結し、DB は使わない。
 export default function ServeLabPage() {
   return (
-    <div className="space-y-6">
-      <ServeLabIntro />
-      <ServeLab />
+    // 横画面ではシミュレーション（左）と操作（右）を並べるため、サイト共通の狭い幅から広げる
+    <div className="relative left-1/2 w-screen max-w-none -translate-x-1/2 px-4">
+      <div className="mx-auto max-w-[1440px] space-y-4">
+        <ServeLabIntro />
+        <ServeLab />
+      </div>
     </div>
   );
 }

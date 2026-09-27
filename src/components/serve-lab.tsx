@@ -6,13 +6,14 @@ import { DisguisePanel } from "@/components/serve-disguise";
 import { InversePanel } from "@/components/serve-inverse";
 import { ReceivePanel } from "@/components/serve-receive";
 import { CAMERAS, ServeViewport, type CameraId } from "@/components/serve-viewport";
+import { JOINTS, SERVE_TYPES, jointsAt, type JointKey } from "@/lib/arm";
 import { readSpin, receiveState, simulateReceive, type ReceiveTiming, type SpinRead, type Technique } from "@/lib/receive";
 import type { DisguiseResult } from "@/lib/serve-search";
 import {
-  DEFAULT_PARAMS,
   MODEL_SOURCES,
   PRESETS,
   PRO_SERVE_SPIN,
+  TABLE,
   faceNormal,
   serveInsights,
   simulateServe,
@@ -30,13 +31,15 @@ type Tab = "serve" | "receive" | "inverse" | "disguise";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "serve", label: "サーブ" },
-  { id: "receive", label: "相手の打球点・レシーブ" },
+  { id: "receive", label: "レシーブ" },
   { id: "inverse", label: "逆算" },
   { id: "disguise", label: "フォーム研究" },
 ];
 
+type ScalarKey = "height" | "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross" | "tossHeight" | "contactHeight" | "contactBehind" | "contactSide";
+
 type SliderDef = {
-  key: keyof ServeParams;
+  key: ScalarKey;
   label: string;
   min: number;
   max: number;
@@ -49,33 +52,12 @@ type SliderDef = {
 
 const GROUPS: { title: string; sliders: SliderDef[] }[] = [
   {
-    title: "ラケット面の角度",
+    title: "スイングの速さ・手首のスナップ",
     sliders: [
-      { key: "faceTilt", label: "上下の角度", min: -80, max: 89, step: 1, unit: "°", hint: "0°=垂直、＋で上向きに開く、−で下向きにかぶせる" },
-      { key: "faceYaw", label: "左右の向き", min: -60, max: 60, step: 1, unit: "°", hint: "＋で左を向く、−で右を向く（自分から見て）" },
-    ],
-  },
-  {
-    title: "スイング",
-    sliders: [
-      { key: "swingSpeed", label: "速さ", min: 0.5, max: 16, step: 0.1, unit: "m/s", hint: "打った瞬間のラケットの速さ" },
-      { key: "swingPitch", label: "上下の方向", min: -60, max: 60, step: 1, unit: "°", hint: "＋でこすり上げ、−で切り下ろし" },
-      { key: "swingYaw", label: "左右の方向", min: -70, max: 70, step: 1, unit: "°", hint: "＋で左へ、−で右へ振る" },
-    ],
-  },
-  {
-    title: "ラケットの動き（手首・腕）",
-    sliders: [
-      { key: "arcRadius", label: "スイングの回転半径", min: 0.1, max: 0.7, step: 0.01, unit: "cm", display: 100, hint: "手首だけの小さな弧 ≈15cm、前腕まで ≈40cm、腕全体 ≈60cm。小さいほど先端が速く回る" },
-      { key: "forearmRoll", label: "前腕のひねり", min: -1500, max: 1500, step: 10, unit: "°/s", hint: "柄を軸に面を回す速さ。＋で面の側から見て反時計回り" },
-      { key: "gripAngle", label: "グリップの向き", min: -180, max: 180, step: 1, unit: "°", hint: "面の上で柄がどちらを向くか。0°で柄が自分側" },
-    ],
-  },
-  {
-    title: "手首のスナップ（打球の瞬間だけ）",
-    sliders: [
-      { key: "snapBrush", label: "こする", min: -4, max: 4, step: 0.1, unit: "m/s", hint: "打球の前後 約12ms だけ面に沿って速く動かす。＋でスイング方向にさらにこする。腕の動き（見える部分）は変わらない" },
-      { key: "snapPush", label: "押す", min: -2, max: 3, step: 0.1, unit: "m/s", hint: "打球の瞬間だけボールを押し込む（＋）/ 引く（−）。押すほど回転より速さになる" },
+      { key: "tempo", label: "スイングの鋭さ", min: 0.03, max: 0.12, step: 0.001, unit: "ms", display: 1000, hint: "関節が打球の前後どれくらいの時間で動くか。短いほど鋭く速い（関節の振り幅が同じなら）" },
+      { key: "snapFlex", label: "手首のスナップ（掌屈）", min: -40, max: 40, step: 1, unit: "°", hint: "打球の前後 約12ms だけの手首の返し。腕の動き（見える部分）はほぼ変わらない" },
+      { key: "snapDev", label: "手首のスナップ（橈屈）", min: -30, max: 30, step: 1, unit: "°", hint: "同じく親指側（＋）/ 小指側（−）へ" },
+      { key: "snapPron", label: "前腕のひねり込み", min: -40, max: 40, step: 1, unit: "°", hint: "打球の前後 約20ms だけの回内（＋）/ 回外（−）" },
     ],
   },
   {
@@ -86,18 +68,19 @@ const GROUPS: { title: string; sliders: SliderDef[] }[] = [
     ],
   },
   {
-    title: "トスと打点",
+    title: "トスと打点・体",
     sliders: [
-      { key: "tossHeight", label: "トスの高さ", min: 0.1, max: 1.5, step: 0.01, unit: "cm", display: 100, hint: "手のひら（台面の高さ）から。16cm以上がルール" },
-      { key: "contactHeight", label: "打点の高さ", min: 0.02, max: 0.5, step: 0.01, unit: "cm", display: 100, hint: "台面からの高さ。低いほど低く出しやすい" },
+      { key: "tossHeight", label: "トスの高さ", min: 0.16, max: 1.5, step: 0.01, unit: "cm", display: 100, hint: "手のひら（台面の高さ）から。16cm以上がルール" },
+      { key: "contactHeight", label: "打点の高さ", min: 0.02, max: 0.5, step: 0.01, unit: "cm", display: 100, hint: "台面からの高さ" },
       { key: "contactBehind", label: "打点の前後", min: 0, max: 0.6, step: 0.01, unit: "cm", display: 100, hint: "エンドラインの後ろへの距離" },
       { key: "contactSide", label: "打点の左右", min: -0.7, max: 0.7, step: 0.01, unit: "cm", display: 100, hint: "台の中心線から。＋が左（バック側）" },
+      { key: "height", label: "身長", min: 1.4, max: 2.0, step: 0.01, unit: "cm", display: 100, hint: "腕の長さ・肩の高さを身長から決める（比率は推定）" },
     ],
   },
 ];
 
 export function ServeLab() {
-  const [params, setParams] = useState<ServeParams>(DEFAULT_PARAMS);
+  const [params, setParams] = useState<ServeParams>(PRESETS[0].params);
   const [ghost, setGhost] = useState<SimResult | null>(null);
   const [camera, setCamera] = useState<CameraId>("overview");
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(0.25);
@@ -135,8 +118,6 @@ export function ServeLab() {
   const serveEnd = result.points[result.points.length - 1]?.t ?? 1;
   const endTime = shownReceive ? Math.max(serveEnd, shownReceive.points[shownReceive.points.length - 1].t) : serveEnd;
 
-
-
   // 再生ループ（requestAnimationFrame で時刻を進める）
   const raf = useRef<number | null>(null);
   useEffect(() => {
@@ -160,289 +141,395 @@ export function ServeLab() {
     };
   }, [playing, speed, loop, endTime]);
 
-  const update = (patch: Partial<ServeParams>) => {
-    setParams((p) => ({ ...p, ...patch }));
+  const restart = () => {
     setActivePreset(null);
     setTime(0);
     setPlaying(true);
+  };
+  const update = (patch: Partial<ServeParams>) => {
+    setParams((p) => ({ ...p, ...patch }));
+    restart();
+  };
+  const updateJoint = (group: "contact" | "sweep", key: JointKey, value: number) => {
+    setParams((p) => ({ ...p, [group]: { ...p[group], [key]: value } }));
+    restart();
   };
 
   const { contact } = result;
   const phase =
     time < result.contactTime ? "トス" : result.events.find((e) => e.kind === "bounce" && e.t <= time) ? "バウンド後" : "打球直後";
+  const curve = lateralCurve(result);
+  const serveType = SERVE_TYPES.find((t) => t.id === params.serveType)!;
 
   return (
-    <div className="space-y-5">
-      {/* プリセット */}
-      <div className="flex flex-wrap gap-2">
-        {PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => {
-              setParams(p.params);
-              setActivePreset(p.id);
-              setTime(0);
-              setPlaying(true);
-            }}
-            aria-pressed={activePreset === p.id}
-            className={`min-h-11 rounded-full px-4 text-sm font-bold transition ${
-              activePreset === p.id
-                ? "bg-tt-charcoal text-white"
-                : "bg-white text-tt-charcoal ring-1 ring-tt-gray30/60 hover:bg-tt-offwhite"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+    <div className="grid gap-4 landscape:sm:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)] lg:grid-cols-[minmax(0,1.4fr)_minmax(380px,1fr)]">
+      {/* 左: シミュレーション（横画面では固定） */}
+      <div className="min-w-0 landscape:sm:sticky landscape:sm:top-2 landscape:sm:self-start lg:sticky lg:top-2 lg:self-start">
+        <div className="overflow-hidden rounded-2xl bg-tt-charcoal shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2 text-white">
+            <div>
+              <p className="font-mono text-lg font-bold leading-none sm:text-xl">
+                {(contact.ballSpeed * 3.6).toFixed(1)}
+                <span className="ml-1 text-xs font-normal">km/h</span>
+                <span className="ml-3">{contact.spin.total.toFixed(0)}</span>
+                <span className="ml-1 text-xs font-normal">rps</span>
+              </p>
+              <p className="mt-1 text-xs text-white/80">
+                {serveType.label}（{contact.hit ? contact.spin.label : "—"}）・{phase}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {CAMERAS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCamera(c.id)}
+                  aria-pressed={camera === c.id}
+                  className={`min-h-8 rounded-md px-2 text-xs font-bold ${
+                    camera === c.id ? "bg-white text-tt-charcoal" : "bg-white/15 text-white hover:bg-white/25"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ServeViewport result={result} ghost={compare} receive={shownReceive} time={time} camera={camera} />
+
+          {/* 再生コントロール */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/10 px-3 py-2 text-white">
+            <button
+              type="button"
+              onClick={() => {
+                if (!playing && time >= endTime) setTime(0);
+                setPlaying((p) => !p);
+              }}
+              className="min-h-8 rounded-md bg-white/15 px-3 text-xs font-bold hover:bg-white/25"
+            >
+              {playing ? "一時停止" : "再生"}
+            </button>
+            <label className="flex items-center gap-1 text-xs">
+              速度
+              <select
+                value={speed}
+                onChange={(e) => setSpeed(Number(e.target.value) as (typeof SPEEDS)[number])}
+                className="rounded-md bg-white/15 px-1 py-1 text-xs"
+              >
+                {SPEEDS.map((s) => (
+                  <option key={s} value={s} className="text-tt-charcoal">
+                    ×{s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1 text-xs">
+              <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
+              ループ
+            </label>
+            <input
+              type="range"
+              aria-label="再生位置"
+              min={0}
+              max={endTime}
+              step={0.001}
+              value={Math.min(time, endTime)}
+              onChange={(e) => {
+                setPlaying(false);
+                setTime(Number(e.target.value));
+              }}
+              className="min-w-24 flex-1 accent-[var(--color-gs-red)]"
+            />
+            <span className="font-mono text-xs tabular-nums">t={Math.max(0, time - result.contactTime).toFixed(3)}s</span>
+          </div>
+          <div className="grid grid-cols-3 gap-px border-t border-white/10 bg-white/10 text-white">
+            <HudStat label="横の曲がり（相手コート1バウンド目）" value={curve.first === null ? "—" : `${curve.first.toFixed(0)}cm`} />
+            <HudStat label="横の曲がり（2バウンド目）" value={curve.second === null ? "—" : `${curve.second.toFixed(0)}cm`} />
+            <HudStat label="ネット上の余裕" value={result.netClearance === null ? "—" : `${(result.netClearance * 100).toFixed(1)}cm`} />
+          </div>
+        </div>
       </div>
 
-      {/* ビューポート */}
-      <div className="overflow-hidden rounded-2xl bg-tt-charcoal shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-3 text-white">
-          <div>
-            <p className="font-mono text-xl font-bold leading-none sm:text-2xl">
-              {(contact.ballSpeed * 3.6).toFixed(1)}
-              <span className="ml-1 text-xs font-normal">km/h</span>
-              <span className="ml-3">{signed(contact.spin.topBack, 0)}</span>
-              <span className="ml-1 text-xs font-normal">rps</span>
-            </p>
-            <p className="mt-1 text-xs text-white/80">
-              サーブ（{contact.hit ? contact.spin.label : "—"}）・{phase}
-            </p>
-          </div>
-          <div className="flex gap-1">
-            {CAMERAS.map((c) => (
+      {/* 右: 変数をいじる */}
+      <div className="min-w-0 space-y-4">
+        <div>
+          <p className="text-xs font-bold text-tt-gray70">サーブの種類（右利き・基本のスイング）</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {PRESETS.map((p) => (
               <button
-                key={c.id}
+                key={p.id}
                 type="button"
-                onClick={() => setCamera(c.id)}
-                aria-pressed={camera === c.id}
-                className={`min-h-9 rounded-md px-2.5 text-xs font-bold ${
-                  camera === c.id ? "bg-white text-tt-charcoal" : "bg-white/15 text-white hover:bg-white/25"
+                onClick={() => {
+                  setParams(p.params);
+                  setActivePreset(p.id);
+                  setTime(0);
+                  setPlaying(true);
+                }}
+                aria-pressed={activePreset === p.id}
+                className={`min-h-10 rounded-full px-3 text-sm font-bold transition ${
+                  activePreset === p.id ? "bg-tt-charcoal text-white" : "bg-white text-tt-charcoal ring-1 ring-tt-gray30/60 hover:bg-tt-offwhite"
                 }`}
               >
-                {c.label}
+                {p.label}
               </button>
             ))}
           </div>
+          <p className="mt-1 text-xs text-tt-gray70">
+            {serveType.label}: {serveType.note}（{serveType.side}）
+          </p>
         </div>
-        <ServeViewport result={result} ghost={compare} receive={shownReceive} time={time} camera={camera} />
 
-        {/* 再生コントロール */}
-        <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-3 py-2 text-white">
-          <button
-            type="button"
-            onClick={() => {
-              if (!playing && time >= endTime) setTime(0);
-              setPlaying((p) => !p);
-            }}
-            className="min-h-9 rounded-md bg-white/15 px-3 text-xs font-bold hover:bg-white/25"
-          >
-            {playing ? "一時停止" : "再生"}
-          </button>
-          <label className="flex items-center gap-1 text-xs">
-            速度
-            <select
-              value={speed}
-              onChange={(e) => setSpeed(Number(e.target.value) as (typeof SPEEDS)[number])}
-              className="rounded-md bg-white/15 px-1 py-1 text-xs"
+        <div role="tablist" aria-label="研究の切り替え" className="flex gap-1 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              type="button"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`min-h-10 shrink-0 rounded-full px-3 text-sm font-bold transition ${
+                tab === t.id ? "bg-tt-charcoal text-white" : "bg-white text-tt-charcoal ring-1 ring-tt-gray30/60 hover:bg-tt-offwhite"
+              }`}
             >
-              {SPEEDS.map((s) => (
-                <option key={s} value={s} className="text-tt-charcoal">
-                  ×{s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-1 text-xs">
-            <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
-            ループ
-          </label>
-          <input
-            type="range"
-            aria-label="再生位置"
-            min={0}
-            max={endTime}
-            step={0.001}
-            value={Math.min(time, endTime)}
-            onChange={(e) => {
-              setPlaying(false);
-              setTime(Number(e.target.value));
-            }}
-            className="min-w-32 flex-1 accent-[var(--color-gs-red)]"
-          />
-          <span className="font-mono text-xs tabular-nums">t={Math.max(0, time - result.contactTime).toFixed(3)}s</span>
-        </div>
-      </div>
-
-      <div role="tablist" aria-label="研究の切り替え" className="-mb-2 flex gap-1 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            type="button"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-bold transition ${
-              tab === t.id ? "bg-tt-charcoal text-white" : "bg-white text-tt-charcoal ring-1 ring-tt-gray30/60 hover:bg-tt-offwhite"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "receive" && (
-        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
-          <ReceivePanel
-            result={result}
-            state={receiveBall && deferred.result === result ? receiveBall : receiveState(result.receiverSide, timing)}
-            timing={timing}
-            onTiming={setTiming}
-            technique={technique}
-            onTechnique={setTechnique}
-            read={read}
-            onRead={setRead}
-            receive={shownReceive}
-          />
-        </section>
-      )}
-      {tab === "inverse" && (
-        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
-          <InversePanel
-            params={params}
-            timing={timing}
-            onApply={(p) => {
-              setParams(p);
-              setActivePreset(null);
-              setTime(0);
-              setPlaying(true);
-            }}
-          />
-        </section>
-      )}
-      {tab === "disguise" && (
-        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
-          <p className="mb-3 text-xs text-tt-gray70">
-            相手が打つタイミング: {timing === "apex" ? "頂点" : timing === "rising" ? "早め（上昇中）" : "遅め（落ち際）"}
-            （「相手の打球点・レシーブ」で変えられます）
-          </p>
-          <DisguisePanel
-            params={params}
-            timing={timing}
-            variant={variant}
-            onVariant={(d) => {
-              setFound(d ? { base: params, d } : null);
-              if (d) setShowing("B");
-            }}
-            showing={showing}
-            onShowing={setShowing}
-            onAdopt={(p) => {
-              setParams(p);
-              setActivePreset(null);
-            }}
-          />
-        </section>
-      )}
-
-      {tab === "serve" && (
-      <>
-      {/* 判定と数値 */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-bold ${
-              result.legal ? "bg-tt-soft-coral text-tt-deep-coral" : "bg-tt-soft-green text-tt-green"
-            }`}
-          >
-            {result.legal ? "入った" : "ミス"}
-          </span>
-          <p className="text-sm font-bold">{result.verdictLabel}</p>
-        </div>
-        {result.warnings.length > 0 && (
-          <ul className="mt-2 space-y-1 text-xs text-tt-green">
-            {result.warnings.map((w) => (
-              <li key={w}>⚠ {w}</li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Metric label="球速（打球直後）" value={(contact.ballSpeed * 3.6).toFixed(1)} unit="km/h" />
-          <Metric label="総回転数" value={contact.spin.total.toFixed(1)} unit="rps" />
-          <Metric label="打ち出し角" value={contact.launchAngle.toFixed(0)} unit="°" />
-          <Metric
-            label="ネット上の余裕"
-            value={result.netClearance === null ? "—" : (result.netClearance * 100).toFixed(1)}
-            unit={result.netClearance === null ? "" : "cm"}
-          />
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <SpinTable title="打球直後の回転" spin={contact.hit ? contact.spin : null} />
-          <SpinTable title="相手コートでバウンドした後" spin={result.spinAtOpponent} />
-        </div>
-
-        {contact.impact && <ImpactPanel impact={contact.impact} racketOmega={norm(result.racket.omega)} />}
-
-        {(result.verdict === "short" || result.verdict === "long") && (
-          <ProComparison kind={result.verdict} spin={contact.spin.total} />
-        )}
-
-        {insights.length > 0 && (
-          <ul className="mt-4 space-y-2 rounded-xl bg-tt-offwhite p-3 text-sm leading-6">
-            {insights.map((t) => (
-              <li key={t}>・{t}</li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setGhost(result)}>
-            この軌道を比較用に残す
-          </Button>
-          {ghost && (
-            <Button variant="ghost" size="sm" onClick={() => setGhost(null)}>
-              比較を消す
-            </Button>
-          )}
-        </div>
-        {ghost && (
-          <p className="mt-2 text-xs text-tt-gray70">
-            灰色の点線が比較用の軌道（{ghost.contact.spin.label}・{(ghost.contact.ballSpeed * 3.6).toFixed(1)}km/h・
-            {ghost.contact.spin.total.toFixed(1)}rps）
-          </p>
-        )}
-      </section>
-
-      {/* 入力 */}
-      <section className="grid gap-4 sm:grid-cols-[1fr_200px]">
-        <div className="space-y-4">
-          {GROUPS.map((g) => (
-            <fieldset key={g.title} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-              <legend className="px-1 text-sm font-bold">{g.title}</legend>
-              <div className="space-y-3">
-                {g.sliders.map((s) => (
-                  <Slider key={s.key} def={s} value={(params[s.key] as number | undefined) ?? 0} onChange={(val) => update({ [s.key]: val })} />
-                ))}
-              </div>
-            </fieldset>
+              {t.label}
+            </button>
           ))}
-
         </div>
 
-        <div className="space-y-4">
-          <ContactDial params={params} />
-          <BladeHitPicker params={params} onChange={(hitAlong, hitAcross) => update({ hitAlong, hitAcross })} />
-        </div>
-      </section>
+        {tab === "receive" && (
+          <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <ReceivePanel
+              result={result}
+              state={receiveBall && deferred.result === result ? receiveBall : receiveState(result.receiverSide, timing)}
+              timing={timing}
+              onTiming={setTiming}
+              technique={technique}
+              onTechnique={setTechnique}
+              read={read}
+              onRead={setRead}
+              receive={shownReceive}
+            />
+          </section>
+        )}
+        {tab === "inverse" && (
+          <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <InversePanel
+              params={params}
+              timing={timing}
+              onApply={(p) => {
+                setParams(p);
+                restart();
+              }}
+            />
+          </section>
+        )}
+        {tab === "disguise" && (
+          <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <p className="mb-3 text-xs text-tt-gray70">
+              相手が打つタイミング: {timing === "apex" ? "頂点" : timing === "rising" ? "早め（上昇中）" : "遅め（落ち際）"}
+              （「レシーブ」で変えられます）
+            </p>
+            <DisguisePanel
+              params={params}
+              timing={timing}
+              variant={variant}
+              onVariant={(d) => {
+                setFound(d ? { base: params, d } : null);
+                if (d) setShowing("B");
+              }}
+              showing={showing}
+              onShowing={setShowing}
+              onAdopt={(p) => {
+                setParams(p);
+                setActivePreset(null);
+              }}
+            />
+          </section>
+        )}
 
-      </>
-      )}
+        {tab === "serve" && (
+          <>
+            <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    result.legal ? "bg-tt-soft-coral text-tt-deep-coral" : "bg-tt-soft-green text-tt-green"
+                  }`}
+                >
+                  {result.legal ? "入った" : "ミス"}
+                </span>
+                <p className="text-sm font-bold">{result.verdictLabel}</p>
+              </div>
+              {result.warnings.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-tt-green">
+                  {result.warnings.map((w) => (
+                    <li key={w}>⚠ {w}</li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Metric label="球速（打球直後）" value={(contact.ballSpeed * 3.6).toFixed(1)} unit="km/h" />
+                <Metric label="総回転数" value={contact.spin.total.toFixed(1)} unit="rps" />
+              </div>
+              <div className="mt-3 grid gap-2">
+                <SpinTable title="打球直後の回転" spin={contact.hit ? contact.spin : null} />
+                <SpinTable title="相手コートでバウンドした後" spin={result.spinAtOpponent} />
+              </div>
+              {(result.verdict === "short" || result.verdict === "long") && (
+                <ProComparison kind={result.verdict} spin={contact.spin.total} />
+              )}
+              {insights.length > 0 && (
+                <ul className="mt-3 space-y-2 rounded-xl bg-tt-offwhite p-3 text-sm leading-6">
+                  {insights.map((t) => (
+                    <li key={t}>・{t}</li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setGhost(result)}>
+                  この軌道を比較用に残す
+                </Button>
+                {ghost && (
+                  <Button variant="ghost" size="sm" onClick={() => setGhost(null)}>
+                    比較を消す
+                  </Button>
+                )}
+              </div>
+            </section>
 
-      <ModelBasis />
+            <JointPanel params={params} result={result} onChange={updateJoint} />
+
+            {GROUPS.map((g) => (
+              <fieldset key={g.title} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                <legend className="px-1 text-sm font-bold">{g.title}</legend>
+                <div className="space-y-3">
+                  {g.sliders.map((s) => (
+                    <Slider key={s.key} def={s} value={params[s.key] as number} onChange={(val) => update({ [s.key]: val })} />
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ContactDial result={result} />
+              <BladeHitPicker params={params} onChange={(hitAlong, hitAcross) => update({ hitAlong, hitAcross })} />
+            </div>
+
+            {contact.impact && (
+              <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+                <ImpactPanel impact={contact.impact} racketOmega={norm(result.racket.omega)} />
+              </section>
+            )}
+          </>
+        )}
+
+        <ModelBasis />
+      </div>
     </div>
+  );
+}
+
+/** サーブの横の曲がり: 打球直後の向きから、相手コートの1・2バウンド目がどれだけ横にずれたか (cm)。 */
+function lateralCurve(r: SimResult): { first: number | null; second: number | null } {
+  const pts = r.points.filter((p) => p.t > r.contactTime);
+  if (pts.length < 3) return { first: null, second: null };
+  const p0 = pts[0].p;
+  const p1 = (pts.find((p) => p.t > pts[0].t + 0.02) ?? pts[1]).p;
+  const dx = p1.x - p0.x;
+  const dy = p1.y - p0.y;
+  const L = Math.hypot(dx, dy) || 1;
+  const lat = (p: { x: number; y: number }) => Math.abs(((p.x - p0.x) * -dy + (p.y - p0.y) * dx) / L) * 100;
+  const opp = r.events.filter((e) => e.kind === "bounce" && e.p.x > TABLE.netX);
+  return { first: opp[0] ? lat(opp[0].p) : null, second: opp[1] ? lat(opp[1].p) : null };
+}
+
+function HudStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-tt-charcoal px-2 py-1.5">
+      <p className="text-[10px] leading-3 text-white/60">{label}</p>
+      <p className="mt-0.5 font-mono text-sm font-bold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+/**
+ * 関節ごとに「打球の瞬間の角度」と「スイングの振り幅」を調整する。
+ * 横棒は可動域（AAOS）で、赤い帯がスイング中に使う範囲、白い線が打球の瞬間。
+ */
+function JointPanel({
+  params,
+  result,
+  onChange,
+}: {
+  params: ServeParams;
+  result: SimResult;
+  onChange: (group: "contact" | "sweep", key: JointKey, value: number) => void;
+}) {
+  const speeds = result.racket.jointSpeeds;
+  return (
+    <fieldset className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <legend className="px-1 text-sm font-bold">体と腕（右利き）</legend>
+      <p className="text-xs leading-5 text-tt-gray70">
+        各関節の「打球の瞬間の角度」と「スイングで動かす幅」。関節は人の可動域（AAOS）の中でしか動きません。
+        帯は可動域、赤がスイング中に使う範囲、白線が打球の瞬間です。
+      </p>
+      <div className="mt-3 space-y-4">
+        {JOINTS.map((j) => {
+          const [lo, hi] = j.rom;
+          const c = params.contact[j.key];
+          const sw = params.sweep[j.key];
+          const used = [jointsAt(params, -0.12).q[j.key], jointsAt(params, 0.12).q[j.key]];
+          const a = Math.min(...used);
+          const b = Math.max(...used);
+          const pct = (x: number) => ((x - lo) / (hi - lo)) * 100;
+          const clamped = result.racket.clampedJoints.includes(j.key);
+          return (
+            <div key={j.key}>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm font-bold">
+                  {j.label}
+                  <span className="ml-1 text-[10px] font-normal text-tt-gray70">可動域 {lo}〜{hi}°（{j.source}）</span>
+                </span>
+                <span className="font-mono text-xs tabular-nums text-tt-gray70">{Math.round(speeds[j.key])}°/s</span>
+              </div>
+              <div className="relative mt-1 h-2 rounded-full bg-tt-offwhite ring-1 ring-tt-gray30/50">
+                <div
+                  className={`absolute inset-y-0 rounded-full ${clamped ? "bg-tt-green" : "bg-tt-green/60"}`}
+                  style={{ left: `${pct(a)}%`, width: `${Math.max(1, pct(b) - pct(a))}%` }}
+                />
+                <div className="absolute inset-y-[-3px] w-0.5 bg-tt-charcoal" style={{ left: `${pct(c)}%` }} />
+              </div>
+              <div className="mt-1 grid grid-cols-2 gap-3">
+                <label className="text-[11px] text-tt-gray70">
+                  打球の瞬間 <span className="font-mono text-tt-charcoal">{c}°</span>
+                  <input
+                    type="range"
+                    min={lo}
+                    max={hi}
+                    step={1}
+                    value={c}
+                    onChange={(e) => onChange("contact", j.key, Number(e.target.value))}
+                    className="block h-7 w-full accent-[var(--color-gs-red)]"
+                  />
+                </label>
+                <label className="text-[11px] text-tt-gray70">
+                  振り幅 <span className="font-mono text-tt-charcoal">{sw > 0 ? `+${sw}` : sw}°</span>
+                  <input
+                    type="range"
+                    min={-120}
+                    max={120}
+                    step={1}
+                    value={sw}
+                    onChange={(e) => onChange("sweep", j.key, Number(e.target.value))}
+                    className="block h-7 w-full accent-[var(--color-gs-blue)]"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] leading-4 text-tt-gray70">{j.hint}</p>
+            </div>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 
@@ -525,11 +612,11 @@ function Slider({ def, value, onChange }: { def: SliderDef; value: number; onCha
  * 「ボールのどこを打つか」— 自分から見たボールの裏側と、ラケットが当たる位置・こする方向。
  * 当たる位置は面の法線の逆側、矢印はスイングの面に沿った成分（＝こする向き）。
  */
-function ContactDial({ params }: { params: ServeParams }) {
+function ContactDial({ result }: { result: SimResult }) {
   const R = 70;
   const c = 90;
-  const n = faceNormal(params);
-  const sw = swingDirection(params);
+  const n = faceNormal(result);
+  const sw = swingDirection(result);
   // 自分から見て: 画面右 = −y、画面上 = +z
   const px = c + n.y * R;
   const py = c + n.z * R;

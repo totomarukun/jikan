@@ -16,16 +16,8 @@ import {
   type BallState,
   type TrajectoryPoint,
 } from "./flight";
-import {
-  buildRacketKinematics,
-  faceNormalOf,
-  simulateRacketContact,
-  swingDirectionOf,
-  type ContactResult,
-  type RacketKinematics,
-  type RacketMotionParams,
-  type RubberContactProps,
-} from "./racket";
+import { JOINTS, buildArmKinematics, type ArmKinematics, type ArmParams, type JointAngles } from "./arm";
+import { simulateRacketContact, type ContactResult, type RubberContactProps } from "./racket";
 import { dot, norm, scale, sub, v, type Vec3 } from "./vec3";
 
 export {
@@ -90,9 +82,33 @@ export const MODEL_SOURCES: { part: string; detail: string; source: string; stat
     status: "estimated",
   },
   {
-    part: "ラケットの動き",
-    detail: "手首まわりの弧＋前腕のひねり＋柄方向の押し出しを持つ剛体",
-    source: "運動学のモデル（関節の角度や筋力は扱わない）",
+    part: "飛行中の回転の減り",
+    detail: "空気のトルクで回転が減る（3m で約3%）",
+    source: "スポーツボールのトルク係数 C_M≈0.012·S（Tavares の測定、Nathan が引用）を流用。卓球の「3mで約5%」という報告と同じ桁",
+    status: "estimated",
+  },
+  {
+    part: "関節の可動域",
+    detail: "肘 0〜150°、前腕の回内・回外 各80°、手首の掌屈80°・背屈70°・橈屈20°・尺屈45°、肩の外旋90°・内旋70°",
+    source: "AAOS（米国整形外科学会）の正常可動域。肩の上腕の向き（水平・上下）はサーブで使う範囲に絞った簡略版",
+    status: "sourced",
+  },
+  {
+    part: "腕の長さ・肩の高さ",
+    detail: "身長に対する比（上腕0.186・前腕0.146・手0.108・肩の高さ0.818・肩幅0.259）",
+    source: "Winter / Drillis & Contini として広く引用される値（原典は未確認）",
+    status: "estimated",
+  },
+  {
+    part: "スイングの動き方",
+    detail: "各関節は打球の瞬間に一番速いベル型の速さで動く。ラケットの握り（親指側へ30°）も推定",
+    source: "運動のモデル化の仮定（筋力やタイミングの個人差は扱わない）",
+    status: "estimated",
+  },
+  {
+    part: "基本スイング（5種類）",
+    detail: "関節の可動域・無理のない姿勢・各サーブの体の使い方・回転の向き（順横/逆横）を満たすよう探索して決めた一例",
+    source: "回転の向きの定義: 卓球の指導サイト（順横=相手から見て左へ、巻き込み・YG・トマホーク・バックは逆横）",
     status: "estimated",
   },
   {
@@ -135,7 +151,7 @@ export const RUBBER: RubberContactProps & { label: string } = {
   contactTime: 0.001,
 };
 
-export type ServeParams = RacketMotionParams & {
+export type ServeParams = ArmParams & {
   /** トスの高さ（手のひら=台面の高さから, m） */
   tossHeight: number;
   /** 打点の高さ（台面から, m） */
@@ -205,74 +221,111 @@ export type SimResult = {
   warnings: string[];
   /** ボールがラケットに触れた時刻（トス開始から, 秒） */
   contactTime: number;
-  /** ラケットの剛体運動（描画用） */
-  racket: RacketKinematics;
+  /** 腕とラケットの動き（描画・研究用） */
+  racket: ArmKinematics;
   /** 相手コートで1バウンドした後のボールの状態（毎ms）。レシーブの打球点を選ぶのに使う */
   receiverSide: BallState[];
 };
 
-// プリセットは実測に合わせて較正: Tリーグのサーブ（Tamaki & Yoshida 2025, 1773本）の
-// 回転数の中央値は ショート 46.4rps（男子）/38.9rps（女子）、ロング 50.9/47.6rps。
-export const DEFAULT_PARAMS: ServeParams = {
+const J = (t: number, az: number, el: number, hr: number, eb: number, pr: number, wf: number, wd: number): JointAngles => ({
+  trunk: t,
+  shoulderAz: az,
+  shoulderEl: el,
+  humeralRot: hr,
+  elbow: eb,
+  pronation: pr,
+  wristFlex: wf,
+  wristDev: wd,
+});
+
+// 各サーブの基本のスイング（右利き）。関節は可動域の中、回転の向きは各サーブの定義どおり、
+// 回転数は Tリーグの実測（Tamaki & Yoshida 2025: ショート中央値 男子46.4/女子38.9rps）に
+// 合わせるよう、探索で決めた値（scripts/tune-serve-presets.mts）。
+/** 基本スイングに共通の設定（身長・トス・打点・スナップなし）。 */
+const COMMON = {
+  height: 1.7,
   tossHeight: 0.4,
   contactHeight: 0.18,
   contactBehind: 0.2,
-  contactSide: 0.35,
-  swingSpeed: 6,
-  swingPitch: -5,
-  swingYaw: -5,
-  faceTilt: 86,
-  faceYaw: 0,
-  gripAngle: 45,
-  arcRadius: 0.4,
-  forearmRoll: 0,
-  hitAlong: 0.03,
+  snapFlex: 0,
+  snapDev: 0,
+  snapPron: 0,
   hitAcross: 0,
-  snapBrush: 0,
-  snapPush: 0,
-};
+} as const;
 
 export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
   {
-    id: "backspin-short",
-    label: "下回転ショート",
-    params: DEFAULT_PARAMS,
-  },
-  {
-    id: "side-back",
-    label: "横下回転",
+    id: "pendulum",
+    label: "フォアサーブ（振り子）",
     params: {
-      ...DEFAULT_PARAMS,
-      swingSpeed: 6,
-      swingPitch: -5,
-      swingYaw: -45,
-      faceTilt: 58,
-      faceYaw: 30,
+      ...COMMON,
+      serveType: "pendulum",
       contactSide: 0.45,
+      contactHeight: 0.18,
+      contactBehind: 0.16,
+      contact: J(-49, 87, -75, 29, 82, -22, -43, -43),
+      sweep: J(1, 58, -29, -35, 4, -82, -10, -1),
+      tempo: 0.048,
+      hitAlong: -0.025,
     },
   },
   {
-    id: "knuckle",
-    label: "ナックル（無回転系）",
+    id: "hook",
+    label: "巻き込み",
     params: {
-      ...DEFAULT_PARAMS,
-      swingSpeed: 2,
-      swingPitch: -5,
-      faceTilt: 42,
+      ...COMMON,
+      serveType: "hook",
+      contactSide: 0.45,
+      contact: J(-100, 34, -56, 65, 35, -16, 60, -17),
+      sweep: J(28, -39, -33, -48, -58, 24, -3, 9),
+      tempo: 0.087,
+      hitAlong: 0,
     },
   },
   {
-    id: "topspin-long",
-    label: "上回転ロング",
+    id: "yg",
+    label: "YG",
     params: {
-      ...DEFAULT_PARAMS,
-      contactHeight: 0.14,
-      swingSpeed: 6,
-      swingPitch: 10,
-      faceTilt: -34,
+      ...COMMON,
+      serveType: "yg",
+      contactSide: 0.45,
+      contactHeight: 0.23,
+      contactBehind: 0.19,
+      contact: J(-94, 42, -77, 17, 67, -68, 28, 6),
+      sweep: J(40, -26, 1, -10, 0, -4, -27, -27),
+      tempo: 0.053,
+      hitAlong: 0,
+    },
+  },
+  {
+    id: "tomahawk",
+    label: "トマホーク",
+    params: {
+      ...COMMON,
+      serveType: "tomahawk",
+      contactSide: 0.45,
+      contact: J(-62, 60, -72, 1, 103, -12, -22, -15),
+      sweep: J(40, -52, 20, 40, -60, -59, 50, -10),
+      tempo: 0.049,
+      hitAlong: 0.005,
+    },
+  },
+  {
+    id: "backhand",
+    label: "バックサーブ",
+    params: {
+      ...COMMON,
+      serveType: "backhand",
+      contactSide: 0.1,
+      contact: J(29, 67, 8, -5, 81, -4, 22, -11),
+      sweep: J(-18, 12, 12, 58, -32, 64, 52, -52),
+      tempo: 0.092,
+      hitAlong: -0.015,
     },
   },
 ];
+
+export const DEFAULT_PARAMS: ServeParams = PRESETS[0].params;
 
 /** 実測の比較基準（Tリーグのサーブの回転数・中央値, rps）。 */
 export const PRO_SERVE_SPIN = {
@@ -308,11 +361,22 @@ function spinLabel(topBack: number, side: number, gyro: number, total: number) {
   return `${parts.join("")}回転`;
 }
 
-/** ラケット面の法線（面が向いている方向の単位ベクトル）。 */
-export const faceNormal = (p: ServeParams): Vec3 => faceNormalOf(p);
+/** 打球の瞬間のラケット面の向き（単位ベクトル）。 */
+export const faceNormal = (r: SimResult): Vec3 => r.racket.pose0.normal;
 
-/** スイング方向の単位ベクトル。 */
-export const swingDirection = (p: ServeParams): Vec3 => swingDirectionOf(p);
+/** 打球の瞬間、ボールに当たる点が動いている方向（単位ベクトル）。 */
+export function swingDirection(r: SimResult): Vec3 {
+  const pose = r.racket.pose0;
+  const hit = sub(r.events[0].p, scale(pose.normal, BALL.radius));
+  const vel = r.racket.pointVelocity(hit, 0);
+  const n = norm(vel);
+  return n > 1e-9 ? scale(vel, 1 / n) : v(1, 0, 0);
+}
+
+/** 打球の瞬間、ボールに当たる点の速さ (m/s)。 */
+export function hitPointSpeed(r: SimResult): number {
+  return r.contact.impact?.hitPointSpeed ?? 0;
+}
 
 function inOwnCourt(p: Vec3) {
   return p.x >= 0 && p.x <= TABLE.netX && Math.abs(p.y) <= TABLE.width / 2;
@@ -362,8 +426,14 @@ export function simulateServe(params: ServeParams, dt = 0.001, contactDt = 1e-6)
   const contactPos = v(start.x, start.y, params.contactHeight);
   const inVel = v(0, 0, -G * tDrop);
 
-  const n = faceNormal(params);
-  const racket = buildRacketKinematics(params, sub(contactPos, scale(n, BALL.radius)));
+  const racket = buildArmKinematics(params, contactPos);
+  const n = racket.pose0.normal;
+  if (racket.clampedJoints.length > 0) {
+    const names = racket.clampedJoints.map((k) => JOINTS.find((j) => j.key === k)?.label ?? k);
+    warnings.push(`可動域の限界に当たっています（${names.join("・")}）`);
+  }
+  if (racket.crouch < -0.03) warnings.push("背伸びしないと届かない打点です（打点を下げるか、腕の角度を見直す）");
+  if (racket.crouch > 0.5) warnings.push("かなり深くしゃがまないと届かない打点です");
   const impact = simulateRacketContact(racket, RUBBER, contactPos, inVel, v(0, 0, 0), contactDt);
 
   const nb = scale(n, -1);
@@ -505,10 +575,6 @@ export function serveInsights(r: SimResult): string[] {
     out.push(
       `ラバーがボールに食いついています。たわんだラバーが戻る力で、転がりの約${impact.overspinRatio.toFixed(1)}倍の回転になっています。`,
     );
-  }
-  // 柄の方向に押し出すスイングでは手首の弧が使えず、先端に当てても速くならない
-  if (impact && r.params.swingSpeed > 1 && norm(r.racket.pivotVel) > 0.8 * r.params.swingSpeed) {
-    out.push("柄の方向に押し出すスイングになっています。グリップの向きを変えて柄と直交する方向に振ると、手首の弧で先端が速く動きます。");
   }
   if (r.contact.hit && r.contact.spin.total > 5 && r.spinAtOpponent) {
     const drop = 1 - r.spinAtOpponent.total / r.contact.spin.total;

@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Chips, Stat, receiverSpinText } from "@/components/serve-receive";
 import type { ReceiveTiming } from "@/lib/receive";
 import { searchServeForSpin, type ServeSearchResult } from "@/lib/serve-search";
+import { JOINTS } from "@/lib/arm";
 import type { ServeParams } from "@/lib/serve-sim";
+
+const fmt = (d: number) => (d > 0 ? `+${d}` : `${d}`);
 
 /** 「相手の打球点でこの回転にしたい」から、サーブのスイングを逆算する。 */
 export function InversePanel({
@@ -47,7 +50,7 @@ export function InversePanel({
     <div className="space-y-4">
       <p className="text-sm leading-6">
         相手のラケットに当たる瞬間に<strong>この回転</strong>にしたい、を指定すると、そのサーブを出すスイングを探します。
-        トス・打点・グリップの向き・ラケットのどこに当てるかは今の設定のままです。
+        サーブの種類（体の使い方）・トス・打点・ラケットのどこに当てるかは今の設定のままで、関節は可動域の中だけで探します。
       </p>
       <div className="space-y-3 rounded-xl p-4 ring-1 ring-tt-gray30/50">
         <Range
@@ -102,13 +105,25 @@ export function InversePanel({
             相手の打球点で <strong>{found.spin.label}</strong>（{text.tb}、{text.sd}）。狙いとの差{" "}
             <span className="font-mono font-bold">{found.error.toFixed(1)}rps</span>
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Stat label="面の上下角度" value={p.faceTilt.toFixed(0)} unit="°" />
-            <Stat label="面の左右向き" value={p.faceYaw.toFixed(0)} unit="°" />
-            <Stat label="スイングの速さ" value={p.swingSpeed.toFixed(1)} unit="m/s" />
-            <Stat label="スイングの上下" value={p.swingPitch.toFixed(0)} unit="°" />
-            <Stat label="スイングの左右" value={p.swingYaw.toFixed(0)} unit="°" />
-            <Stat label="前腕のひねり" value={p.forearmRoll.toFixed(0)} unit="°/s" />
+          <p className="mt-3 text-xs font-bold">今の設定から変わる関節（打球の瞬間の角度 / 振り幅）</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {JOINTS.map((j) => {
+              const dc = p.contact[j.key] - params.contact[j.key];
+              const ds = p.sweep[j.key] - params.sweep[j.key];
+              if (Math.abs(dc) < 1 && Math.abs(ds) < 1) return null;
+              return (
+                <li key={j.key} className="flex justify-between gap-3 border-b border-tt-gray30/30 py-1">
+                  <span>{j.label}</span>
+                  <span className="font-mono tabular-nums">
+                    {p.contact[j.key]}°（{fmt(dc)}）/ 振り幅 {p.sweep[j.key]}°（{fmt(ds)}）
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Stat label="打球点の速さ" value={(found.result.contact.impact?.hitPointSpeed ?? 0).toFixed(1)} unit="m/s" />
+            <Stat label="スイングの鋭さ" value={(p.tempo * 1000).toFixed(0)} unit="ms" />
           </div>
           <div className="mt-3">
             <Button size="sm" variant="secondary" onClick={() => onApply(p)}>

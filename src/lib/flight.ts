@@ -39,11 +39,23 @@ const LOW_SPIN_LIFT_SLOPE = 1.5;
 // Ace: 台の動摩擦係数
 const TABLE_FRICTION = 0.25;
 
+// 飛行中の回転の減衰: 空気のトルク I·dω/dt = −R·ρ·A·C_M·v²、C_M ≈ 0.012·S（S = Rω/v）。
+// スポーツボールの測定（Tavares, Nathan "The Effect of Spin-Down on the Flight of a Baseball" が引用）の値を流用【推定】。
+// 卓球ボールでは 3m 飛ぶ間に約3%減る計算で、「3mで約5%減る」という報告と同じ桁。
+const SPIN_DECAY_CM_PER_S = 0.012;
+
 const AREA = Math.PI * BALL.radius ** 2;
 const K_DRAG = (0.5 * AIR_DENSITY * DRAG_COEF * AREA) / BALL.mass;
 const K_MAGNUS_BASE = ((4 / 3) * Math.PI * AIR_DENSITY * BALL.radius ** 3) / BALL.mass;
 // 中空球の慣性モーメント I = 2/3 m r²
 const INERTIA = (2 / 3) * BALL.mass * BALL.radius ** 2;
+// dω/dt = −K_SPIN_DECAY·|v|·ω（上の式を中空球の I で整理したもの）
+const K_SPIN_DECAY = (SPIN_DECAY_CM_PER_S * AIR_DENSITY * AREA * BALL.radius ** 2) / INERTIA;
+
+/** 1ステップぶん回転を減衰させる。 */
+export function decaySpin(omega: Vec3, speed: number, dt: number): Vec3 {
+  return scale(omega, Math.exp(-K_SPIN_DECAY * speed * dt));
+}
 
 export type TrajectoryPoint = { t: number; p: Vec3 };
 
@@ -164,6 +176,7 @@ export function flyBall(
     const step = rk4(pos, vel, omega, dt);
     const next = step.pos;
     vel = step.vel;
+    omega = decaySpin(omega, norm(vel), dt);
     t += dt;
 
     // ネット面（x = netX）の通過判定（向きは問わない）

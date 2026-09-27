@@ -14,22 +14,22 @@ import {
   type DisguiseMode,
   type DisguiseResult,
 } from "@/lib/serve-search";
+import { JOINTS } from "@/lib/arm";
 import type { ServeParams } from "@/lib/serve-sim";
 
 type Check = { technique: Technique; fooled: ReceiveOutcome; correct: ReceiveOutcome };
 
-// サーブの差分を、人が読める言葉にする
-const DIFF_LABELS: { key: keyof ServeParams; label: string; unit: string; scale?: number; digits?: number }[] = [
-  { key: "snapBrush", label: "手首のスナップ（こする）", unit: "m/s", digits: 1 },
-  { key: "snapPush", label: "手首のスナップ（押す）", unit: "m/s", digits: 1 },
-  { key: "forearmRoll", label: "前腕のひねり", unit: "°/s", digits: 0 },
-  { key: "hitAlong", label: "当てる位置（先端方向）", unit: "mm", scale: 1000, digits: 0 },
-  { key: "hitAcross", label: "当てる位置（横）", unit: "mm", scale: 1000, digits: 0 },
-  { key: "faceTilt", label: "面の上下角度", unit: "°", digits: 0 },
-  { key: "faceYaw", label: "面の左右向き", unit: "°", digits: 0 },
-  { key: "swingSpeed", label: "スイングの速さ", unit: "m/s", digits: 1 },
-  { key: "swingPitch", label: "スイングの上下", unit: "°", digits: 0 },
-  { key: "swingYaw", label: "スイングの左右", unit: "°", digits: 0 },
+// サーブの差分を、人が読める言葉にする（関節の角度・振り幅・スナップ・当てる位置）
+type DiffDef = { id: string; label: string; unit: string; get: (p: ServeParams) => number; scale?: number; digits?: number };
+const DIFF_LABELS: DiffDef[] = [
+  ...JOINTS.map((j) => ({ id: `c-${j.key}`, label: `${j.label}（打球の瞬間）`, unit: "°", get: (p: ServeParams) => p.contact[j.key], digits: 0 })),
+  ...JOINTS.map((j) => ({ id: `s-${j.key}`, label: `${j.label}（振り幅）`, unit: "°", get: (p: ServeParams) => p.sweep[j.key], digits: 0 })),
+  { id: "tempo", label: "スイングの鋭さ", unit: "ms", get: (p) => p.tempo, scale: 1000, digits: 0 },
+  { id: "snapFlex", label: "手首のスナップ（掌屈）", unit: "°", get: (p) => p.snapFlex, digits: 0 },
+  { id: "snapDev", label: "手首のスナップ（橈屈）", unit: "°", get: (p) => p.snapDev, digits: 0 },
+  { id: "snapPron", label: "前腕のひねり込み", unit: "°", get: (p) => p.snapPron, digits: 0 },
+  { id: "hitAlong", label: "当てる位置（先端方向）", unit: "mm", get: (p) => p.hitAlong, scale: 1000, digits: 0 },
+  { id: "hitAcross", label: "当てる位置（横）", unit: "mm", get: (p) => p.hitAcross, scale: 1000, digits: 0 },
 ];
 
 /**
@@ -93,11 +93,9 @@ export function DisguisePanel({
   };
 
   const diffs = variant
-    ? DIFF_LABELS.map((d) => {
-        const a = (params[d.key] as number | undefined) ?? 0;
-        const b = (variant.params[d.key] as number | undefined) ?? 0;
-        return { ...d, delta: (b - a) * (d.scale ?? 1) };
-      }).filter((d) => Math.abs(d.delta) >= (d.digits === 0 ? 1 : 0.1))
+    ? DIFF_LABELS.map((d) => ({ ...d, delta: (d.get(variant.params) - d.get(params)) * (d.scale ?? 1) })).filter(
+        (d) => Math.abs(d.delta) >= (d.digits === 0 ? 1 : 0.1),
+      )
     : [];
 
   return (
@@ -197,7 +195,7 @@ export function DisguisePanel({
             ) : (
               <ul className="mt-1 space-y-1 text-sm">
                 {diffs.map((d) => (
-                  <li key={d.key} className="flex justify-between gap-3 border-b border-tt-gray30/30 py-1">
+                  <li key={d.id} className="flex justify-between gap-3 border-b border-tt-gray30/30 py-1">
                     <span>{d.label}</span>
                     <span className="font-mono tabular-nums">
                       {d.delta > 0 ? "+" : ""}

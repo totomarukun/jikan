@@ -3,6 +3,7 @@
 //   2) フォーム研究: 見た目（ラケットの動き）をほぼ変えずに、回転だけを大きく変える打ち方を探す
 //
 // どちらも乱択 → 座標ごとの山登り。ブラウザを固めないよう、少しずつ await で手を離す。
+import { JOINTS } from "./arm";
 import { BLADE } from "./racket";
 import { receiveState, type ReceiveTiming } from "./receive";
 import { breakdownSpin, simulateServe, type ServeParams, type SimResult, type SpinBreakdown } from "./serve-sim";
@@ -18,7 +19,33 @@ export function spinAtReceive(r: SimResult, timing: ReceiveTiming): { state: Bal
   return { state, spin: breakdownSpin(state.omega, state.vel) };
 }
 
-type Range = { key: keyof ServeParams; min: number; max: number; step: number };
+/** 探索する変数（入れ子の関節角度も扱えるよう、読み書きの関数で持つ）。 */
+type Range = {
+  get: (p: ServeParams) => number;
+  set: (p: ServeParams, x: number) => ServeParams;
+  min: number;
+  max: number;
+  step: number;
+};
+
+/** 関節角度（打球の瞬間 or 振り幅）を base のまわり ±span で、可動域の中だけ動かす。 */
+function jointRanges(base: ServeParams, group: "contact" | "sweep", span: number, step: number): Range[] {
+  return JOINTS.map((j) => {
+    const c = base[group][j.key];
+    const [lo, hi] = group === "contact" ? j.rom : [-120, 120];
+    return {
+      get: (p: ServeParams) => p[group][j.key],
+      set: (p: ServeParams, x: number) => ({ ...p, [group]: { ...p[group], [j.key]: x } }),
+      min: Math.max(lo, c - span),
+      max: Math.min(hi, c + span),
+      step,
+    };
+  });
+}
+
+function scalarRange(key: "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross", min: number, max: number, step: number): Range {
+  return { get: (p) => p[key], set: (p, x) => ({ ...p, [key]: x }), min, max, step };
+}
 
 function mulberry32(seed: number) {
   let a = seed >>> 0;
@@ -70,7 +97,9 @@ async function optimize(
   while (used < randomBudget) {
     if (opts.isCancelled?.()) return null;
     const p = { ...base };
-    for (const r of ranges) (p[r.key] as number) = r.min + rand() * (r.max - r.min);
+    let q = p;
+    for (const r of ranges) q = r.set(q, r.min + rand() * (r.max - r.min));
+    Object.assign(p, q);
     await consider(p);
   }
   // 上位から山登り（刻みを半分にしながら）
@@ -84,7 +113,7 @@ async function optimize(
         for (const r of ranges) {
           for (const dir of [1, -1]) {
             if (opts.isCancelled?.()) return null;
-            const p = { ...cur, [r.key]: clamp((cur[r.key] as number) + dir * r.step * shrink, r.min, r.max) };
+            const p = r.set(cur, clamp(r.get(cur) + dir * r.step * shrink, r.min, r.max));
             const c = await consider(p);
             if (c < curCost) {
               cur = p;
@@ -137,13 +166,11 @@ export async function searchServeForSpin(
   base: ServeParams,
   opts: SearchOpts = {},
 ): Promise<ServeSearchResult | null> {
+  // サーブの種類（体の使い方）は変えず、打球の瞬間の関節角度・振り幅・速さを可動域の中で動かす
   const ranges: Range[] = [
-    { key: "faceTilt", min: -70, max: 89, step: 8 },
-    { key: "faceYaw", min: -50, max: 50, step: 8 },
-    { key: "swingSpeed", min: 1, max: 14, step: 1 },
-    { key: "swingPitch", min: -45, max: 45, step: 8 },
-    { key: "swingYaw", min: -70, max: 70, step: 10 },
-    { key: "forearmRoll", min: -1500, max: 1500, step: 200 },
+    ...jointRanges(base, "contact", 30, 6),
+    ...jointRanges(base, "sweep", 40, 8),
+    scalarRange("tempo", 0.035, 0.12, 0.005),
   ];
   const top = await optimize(
     base,
@@ -193,11 +220,19 @@ export function visibleDifference(a: SimResult, b: SimResult): VisibleDifference
   let max = 0;
   let face = 0;
   let n = 0;
+  // 相手に見えるのはラケットだけでなく腕も。ラケット（中心・先端・横の端）と肘・手首の位置を比べる
   const pts = (r: SimResult, tau: number) => {
-    const p = r.racket.poseAt(tau);
+    const arm = r.racket.armAt(tau);
+    const p = arm.racket;
     return {
       normal: p.normal,
-      points: [p.center, sub(p.center, scale(p.handle, BLADE.halfLength)), add3(p.center, scale(p.side, BLADE.halfWidth))],
+      points: [
+        p.center,
+        sub(p.center, scale(p.handle, BLADE.halfLength)),
+        add3(p.center, scale(p.side, BLADE.halfWidth)),
+        arm.elbow,
+        arm.wrist,
+      ],
     };
   };
   for (let tau = -VISIBLE_WINDOW_S; tau <= VISIBLE_WINDOW_S + 1e-9; tau += 0.005) {
@@ -212,7 +247,7 @@ export function visibleDifference(a: SimResult, b: SimResult): VisibleDifference
     face += (Math.acos(Math.max(-1, Math.min(1, dot(pa.normal, pb.normal)))) * 180) / Math.PI;
     n++;
   }
-  return { meanCm: sum / (n * 3), maxCm: max, faceDeg: face / n };
+  return { meanCm: sum / (n * 5), maxCm: max, faceDeg: face / n };
 }
 
 const add3 = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -276,17 +311,16 @@ export async function searchDisguise(
   if (!a.legal || !ra || !landA) return null;
   const totalA = ra.spin.total;
 
+  // どれが「見えにくい」かは決め打ちせず、すべてを少しずつ動かして、見え方は visibleDifference で測る
   const ranges: Range[] = [
-    { key: "faceTilt", min: base.faceTilt - 8, max: Math.min(89, base.faceTilt + 8), step: 2 },
-    { key: "faceYaw", min: base.faceYaw - 8, max: base.faceYaw + 8, step: 2 },
-    { key: "swingSpeed", min: base.swingSpeed * 0.8, max: base.swingSpeed * 1.2, step: base.swingSpeed * 0.05 },
-    { key: "swingPitch", min: base.swingPitch - 8, max: base.swingPitch + 8, step: 2 },
-    { key: "swingYaw", min: base.swingYaw - 8, max: base.swingYaw + 8, step: 2 },
-    { key: "forearmRoll", min: -1500, max: 1500, step: 250 },
-    { key: "hitAlong", min: -0.05, max: 0.065, step: 0.01 },
-    { key: "hitAcross", min: -0.05, max: 0.05, step: 0.01 },
-    { key: "snapBrush", min: -4, max: 4, step: 0.5 },
-    { key: "snapPush", min: -2, max: 3, step: 0.5 },
+    ...jointRanges(base, "contact", 8, 2),
+    ...jointRanges(base, "sweep", 15, 4),
+    scalarRange("tempo", base.tempo * 0.85, base.tempo * 1.15, base.tempo * 0.05),
+    scalarRange("snapFlex", -40, 40, 5),
+    scalarRange("snapDev", -30, 30, 5),
+    scalarRange("snapPron", -40, 40, 5),
+    scalarRange("hitAlong", -0.05, 0.065, 0.01),
+    scalarRange("hitAcross", -0.05, 0.05, 0.01),
   ];
   const measure = (b: SimResult) => {
     const rb = spinAtReceive(b, timing);
@@ -345,17 +379,17 @@ export async function searchDisguise(
 /** スライダーで扱いやすい刻みに丸める。 */
 function roundParams(p: ServeParams): ServeParams {
   const r = (x: number, step: number) => Math.round(x / step) * step;
+  const ra = (a: ServeParams["contact"]) =>
+    Object.fromEntries(Object.entries(a).map(([k, x]) => [k, r(x, 1)])) as ServeParams["contact"];
   return {
     ...p,
-    faceTilt: r(p.faceTilt, 1),
-    faceYaw: r(p.faceYaw, 1),
-    swingSpeed: r(p.swingSpeed, 0.1),
-    swingPitch: r(p.swingPitch, 1),
-    swingYaw: r(p.swingYaw, 1),
-    forearmRoll: r(p.forearmRoll, 10),
+    contact: ra(p.contact),
+    sweep: ra(p.sweep),
+    tempo: r(p.tempo, 0.001),
+    snapFlex: r(p.snapFlex, 1),
+    snapDev: r(p.snapDev, 1),
+    snapPron: r(p.snapPron, 1),
     hitAlong: r(p.hitAlong, 0.005),
     hitAcross: r(p.hitAcross, 0.005),
-    snapBrush: r(p.snapBrush ?? 0, 0.1),
-    snapPush: r(p.snapPush ?? 0, 0.1),
   };
 }

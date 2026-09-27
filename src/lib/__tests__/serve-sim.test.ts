@@ -9,54 +9,47 @@ import {
   simulateServe,
   tableRestitution,
 } from "../serve-sim";
+import { decaySpin } from "../flight";
+
+const preset = (id: string) => PRESETS.find((p) => p.id === id)!.params;
 
 describe("simulateServe", () => {
-  it("全プリセットがルール上入るサーブになる", () => {
-    for (const preset of PRESETS) {
-      const r = simulateServe(preset.params);
-      expect(r.legal, preset.label).toBe(true);
+  it("全プリセット（5種類の基本スイング）がルール上入るサーブになる", () => {
+    for (const p of PRESETS) {
+      const r = simulateServe(p.params);
+      expect(r.legal, p.label).toBe(true);
     }
   });
 
-  it("ラケット面を上に開いて前に振ると下回転になる", () => {
-    const r = simulateServe(DEFAULT_PARAMS);
-    expect(r.contact.spin.topBack).toBeLessThan(-10);
-    expect(r.contact.spin.label).toContain("下");
-  });
-
-  it("面をかぶせて振り上げると上回転になる", () => {
-    const r = simulateServe(PRESETS.find((p) => p.id === "topspin-long")!.params);
-    expect(r.contact.spin.topBack).toBeGreaterThan(10);
-    expect(r.verdict).toBe("long");
-  });
-
-  it("スイングを速くすると回転量が増える", () => {
-    const slow = simulateServe({ ...DEFAULT_PARAMS, swingSpeed: 4 });
-    const fast = simulateServe({ ...DEFAULT_PARAMS, swingSpeed: 8 });
+  it("スイングを鋭くする（同じ振り幅を短い時間で）と回転量が増える", () => {
+    const base = preset("hook");
+    const slow = simulateServe({ ...base, tempo: base.tempo * 1.3 });
+    const fast = simulateServe({ ...base, tempo: base.tempo * 0.8 });
     expect(fast.contact.spin.total).toBeGreaterThan(slow.contact.spin.total);
   });
 
-  it("横回転の向きに合わせて飛行中に進路が曲がる", () => {
+  it("横回転の向きに合わせて飛行中に進路が曲がる（順横は右へ、逆横は左へ）", () => {
     // 空気抵抗は進行方向に沿うので、水平面での向きを変えるのは横回転（マグヌス力）だけ
+    // 打球から自コートの1バウンド目までの「空中」だけで測る（バウンドでの横跳ねは別の現象）
     const heading = (r: ReturnType<typeof simulateServe>) => {
-      const i = r.points.findIndex((pt) => pt.t > r.contactTime);
-      const a = r.points[i];
-      const b = r.points[i + 20];
-      const c = r.points[i + 21];
-      const early = Math.atan2(r.points[i + 1].p.y - a.p.y, r.points[i + 1].p.x - a.p.x);
-      const late = Math.atan2(c.p.y - b.p.y, c.p.x - b.p.x);
+      const firstBounce = r.events.find((e) => e.kind === "bounce")!.t;
+      const pts = r.points.filter((pt) => pt.t > r.contactTime && pt.t < firstBounce);
+      const a = pts[0];
+      const b = pts[1];
+      const c = pts[pts.length - 2];
+      const d = pts[pts.length - 1];
+      const early = Math.atan2(b.p.y - a.p.y, b.p.x - a.p.x);
+      const late = Math.atan2(d.p.y - c.p.y, d.p.x - c.p.x);
       return late - early;
     };
-    const left = simulateServe({ ...DEFAULT_PARAMS, faceTilt: 0, faceYaw: 45, swingYaw: -15, swingSpeed: 5 });
-    const right = simulateServe({ ...DEFAULT_PARAMS, faceTilt: 0, faceYaw: -45, swingYaw: 15, swingSpeed: 5 });
-    expect(left.contact.spin.side).toBeGreaterThan(5);
-    expect(right.contact.spin.side).toBeLessThan(-5);
-    expect(heading(left)).toBeGreaterThan(0);
-    expect(heading(right)).toBeLessThan(0);
+    expect(heading(simulateServe(preset("pendulum")))).toBeLessThan(0);
+    expect(heading(simulateServe(preset("tomahawk")))).toBeGreaterThan(0);
   });
 
-  it("面とスイングが離れる向きだと空振りになる", () => {
-    const r = simulateServe({ ...DEFAULT_PARAMS, faceTilt: -80, swingPitch: 60 });
+  it("ラケットがボールから離れる向きに動くと空振りになる", () => {
+    const base = preset("hook");
+    const away = Object.fromEntries(Object.entries(base.sweep).map(([k, x]) => [k, -x])) as typeof base.sweep;
+    const r = simulateServe({ ...base, sweep: away });
     expect(r.verdict).toBe("whiff");
     expect(r.legal).toBe(false);
   });
@@ -67,22 +60,23 @@ describe("simulateServe", () => {
     expect(r.legal).toBe(false);
   });
 
-  it("ボール上の接触位置は面の向きから求まる（面を上に向けるほど下側）", () => {
-    const open = simulateServe({ ...DEFAULT_PARAMS, faceTilt: 80 });
-    const vertical = simulateServe({ ...DEFAULT_PARAMS, faceTilt: 0 });
-    expect(open.contact.contactOnBall.fromBottomDeg).toBeCloseTo(10, 5);
-    expect(vertical.contact.contactOnBall.fromBottomDeg).toBeCloseTo(90, 5);
+  it("ボール上の接触位置は、打球の瞬間の面の向きから求まる", () => {
+    const r = simulateServe(DEFAULT_PARAMS);
+    const n = r.racket.pose0.normal;
+    expect(r.contact.contactOnBall.fromBottomDeg).toBeCloseTo((Math.acos(n.z) * 180) / Math.PI, 5);
   });
 });
 
 describe("serveInsights", () => {
   it("短いサーブでは2バウンド目の位置を伝える", () => {
-    const tips = serveInsights(simulateServe(DEFAULT_PARAMS));
+    const tips = serveInsights(simulateServe(preset("hook")));
     expect(tips.some((t) => t.includes("2バウンド"))).toBe(true);
   });
 
   it("空振りでは当たらない理由を伝える", () => {
-    const tips = serveInsights(simulateServe({ ...DEFAULT_PARAMS, faceTilt: -80, swingPitch: 60 }));
+    const base = preset("hook");
+    const away = Object.fromEntries(Object.entries(base.sweep).map(([k, x]) => [k, -x])) as typeof base.sweep;
+    const tips = serveInsights(simulateServe({ ...base, sweep: away }));
     expect(tips[0]).toContain("当たっていません");
   });
 });
@@ -113,28 +107,27 @@ describe("実測との照合", () => {
     expect(lift(50)).toBeLessThan(lift(300) * 1.01);
   });
 
-  it("ショートサーブのプリセットはTリーグの回転数の範囲に入る", () => {
+  it("全プリセットの回転数はTリーグのショートサーブの範囲に入る", () => {
     // 中央値 ± 四分位範囲の半分（男子 46.4±15.8/2、女子 38.9±13.6/2）の外側の包絡
     const lo = PRO_SERVE_SPIN.short.women - 13.6 / 2;
     const hi = PRO_SERVE_SPIN.short.men + 15.8 / 2;
-    for (const id of ["backspin-short", "side-back"]) {
-      const r = simulateServe(PRESETS.find((p) => p.id === id)!.params);
-      expect(r.verdict, id).toBe("short");
-      expect(r.contact.spin.total, id).toBeGreaterThan(lo);
-      expect(r.contact.spin.total, id).toBeLessThan(hi);
+    for (const p of PRESETS) {
+      const r = simulateServe(p.params);
+      expect(r.verdict, p.label).toBe("short");
+      expect(r.contact.spin.total, p.label).toBeGreaterThan(lo);
+      expect(r.contact.spin.total, p.label).toBeLessThan(hi);
     }
   });
 
-  it("ロングサーブのプリセットはTリーグの回転数の範囲に入る", () => {
-    const lo = PRO_SERVE_SPIN.long.women - 14.7 / 2;
-    const hi = PRO_SERVE_SPIN.long.men + 13.8 / 2;
-    const r = simulateServe(PRESETS.find((p) => p.id === "topspin-long")!.params);
-    expect(r.contact.spin.total).toBeGreaterThan(lo);
-    expect(r.contact.spin.total).toBeLessThan(hi);
+  it("台でのバウンドでは横回転（縦軸まわり）はほぼ変わらない（Ace の接触モデル。空気での減衰ぶんだけ減る）", () => {
+    const r = simulateServe(preset("tomahawk"));
+    expect(Math.abs(r.spinAtOpponent!.side - r.contact.spin.side) / Math.abs(r.contact.spin.side)).toBeLessThan(0.05);
   });
 
-  it("台でのバウンドでは横回転（縦軸まわり）は変わらない（Ace の接触モデル）", () => {
-    const r = simulateServe(PRESETS.find((p) => p.id === "side-back")!.params);
-    expect(r.spinAtOpponent!.side).toBeCloseTo(r.contact.spin.side, 0);
+  it("飛行中の回転の減衰: 3m 飛ぶと約3%（スポーツボールのトルク係数 0.012·S）", () => {
+    let w = { x: 0, y: 300, z: 0 };
+    for (let i = 0; i < 300; i++) w = decaySpin(w, 10, 0.001);
+    expect(1 - w.y / 300).toBeGreaterThan(0.02);
+    expect(1 - w.y / 300).toBeLessThan(0.05);
   });
 });

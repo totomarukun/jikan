@@ -1,9 +1,10 @@
 "use client";
 
+import type { ArmPose } from "@/lib/arm";
 import { BLADE, type RacketPose } from "@/lib/racket";
 import type { ReceiveResult } from "@/lib/receive";
 import { BALL, TABLE, positionAt, swingDirection, type SimResult } from "@/lib/serve-sim";
-import { add, cross, dot, norm, scale, sub, unit, type Vec3 } from "@/lib/vec3";
+import { add, cross, dot, scale, sub, unit, type Vec3 } from "@/lib/vec3";
 
 export type CameraId = "racket" | "overview" | "behind" | "side" | "top";
 
@@ -99,14 +100,15 @@ export function ServeViewport({
   // ラケット: 計算した剛体運動（手首まわりの弧＋前腕のひねり）に沿って動かす。
   // 表示するのは打球の前後、ラケットが最大 ±70° ほど回る範囲。
   const kin = result.racket;
-  const w = Math.max(1e-6, norm(kin.omega));
-  const tauMin = -Math.min(0.12, 1.2 / w);
-  const tauMax = Math.min(0.08, 0.8 / w);
+  // 腕のモデルでは関節角度が振り幅の範囲で止まるので、スイング全体（約 ±2.5×鋭さ）を見せる
+  const tauMin = -(2.5 * result.params.tempo + 0.03);
+  const tauMax = 2.5 * result.params.tempo + 0.03;
   const tau = Math.min(tauMax, Math.max(tauMin, time - result.contactTime));
   const pose = kin.poseAt(tau);
   // スイング軌道（ブレード中心の通り道）
   const trail = Array.from({ length: 41 }, (_, i) => kin.poseAt(tauMin + ((tauMax - tauMin) * i) / 40).center);
-  const swing = swingDirection(result.params);
+  const swing = swingDirection(result);
+  const arm = kin.armAt(tau);
   const [s0x, s0y] = project(kin.pose0.center);
   const [s1x, s1y] = project(add(kin.pose0.center, scale(swing, 0.12)));
 
@@ -190,6 +192,7 @@ export function ServeViewport({
 
       {/* スイング軌道・ラケット（柄＋ブレード）・打球の瞬間のスイング方向 */}
       <polyline points={poly(project, trail)} fill="none" stroke="#ffd166" strokeOpacity={0.45} strokeWidth={2} />
+      <ArmShape arm={arm} project={project} />
       <RacketShape pose={pose} project={project} camPos={cam.pos} tone="server" />
       {Math.abs(tau) < 0.01 && (
         <line x1={s0x} y1={s0y} x2={s1x} y2={s1y} stroke="#ffd166" strokeWidth={2} markerEnd="url(#arrow)" />
@@ -230,6 +233,28 @@ function RacketShape({
         stroke={facingCamera ? faceStroke : "#6a6a72"}
         strokeWidth={1.5}
       />
+    </g>
+  );
+}
+
+/** 体と右腕（肩・上腕・前腕・手）。 */
+function ArmShape({ arm, project }: { arm: ArmPose; project: (p: Vec3) => [number, number, number] }) {
+  const seg = (a: Vec3, b: Vec3, w: number, color: string, key: string) => {
+    const [x1, y1] = project(a);
+    const [x2, y2] = project(b);
+    return <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={w} strokeLinecap="round" />;
+  };
+  const hip = add(arm.spine, { x: 0, y: 0, z: -0.5 });
+  const head = add(arm.spine, { x: 0, y: 0, z: 0.25 });
+  const [hx, hy, hz] = project(head);
+  return (
+    <g opacity={0.95}>
+      {seg(arm.spine, hip, 10, "#5a5f6b", "torso")}
+      {seg(arm.leftShoulder, arm.shoulder, 8, "#5a5f6b", "shoulders")}
+      <circle cx={hx} cy={hy} r={Math.max(6, 900 / (hz * 12))} fill="#5a5f6b" />
+      {seg(arm.shoulder, arm.elbow, 7, "#c9ced8", "upper")}
+      {seg(arm.elbow, arm.wrist, 6, "#c9ced8", "fore")}
+      {seg(arm.wrist, arm.grip, 5, "#e2c9a8", "hand")}
     </g>
   );
 }

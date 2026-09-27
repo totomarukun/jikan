@@ -112,13 +112,10 @@ export type RacketPose = {
   side: Vec3;
 };
 
+/** 接触計算に必要な、ラケットの剛体運動（腕のモデルでも単純なモデルでも同じ形）。 */
 export type RacketKinematics = {
   /** 打球の瞬間（τ=0）の姿勢 */
   pose0: RacketPose;
-  /** 回転中心（手首）の位置（τ=0） */
-  pivot0: Vec3;
-  /** 回転中心の並進速度（柄方向に押し出す成分） */
-  pivotVel: Vec3;
   /** ラケットの角速度ベクトル (rad/s) */
   omega: Vec3;
   /** τ 秒後の姿勢 */
@@ -153,7 +150,10 @@ function handleDirection(n: Vec3, gripAngle: number): Vec3 {
  * ラケットの剛体運動を組み立てる。打球の瞬間にブレード上の打球点が hitPoint にあるよう置く。
  * 運動 = 手首（柄の延長上、ブレード中心から arcRadius）まわりの回転 ＋ 柄方向の押し出し。
  */
-export function buildRacketKinematics(p: RacketMotionParams, hitPoint: Vec3): RacketKinematics {
+export function buildRacketKinematics(
+  p: RacketMotionParams,
+  hitPoint: Vec3,
+): RacketKinematics & { pivot0: Vec3; pivotVel: Vec3 } {
   const n = faceNormalOf(p);
   const h = handleDirection(n, p.gripAngle);
   const s = cross(n, h);
