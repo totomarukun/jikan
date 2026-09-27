@@ -83,6 +83,9 @@ export default function RootLayout({
               <Link href="/compare/select" className="hover:text-tt-green">
                 対決を作る
               </Link>
+              <Link href="/lab/serve" className="hover:text-tt-green">
+                サーブ解析ラボ
+              </Link>
               <Link href="/terms" className="hover:text-tt-green">
                 利用規約
               </Link>
