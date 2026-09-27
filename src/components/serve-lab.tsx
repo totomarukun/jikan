@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DisguisePanel } from "@/components/serve-disguise";
 import { AbReceiverCompare } from "@/components/serve-ab-compare";
 import { DeceptionPanel, type DeceptionRun } from "@/components/serve-deception";
+import { SpinShiftPanel, type ShiftRun } from "@/components/serve-spin-shift";
 import { InversePanel } from "@/components/serve-inverse";
 import { ReceivePanel } from "@/components/serve-receive";
 import { CAMERAS, ServeViewport, type CameraId } from "@/components/serve-viewport";
@@ -29,7 +30,7 @@ import { norm } from "@/lib/vec3";
 
 const SPEEDS = [0.1, 0.25, 0.5, 1] as const;
 
-type Tab = "serve" | "receive" | "inverse" | "disguise" | "deceive";
+type Tab = "serve" | "receive" | "inverse" | "disguise" | "deceive" | "spin";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "serve", label: "サーブ" },
@@ -37,6 +38,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "inverse", label: "逆算" },
   { id: "disguise", label: "フォーム研究" },
   { id: "deceive", label: "見誤り探索" },
+  { id: "spin", label: "回転の変化" },
 ];
 
 type ScalarKey = "height" | "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross" | "tossHeight" | "contactHeight" | "contactBehind" | "contactSide";
@@ -102,6 +104,8 @@ export function ServeLab() {
   const variant = found && found.base === params ? found.d : null;
   // 見誤り探索の結果（タブを切り替えても残す）。選んだ組は A を今のサーブ・B をフォーム研究の B にして表示する
   const [deception, setDeception] = useState<DeceptionRun | null>(null);
+  // 回転の変化探索の結果（タブを切り替えても残す）
+  const [shiftRun, setShiftRun] = useState<ShiftRun | null>(null);
   const selectedDeception = variant ? (deception?.list.find((c) => c.disguise === variant) ?? null) : null;
   const showing = variant ? showingRaw : "A";
 
@@ -115,7 +119,7 @@ export function ServeLab() {
   const deferred = useDeferredValue({ result, timing, technique, read, tab });
   const receiveBall = useMemo(() => receiveState(deferred.result.receiverSide, deferred.timing), [deferred.result, deferred.timing]);
   const receive = useMemo(() => {
-    if (!receiveBall || deferred.tab === "serve" || deferred.tab === "inverse") return null;
+    if (!receiveBall || deferred.tab === "serve" || deferred.tab === "inverse" || deferred.tab === "spin") return null;
     const readOmega = readSpin(receiveBall.omega, receiveBall.vel, deferred.read);
     return simulateReceive(receiveBall, deferred.technique, readOmega);
   }, [receiveBall, deferred.technique, deferred.read, deferred.tab]);
@@ -360,6 +364,22 @@ export function ServeLab() {
               onAdopt={(p) => {
                 setParams(p);
                 setActivePreset(null);
+              }}
+            />
+          </section>
+        )}
+
+        {tab === "spin" && (
+          <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <SpinShiftPanel
+              result={result}
+              params={params}
+              timing={timing}
+              run={shiftRun}
+              onRun={setShiftRun}
+              onApply={(c) => {
+                setParams(c.params);
+                restart();
               }}
             />
           </section>

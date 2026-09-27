@@ -358,6 +358,8 @@ function spinLabel(topBack: number, side: number, gyro: number, total: number) {
   if (Math.abs(side) >= main * 0.4) parts.push("横");
   if (Math.abs(topBack) >= main * 0.4) parts.push(topBack > 0 ? "上" : "下");
   if (parts.length === 0) return "ジャイロ回転";
+  // ジャイロ（進行方向の軸まわり）がいちばん大きいときは、それも名前に入れる
+  if (Math.abs(gyro) >= main) return `${parts.join("")}回転（ジャイロ多め）`;
   return `${parts.join("")}回転`;
 }
 

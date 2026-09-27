@@ -12,7 +12,7 @@ import { dot, norm, scale, sub, type Vec3 } from "./vec3";
 import type { BallState } from "./flight";
 
 /** 探索中は刻みを粗くして速くする（最後に細かい刻みで計算し直す）。 */
-const COARSE = { dt: 0.003, contactDt: 6e-6 };
+export const COARSE = { dt: 0.003, contactDt: 6e-6 };
 
 export function spinAtReceive(r: SimResult, timing: ReceiveTiming): { state: BallState; spin: SpinBreakdown } | null {
   const state = receiveState(r.receiverSide, timing);
@@ -21,7 +21,7 @@ export function spinAtReceive(r: SimResult, timing: ReceiveTiming): { state: Bal
 }
 
 /** 探索する変数（入れ子の関節角度も扱えるよう、読み書きの関数で持つ）。 */
-type Range<T = ServeParams> = {
+export type Range<T = ServeParams> = {
   get: (p: T) => number;
   set: (p: T, x: number) => T;
   min: number;
@@ -30,7 +30,7 @@ type Range<T = ServeParams> = {
 };
 
 /** 関節角度（打球の瞬間 or 振り幅）を base のまわり ±span で、可動域の中だけ動かす。 */
-function jointRanges(base: ServeParams, group: "contact" | "sweep", span: number, step: number): Range[] {
+export function jointRanges(base: ServeParams, group: "contact" | "sweep", span: number, step: number): Range[] {
   return JOINTS.map((j) => {
     const c = base[group][j.key];
     const [lo, hi] = group === "contact" ? j.rom : [-120, 120];
@@ -46,11 +46,11 @@ function jointRanges(base: ServeParams, group: "contact" | "sweep", span: number
 
 type ScalarKey = "tempo" | "snapFlex" | "snapDev" | "snapPron" | "hitAlong" | "hitAcross" | "contactHeight" | "contactBehind" | "contactSide";
 
-function scalarRange(key: ScalarKey, min: number, max: number, step: number): Range {
+export function scalarRange(key: ScalarKey, min: number, max: number, step: number): Range {
   return { get: (p) => p[key], set: (p, x) => ({ ...p, [key]: x }), min, max, step };
 }
 
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -62,9 +62,9 @@ function mulberry32(seed: number) {
 }
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
-const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+export const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
-type SearchOpts = {
+export type SearchOpts = {
   budget?: number;
   onProgress?: (fraction: number) => void;
   isCancelled?: () => boolean;
@@ -74,7 +74,7 @@ type SearchOpts = {
 };
 
 /** 乱択＋座標山登りの共通部分。cost は小さいほど良い。 */
-async function optimize<T = ServeParams>(
+export async function optimize<T = ServeParams>(
   base: T,
   ranges: Range<T>[],
   cost: (p: T) => number,
@@ -528,7 +528,7 @@ function pairRanges(base: ServeParams, wide: boolean): { aRanges: Range<Pair>[];
 }
 
 /** 人が無理なく打てる姿勢か（関節が可動域の端に張り付かない・しゃがみ込みすぎない）。 */
-function postureCost(r: SimResult) {
+export function postureCost(r: SimResult) {
   return 20 * r.racket.clampedJoints.length + 500 * (Math.max(0, 0.03 - r.racket.crouch) + Math.max(0, r.racket.crouch - 0.45));
 }
 
