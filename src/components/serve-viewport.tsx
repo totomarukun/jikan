@@ -1,18 +1,13 @@
 "use client";
 
-import {
-  BALL,
-  TABLE,
-  faceNormal,
-  positionAt,
-  swingDirection,
-  type SimResult,
-  type Vec3,
-} from "@/lib/serve-sim";
+import { BLADE } from "@/lib/racket";
+import { BALL, TABLE, positionAt, swingDirection, type SimResult } from "@/lib/serve-sim";
+import { add, cross, dot, norm, scale, sub, unit, type Vec3 } from "@/lib/vec3";
 
-export type CameraId = "overview" | "behind" | "side" | "top";
+export type CameraId = "racket" | "overview" | "behind" | "side" | "top";
 
 export const CAMERAS: { id: CameraId; label: string }[] = [
+  { id: "racket", label: "打点アップ" },
   { id: "overview", label: "全体" },
   { id: "behind", label: "後ろ" },
   { id: "side", label: "横" },
@@ -24,23 +19,11 @@ const H = 450;
 
 type Camera = { pos: Vec3; target: Vec3; up: Vec3; focal: number };
 
-const CAMERA_DEFS: Record<CameraId, Camera> = {
+const CAMERA_DEFS: Record<Exclude<CameraId, "racket">, Camera> = {
   overview: { pos: { x: -1.2, y: -1.3, z: 0.95 }, target: { x: 1.0, y: 0.15, z: 0 }, up: { x: 0, y: 0, z: 1 }, focal: 640 },
   behind: { pos: { x: -2.1, y: 0, z: 0.75 }, target: { x: 1.4, y: 0, z: 0 }, up: { x: 0, y: 0, z: 1 }, focal: 760 },
   side: { pos: { x: 1.2, y: -9, z: 0.2 }, target: { x: 1.2, y: 0, z: 0.2 }, up: { x: 0, y: 0, z: 1 }, focal: 2300 },
   top: { pos: { x: 1.3, y: 0, z: 9 }, target: { x: 1.3, y: 0, z: 0 }, up: { x: 1, y: 0, z: 0 }, focal: 1300 },
-};
-
-const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
-const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
-const cross = (a: Vec3, b: Vec3): Vec3 => ({
-  x: a.y * b.z - a.z * b.y,
-  y: a.z * b.x - a.x * b.z,
-  z: a.x * b.y - a.y * b.x,
-});
-const unit = (a: Vec3): Vec3 => {
-  const n = Math.hypot(a.x, a.y, a.z) || 1;
-  return { x: a.x / n, y: a.y / n, z: a.z / n };
 };
 
 function makeProjector(cam: Camera) {
@@ -80,7 +63,13 @@ export function ServeViewport({
   time: number;
   camera: CameraId;
 }) {
-  const project = makeProjector(CAMERA_DEFS[camera]);
+  const contact = result.events[0].p;
+  // 打点アップ: 打点を斜め後ろ・やや上から見る
+  const cam: Camera =
+    camera === "racket"
+      ? { pos: add(contact, { x: -0.55, y: -0.5, z: 0.28 }), target: contact, up: { x: 0, y: 0, z: 1 }, focal: 900 }
+      : CAMERA_DEFS[camera];
+  const project = makeProjector(cam);
   const hw = TABLE.width / 2;
   const L = TABLE.length;
   const legH = -TABLE.heightFromFloor;
@@ -97,28 +86,31 @@ export function ServeViewport({
   // ボール（時刻に応じた位置）と台面上の影
   const ballPos = positionAt(result.points, time);
   const [bx, by, bz] = project(ballPos);
-  const ballR = Math.max(3, (CAMERA_DEFS[camera].focal * BALL.radius) / bz);
+  const ballR = Math.max(3, (cam.focal * BALL.radius) / bz);
   const shadowOnTable =
     ballPos.x >= 0 && ballPos.x <= L && Math.abs(ballPos.y) <= hw && ballPos.z > 0;
   const [sx, sy] = project(P(ballPos.x, ballPos.y, 0));
 
-  // ラケット: 打点でボールの背後に、面の法線を向けて置く
-  const n = faceNormal(result.params);
-  const contact = result.events[0].p;
-  const center = P(
-    contact.x - n.x * (BALL.radius + 0.005),
-    contact.y - n.y * (BALL.radius + 0.005),
-    contact.z - n.z * (BALL.radius + 0.005),
-  );
-  const helper = Math.abs(n.z) < 0.9 ? P(0, 0, 1) : P(1, 0, 0);
-  const a = unit(cross(n, helper));
-  const b = cross(n, a);
-  const racketPts = ring(center, 0.075, a, b);
-  const showRacket = time <= result.contactTime + 0.25;
-
+  // ラケット: 計算した剛体運動（手首まわりの弧＋前腕のひねり）に沿って動かす。
+  // 表示するのは打球の前後、ラケットが最大 ±70° ほど回る範囲。
+  const kin = result.racket;
+  const w = Math.max(1e-6, norm(kin.omega));
+  const tauMin = -Math.min(0.12, 1.2 / w);
+  const tauMax = Math.min(0.08, 0.8 / w);
+  const tau = Math.min(tauMax, Math.max(tauMin, time - result.contactTime));
+  const pose = kin.poseAt(tau);
+  const blade = ring(pose.center, 1, scale(pose.side, BLADE.halfWidth), scale(pose.handle, BLADE.halfLength), 32);
+  const handleStart = add(pose.center, scale(pose.handle, BLADE.halfLength * 0.92));
+  const handleEnd = add(pose.center, scale(pose.handle, BLADE.halfLength + BLADE.handleLength));
+  const hw2 = scale(pose.side, 0.0125);
+  const handlePoly = [add(handleStart, hw2), add(handleEnd, hw2), sub(handleEnd, hw2), sub(handleStart, hw2)];
+  // カメラ側を向いている面の色: 打つ面（赤ラバー）か裏面（黒ラバー）か
+  const facingCamera = dot(pose.normal, sub(cam.pos, pose.center)) > 0;
+  // スイング軌道（ブレード中心の通り道）
+  const trail = Array.from({ length: 41 }, (_, i) => kin.poseAt(tauMin + ((tauMax - tauMin) * i) / 40).center);
   const swing = swingDirection(result.params);
-  const [s0x, s0y] = project(center);
-  const [s1x, s1y] = project(P(center.x + swing.x * 0.25, center.y + swing.y * 0.25, center.z + swing.z * 0.25));
+  const [s0x, s0y] = project(kin.pose0.center);
+  const [s1x, s1y] = project(add(kin.pose0.center, scale(swing, 0.12)));
 
   const bounceMarks = result.events.filter((e) => e.kind === "bounce" || e.kind === "net");
 
@@ -192,12 +184,19 @@ export function ServeViewport({
         );
       })}
 
-      {/* ラケット面とスイング方向 */}
-      {showRacket && (
-        <g>
-          <polygon points={poly(project, racketPts)} fill="var(--color-gs-red)" fillOpacity={0.55} stroke="#ff8a95" strokeWidth={1.5} />
-          <line x1={s0x} y1={s0y} x2={s1x} y2={s1y} stroke="#ffd166" strokeWidth={2} markerEnd="url(#arrow)" />
-        </g>
+      {/* スイング軌道・ラケット（柄＋ブレード）・打球の瞬間のスイング方向 */}
+      <polyline points={poly(project, trail)} fill="none" stroke="#ffd166" strokeOpacity={0.45} strokeWidth={2} />
+      <g>
+        <polygon points={poly(project, handlePoly)} fill="#c9a36b" stroke="#6b5230" strokeWidth={1} />
+        <polygon
+          points={poly(project, blade)}
+          fill={facingCamera ? "var(--color-gs-red)" : "#1f1f24"}
+          stroke={facingCamera ? "#ff8a95" : "#6a6a72"}
+          strokeWidth={1.5}
+        />
+      </g>
+      {Math.abs(tau) < 0.01 && (
+        <line x1={s0x} y1={s0y} x2={s1x} y2={s1y} stroke="#ffd166" strokeWidth={2} markerEnd="url(#arrow)" />
       )}
 
       {/* ボール */}

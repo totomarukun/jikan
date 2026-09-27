@@ -12,6 +12,17 @@
 //     台の反発 ε=0.98−0.02·v_z、摩擦 μ=0.25、滑り/転がりの切り替え。
 //   - ラケット: Ace と同じ撃力モデルの形。ただし論文はラバーの係数を公開していないため、
 //     反発の速度依存（衝突速度 1m/s あたり約 0.019 低下, ISJOS v15）以外は推定値。
+import {
+  buildRacketKinematics,
+  faceNormalOf,
+  simulateRacketContact,
+  swingDirectionOf,
+  type ContactResult,
+  type RacketKinematics,
+  type RacketMotionParams,
+} from "./racket";
+import { add, cross, norm, scale, sub, v, dot, type Vec3 } from "./vec3";
+
 export const TABLE = {
   length: 2.74,
   width: 1.525,
@@ -55,22 +66,9 @@ export function tableRestitution(vzIn: number) {
   return Math.min(0.98, Math.max(0.5, 0.98 - 0.02 * Math.abs(vzIn)));
 }
 
-/** ラバーの反発係数。衝突速度 1m/s あたり 0.019 下がる（ISJOS v15, 1.4〜20.2m/s で線形）。 */
-export function racketRestitution(base: number, vnIn: number) {
-  return Math.max(0.3, base - 0.019 * Math.abs(vnIn));
-}
 
-export type Vec3 = { x: number; y: number; z: number };
-
-const v = (x: number, y: number, z: number): Vec3 => ({ x, y, z });
-const add = (a: Vec3, b: Vec3) => v(a.x + b.x, a.y + b.y, a.z + b.z);
-const sub = (a: Vec3, b: Vec3) => v(a.x - b.x, a.y - b.y, a.z - b.z);
-const scale = (a: Vec3, s: number) => v(a.x * s, a.y * s, a.z * s);
-const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
-const cross = (a: Vec3, b: Vec3) =>
-  v(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
-const norm = (a: Vec3) => Math.hypot(a.x, a.y, a.z);
-const rad = (deg: number) => (deg * Math.PI) / 180;
+export type { Vec3 } from "./vec3";
+export { racketRestitution } from "./racket";
 
 /** 画面に出すモデルの根拠。status: sourced = 論文・規格の値 / estimated = 推定値。 */
 export const MODEL_SOURCES: { part: string; detail: string; source: string; status: "sourced" | "estimated" }[] = [
@@ -105,6 +103,24 @@ export const MODEL_SOURCES: { part: string; detail: string; source: string; stat
     status: "sourced",
   },
   {
+    part: "ボールがラバーに触れている時間",
+    detail: "約1ms（押す方向はばね＋ダンパー、1マイクロ秒刻みで計算）",
+    source: "広く引用される値。硬いガラス板で約0.6ms（Phys. Rev. E のボール座屈実験）",
+    status: "estimated",
+  },
+  {
+    part: "ラバーのたわみによる回転の上乗せ",
+    detail: "表面が横にたわんで戻る力で、転がり以上に回る（over-spin）",
+    source: "現象は Rinaldi et al., Applied Sciences (2019) が実験で確認。強さ（横/縦の硬さ比 0.67）は弾性理論（Mindlin）からの推定",
+    status: "estimated",
+  },
+  {
+    part: "ラケットの動き",
+    detail: "手首まわりの弧＋前腕のひねり＋柄方向の押し出しを持つ剛体",
+    source: "運動学のモデル（関節の角度や筋力は扱わない）",
+    status: "estimated",
+  },
+  {
     part: "ラバーごとの反発・摩擦の基準値",
     detail: "テンション/粘着/表/粒高の数値そのもの",
     source: "公開値が見つからず推定（Ace の論文もラバー係数は非公開）",
@@ -123,35 +139,39 @@ export type RubberType = "tension" | "tacky" | "shortPips" | "longPips";
 // 用具の「面の性質」を2値に落としたもの。製品名ではなく一般的な傾向。
 export const RUBBERS: Record<
   RubberType,
-  { label: string; restitution: number; friction: number; note: string }
+  { label: string; restitution: number; friction: number; contactTime: number; note: string }
 > = {
   tension: {
     label: "裏ソフト（テンション系）",
     restitution: 0.85,
     friction: 0.9,
+    contactTime: 0.001,
     note: "よく弾み、よく引っかかる（数値は推定）",
   },
   tacky: {
     label: "裏ソフト（粘着系）",
     restitution: 0.75,
     friction: 1.1,
+    contactTime: 0.001,
     note: "弾みは控えめ、回転がかけやすい（数値は推定）",
   },
   shortPips: {
     label: "表ソフト",
     restitution: 0.85,
     friction: 0.5,
+    contactTime: 0.0009,
     note: "弾くが回転はかかりにくい（数値は推定）",
   },
   longPips: {
     label: "粒高",
     restitution: 0.6,
     friction: 0.25,
+    contactTime: 0.0008,
     note: "自分からは回転がかかりにくい（数値は推定）",
   },
 };
 
-export type ServeParams = {
+export type ServeParams = RacketMotionParams & {
   /** トスの高さ（手のひら=台面の高さから, m） */
   tossHeight: number;
   /** 打点の高さ（台面から, m） */
@@ -160,16 +180,6 @@ export type ServeParams = {
   contactBehind: number;
   /** 打点の左右位置（台の中心線から, m。左が正） */
   contactSide: number;
-  /** スイングの速さ (m/s) */
-  swingSpeed: number;
-  /** スイングの上下方向 (度)。+ = 上向き（こすり上げ）、- = 下向き（切り下ろし） */
-  swingPitch: number;
-  /** スイングの左右方向 (度)。+ = 左へ振る、- = 右へ振る */
-  swingYaw: number;
-  /** ラケット面の上下角度 (度)。0 = 垂直、+ = 上向き（開く）、- = 下向き（かぶせる） */
-  faceTilt: number;
-  /** ラケット面の左右向き (度)。+ = 左を向く、- = 右を向く */
-  faceYaw: number;
   rubber: RubberType;
 };
 
@@ -196,6 +206,8 @@ export type ContactInfo = {
   slipped: boolean;
   /** 打球直後の打ち出し角（水平から, 度） */
   launchAngle: number;
+  /** ボールがラバーに触れていた約1msの中身（時間分解した接触計算） */
+  impact: ContactResult | null;
 };
 
 export type TrajectoryEvent =
@@ -229,7 +241,10 @@ export type SimResult = {
   /** 相手コート1バウンド目の直後の回転 */
   spinAtOpponent: SpinBreakdown | null;
   warnings: string[];
+  /** ボールがラケットに触れた時刻（トス開始から, 秒） */
   contactTime: number;
+  /** ラケットの剛体運動（描画用） */
+  racket: RacketKinematics;
 };
 
 // プリセットは実測に合わせて較正: Tリーグのサーブ（Tamaki & Yoshida 2025, 1773本）の
@@ -239,11 +254,16 @@ export const DEFAULT_PARAMS: ServeParams = {
   contactHeight: 0.18,
   contactBehind: 0.2,
   contactSide: 0.35,
-  swingSpeed: 9,
-  swingPitch: -10,
+  swingSpeed: 6,
+  swingPitch: -5,
   swingYaw: -5,
-  faceTilt: 80,
+  faceTilt: 86,
   faceYaw: 0,
+  gripAngle: 45,
+  arcRadius: 0.4,
+  forearmRoll: 0,
+  hitAlong: 0.03,
+  hitAcross: 0,
   rubber: "tension",
 };
 
@@ -258,10 +278,10 @@ export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
     label: "横下回転",
     params: {
       ...DEFAULT_PARAMS,
-      swingSpeed: 8,
+      swingSpeed: 6,
       swingPitch: -5,
       swingYaw: -45,
-      faceTilt: 56,
+      faceTilt: 58,
       faceYaw: 30,
       contactSide: 0.45,
     },
@@ -272,8 +292,8 @@ export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
     params: {
       ...DEFAULT_PARAMS,
       swingSpeed: 2,
-      swingPitch: 0,
-      faceTilt: 44,
+      swingPitch: -5,
+      faceTilt: 42,
     },
   },
   {
@@ -282,9 +302,9 @@ export const PRESETS: { id: string; label: string; params: ServeParams }[] = [
     params: {
       ...DEFAULT_PARAMS,
       contactHeight: 0.14,
-      swingSpeed: 10,
-      swingPitch: 25,
-      faceTilt: -40,
+      swingSpeed: 6,
+      swingPitch: 10,
+      faceTilt: -34,
     },
   },
 ];
@@ -324,18 +344,10 @@ function spinLabel(topBack: number, side: number, gyro: number, total: number) {
 }
 
 /** ラケット面の法線（面が向いている方向の単位ベクトル）。 */
-export function faceNormal(p: ServeParams): Vec3 {
-  const t = rad(p.faceTilt);
-  const y = rad(p.faceYaw);
-  return v(Math.cos(t) * Math.cos(y), Math.cos(t) * Math.sin(y), Math.sin(t));
-}
+export const faceNormal = (p: ServeParams): Vec3 => faceNormalOf(p);
 
 /** スイング方向の単位ベクトル。 */
-export function swingDirection(p: ServeParams): Vec3 {
-  const ph = rad(p.swingPitch);
-  const yw = rad(p.swingYaw);
-  return v(Math.cos(ph) * Math.cos(yw), Math.cos(ph) * Math.sin(yw), Math.sin(ph));
-}
+export const swingDirection = (p: ServeParams): Vec3 => swingDirectionOf(p);
 
 /**
  * 接触面での衝突（法線方向は反発係数、接線方向は摩擦の上限つきで「転がり」に向かう）。
@@ -458,14 +470,8 @@ export function simulateServe(params: ServeParams, dt = 0.001): SimResult {
   const inVel = v(0, 0, -G * tDrop);
 
   const n = faceNormal(params);
-  const hitRes = collide(
-    inVel,
-    v(0, 0, 0),
-    n,
-    scale(swingDirection(params), params.swingSpeed),
-    (vn) => racketRestitution(rubber.restitution, vn),
-    rubber.friction,
-  );
+  const racket = buildRacketKinematics(params, sub(contactPos, scale(n, BALL.radius)));
+  const impact = simulateRacketContact(racket, rubber, contactPos, inVel);
 
   const nb = scale(n, -1);
   const contactOnBall = {
@@ -475,11 +481,19 @@ export function simulateServe(params: ServeParams, dt = 0.001): SimResult {
 
   const events: TrajectoryEvent[] = [{ kind: "contact", t: contactTime, p: contactPos }];
 
-  if (!hitRes) {
+  if (!impact.hit) {
     const zero = breakdownSpin(v(0, 0, 0), v(1, 0, 0));
     return {
       params,
-      contact: { hit: false, ballSpeed: 0, spin: zero, contactOnBall, slipped: false, launchAngle: 0 },
+      contact: {
+        hit: false,
+        ballSpeed: 0,
+        spin: zero,
+        contactOnBall,
+        slipped: false,
+        launchAngle: 0,
+        impact: null,
+      },
       points: [...tossPath, { t: contactTime, p: contactPos }],
       events,
       verdict: "whiff",
@@ -490,23 +504,29 @@ export function simulateServe(params: ServeParams, dt = 0.001): SimResult {
       spinAtOpponent: null,
       warnings,
       contactTime,
+      racket,
     };
   }
 
-  let pos = contactPos;
-  let vel = hitRes.vel;
-  let omega = hitRes.omega;
+  let pos = impact.exitPos;
+  let vel = impact.vel;
+  let omega = impact.omega;
   const contact: ContactInfo = {
     hit: true,
     ballSpeed: norm(vel),
     spin: breakdownSpin(omega, vel),
     contactOnBall,
-    slipped: hitRes.slipped,
+    slipped: impact.slipFraction > 0.5,
     launchAngle: (Math.atan2(vel.z, Math.hypot(vel.x, vel.y)) * 180) / Math.PI,
+    impact,
   };
 
-  const points: TrajectoryPoint[] = [...tossPath, { t: contactTime, p: pos }];
-  let t = contactTime;
+  const points: TrajectoryPoint[] = [
+    ...tossPath,
+    { t: contactTime, p: contactPos },
+    { t: contactTime + impact.duration, p: pos },
+  ];
+  let t = contactTime + impact.duration;
   let netClearance: number | null = null;
   let netChecked = false;
   let spinAtOpponent: SpinBreakdown | null = null;
@@ -595,6 +615,7 @@ export function simulateServe(params: ServeParams, dt = 0.001): SimResult {
     spinAtOpponent,
     warnings,
     contactTime,
+    racket,
   };
 }
 
@@ -676,8 +697,19 @@ export function serveInsights(r: SimResult): string[] {
   if (r.netClearance !== null && r.verdict !== "net" && r.netClearance > 0.12) {
     out.push(`ネットの上を約${cm(r.netClearance)}cm通過しています。高く浮くサーブは相手に強く打たれやすくなります。`);
   }
-  if (r.contact.hit && r.contact.slipped) {
-    out.push("ボールがラバーの上で滑っています（摩擦の上限）。ここから回転を増やすには、スイングを速くするか摩擦の大きいラバーが有効です。");
+  const impact = r.contact.impact;
+  if (impact && impact.slipFraction > 0.8) {
+    out.push(
+      "接触中ずっとラバーの上で滑っています。滑っている間の回転は「摩擦 × 押す力」で決まるので、こする速さを上げるより、少し厚く当てて押す力を増やすか、摩擦の大きいラバーの方が効きます。",
+    );
+  } else if (impact && impact.slipFraction < 0.3 && impact.overspinRatio > 1.2) {
+    out.push(
+      `ラバーがボールに食いついています。たわんだラバーが戻る力で、転がりの約${impact.overspinRatio.toFixed(1)}倍の回転になっています。`,
+    );
+  }
+  // 柄の方向に押し出すスイングでは手首の弧が使えず、先端に当てても速くならない
+  if (impact && r.params.swingSpeed > 1 && norm(r.racket.pivotVel) > 0.8 * r.params.swingSpeed) {
+    out.push("柄の方向に押し出すスイングになっています。グリップの向きを変えて柄と直交する方向に振ると、手首の弧で先端が速く動きます。");
   }
   if (r.contact.hit && r.contact.spin.total > 5 && r.spinAtOpponent) {
     const drop = 1 - r.spinAtOpponent.total / r.contact.spin.total;

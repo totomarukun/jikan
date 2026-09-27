@@ -18,6 +18,8 @@ import {
   type SimResult,
   type SpinBreakdown,
 } from "@/lib/serve-sim";
+import { BLADE, type ContactResult } from "@/lib/racket";
+import { norm } from "@/lib/vec3";
 
 const SPEEDS = [0.1, 0.25, 0.5, 1] as const;
 
@@ -47,6 +49,21 @@ const GROUPS: { title: string; sliders: SliderDef[] }[] = [
       { key: "swingSpeed", label: "速さ", min: 0.5, max: 16, step: 0.1, unit: "m/s", hint: "打った瞬間のラケットの速さ" },
       { key: "swingPitch", label: "上下の方向", min: -60, max: 60, step: 1, unit: "°", hint: "＋でこすり上げ、−で切り下ろし" },
       { key: "swingYaw", label: "左右の方向", min: -70, max: 70, step: 1, unit: "°", hint: "＋で左へ、−で右へ振る" },
+    ],
+  },
+  {
+    title: "ラケットの動き（手首・腕）",
+    sliders: [
+      { key: "arcRadius", label: "スイングの回転半径", min: 0.1, max: 0.7, step: 0.01, unit: "cm", display: 100, hint: "手首だけの小さな弧 ≈15cm、前腕まで ≈40cm、腕全体 ≈60cm。小さいほど先端が速く回る" },
+      { key: "forearmRoll", label: "前腕のひねり", min: -1500, max: 1500, step: 10, unit: "°/s", hint: "柄を軸に面を回す速さ。＋で面の側から見て反時計回り" },
+      { key: "gripAngle", label: "グリップの向き", min: -180, max: 180, step: 1, unit: "°", hint: "面の上で柄がどちらを向くか。0°で柄が自分側" },
+    ],
+  },
+  {
+    title: "ラケットのどこに当てるか",
+    sliders: [
+      { key: "hitAlong", label: "先端 ⇔ 根元", min: -0.06, max: 0.07, step: 0.005, unit: "mm", display: 1000, hint: "ブレード中心から先端方向へ。先端ほど速く動いている" },
+      { key: "hitAcross", label: "左右", min: -0.06, max: 0.06, step: 0.005, unit: "mm", display: 1000, hint: "ブレード中心から横方向へ" },
     ],
   },
   {
@@ -249,6 +266,8 @@ export function ServeLab() {
           <SpinTable title="相手コートでバウンドした後" spin={result.spinAtOpponent} />
         </div>
 
+        {contact.impact && <ImpactPanel impact={contact.impact} racketOmega={norm(result.racket.omega)} />}
+
         {(result.verdict === "short" || result.verdict === "long") && (
           <ProComparison kind={result.verdict} spin={contact.spin.total} />
         )}
@@ -320,6 +339,7 @@ export function ServeLab() {
 
         <div className="space-y-4">
           <ContactDial params={params} />
+          <BladeHitPicker params={params} onChange={(hitAlong, hitAcross) => update({ hitAlong, hitAcross })} />
         </div>
       </section>
 
@@ -521,8 +541,173 @@ function ModelBasis() {
         ))}
       </ul>
       <p className="mt-3 text-xs leading-6 text-tt-gray70">
-        まだ入っていないもの: ラケットの材質の影響（しなり）、ボールの変形、打球の「球持ち」（接触時間）。
+        まだ入っていないもの: ボールがスポンジに沈み込んで生まれる「食い込み」（摩擦以上のひっかかり）、ブレードのしなり、ボールの変形。
       </p>
     </details>
   );
 }
+
+/**
+ * インパクトの約1ミリ秒を分解して見せる。回転の立ち上がりと押す力を、時間軸をそろえた2つの小さなグラフで。
+ * 灰色の帯はラバーの上で滑っている時間（摩擦の上限に達している）。
+ */
+function ImpactPanel({ impact, racketOmega }: { impact: ContactResult; racketOmega: number }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const trace = impact.trace;
+  if (trace.length < 2) return null;
+  const tMax = trace[trace.length - 1].tMs;
+  const W = 320;
+  const H = 76;
+  const PAD_L = 4;
+  const PAD_R = 4;
+  const x = (t: number) => PAD_L + ((W - PAD_L - PAD_R) * t) / tMax;
+  const spinMax = Math.max(1, ...trace.map((s) => s.spinRps));
+  const forceMax = Math.max(0.1, ...trace.map((s) => s.normalForce));
+  const line = (get: (s: (typeof trace)[number]) => number, max: number) =>
+    trace.map((s, i) => `${i === 0 ? "M" : "L"}${x(s.tMs).toFixed(1)},${(H - 4 - ((H - 12) * get(s)) / max).toFixed(1)}`).join(" ");
+  // 滑っている区間を帯にまとめる
+  const bands: [number, number][] = [];
+  trace.forEach((s, i) => {
+    const next = trace[i + 1]?.tMs ?? s.tMs;
+    if (!s.slipping) return;
+    const last = bands[bands.length - 1];
+    if (last && Math.abs(last[1] - s.tMs) < 1e-9) last[1] = next;
+    else bands.push([s.tMs, next]);
+  });
+  const hs = hover === null ? null : trace[hover];
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = ((e.clientX - rect.left) / rect.width) * (W / (W - PAD_L - PAD_R)) * tMax;
+    let best = 0;
+    trace.forEach((s, i) => {
+      if (Math.abs(s.tMs - t) < Math.abs(trace[best].tMs - t)) best = i;
+    });
+    setHover(best);
+  };
+  const chart = (title: string, unit: string, get: (s: (typeof trace)[number]) => number, max: number, color: string) => (
+    <div>
+      <div className="flex items-baseline justify-between text-[11px] text-tt-gray70">
+        <span className="font-bold text-tt-charcoal">{title}</span>
+        <span className="font-mono tabular-nums">
+          最大 {max.toFixed(max < 10 ? 1 : 0)}
+          {unit}
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="mt-1 block h-auto w-full touch-none"
+        onPointerMove={onMove}
+        onPointerDown={onMove}
+        onPointerLeave={() => setHover(null)}
+        role="img"
+        aria-label={`${title}の時間変化`}
+      >
+        {bands.map(([a, b]) => (
+          <rect key={a} x={x(a)} y={0} width={Math.max(1, x(b) - x(a))} height={H} fill="#e9e9ec" />
+        ))}
+        <line x1={0} y1={H - 4} x2={W} y2={H - 4} stroke="#b9b9bd" strokeWidth={1} />
+        <path d={line(get, max)} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+        {hs && <line x1={x(hs.tMs)} y1={0} x2={x(hs.tMs)} y2={H} stroke="#57575a" strokeWidth={1} strokeDasharray="2 2" />}
+      </svg>
+    </div>
+  );
+
+  return (
+    <div className="mt-4 rounded-xl p-3 ring-1 ring-tt-gray30/50">
+      <p className="text-xs font-bold">インパクトの1ミリ秒（ボールがラバーに触れている間）</p>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <MiniStat label="接触時間" value={(impact.duration * 1000).toFixed(2)} unit="ms" />
+        <MiniStat label="ラバー上を転がった距離" value={(impact.travelOnRubber * 1000).toFixed(1)} unit="mm" />
+        <MiniStat label="滑っていた時間の割合" value={Math.round(impact.slipFraction * 100).toString()} unit="%" />
+        <MiniStat
+          label="回転の上乗せ（転がり比）"
+          value={impact.overspinRatio > 0 ? impact.overspinRatio.toFixed(2) : "—"}
+          unit={impact.overspinRatio > 0 ? "倍" : ""}
+        />
+        <MiniStat label="打球点の速さ" value={impact.hitPointSpeed.toFixed(1)} unit="m/s" />
+        <MiniStat label="ラケットの回転の速さ" value={Math.round((racketOmega * 180) / Math.PI).toString()} unit="°/s" />
+      </div>
+      <div className="mt-3 space-y-2">
+        {chart("回転数の立ち上がり", "rps", (s) => s.spinRps, spinMax, "var(--color-gs-red)")}
+        {chart("ボールを押す力", "N", (s) => s.normalForce, forceMax, "var(--color-gs-blue)")}
+        <div className="flex justify-between font-mono text-[10px] text-tt-gray70 tabular-nums">
+          <span>0ms</span>
+          <span>{(tMax / 2).toFixed(2)}ms</span>
+          <span>{tMax.toFixed(2)}ms</span>
+        </div>
+      </div>
+      <p className="mt-2 min-h-5 font-mono text-xs tabular-nums text-tt-charcoal">
+        {hs
+          ? `${hs.tMs.toFixed(2)}ms: 回転 ${hs.spinRps.toFixed(1)}rps / 押す力 ${hs.normalForce.toFixed(1)}N / ${hs.slipping ? "滑っている" : "食いついている"}`
+          : "グラフをなぞると、その瞬間の値を表示します"}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-tt-gray70">
+        灰色の帯はラバーの上で滑っている時間。「回転の上乗せ」が1倍を超えるのは、横にたわんだラバーが戻るときにボールを余分に回すためです（1倍＝ちょうど転がり）。
+      </p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="rounded-lg bg-tt-offwhite px-2.5 py-2">
+      <p className="text-[11px] leading-4 text-tt-gray70">{label}</p>
+      <p className="mt-0.5 font-mono text-base font-bold tabular-nums">
+        {value}
+        <span className="ml-1 text-[11px] font-normal text-tt-gray70">{unit}</span>
+      </p>
+    </div>
+  );
+}
+
+/** ブレードの正面図。クリック（タップ）した位置に打球点を動かす。 */
+function BladeHitPicker({
+  params,
+  onChange,
+}: {
+  params: ServeParams;
+  onChange: (hitAlong: number, hitAcross: number) => void;
+}) {
+  const S = 700; // m → px
+  const cx = 90;
+  const cy = 78;
+  const rx = BLADE.halfWidth * S;
+  const ry = BLADE.halfLength * S;
+  const px = cx + params.hitAcross * S;
+  const py = cy - params.hitAlong * S;
+  const pick = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const sx = ((e.clientX - rect.left) / rect.width) * 180;
+    const sy = ((e.clientY - rect.top) / rect.height) * 200;
+    const across = (sx - cx) / S;
+    const along = (cy - sy) / S;
+    // ブレードの内側（ボール半径ぶん内側）に収める
+    const k = Math.hypot(across / (BLADE.halfWidth - 0.015), along / (BLADE.halfLength - 0.015));
+    const f = k > 1 ? 1 / k : 1;
+    onChange(Math.round((along * f) / 0.005) * 0.005, Math.round((across * f) / 0.005) * 0.005);
+  };
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <p className="text-sm font-bold">ラケットのどこに当てるか</p>
+      <svg
+        viewBox="0 0 180 200"
+        className="mx-auto mt-2 block w-36 cursor-crosshair touch-none"
+        onPointerDown={pick}
+        role="img"
+        aria-label="ブレード上の打球位置"
+      >
+        <rect x={cx - 9} y={cy + ry - 6} width={18} height={70} rx={4} fill="#c9a36b" stroke="#6b5230" />
+        <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="var(--color-gs-red)" stroke="#a00c1d" strokeWidth={2} />
+        <line x1={cx} y1={cy - ry} x2={cx} y2={cy + ry} stroke="#fff" strokeOpacity={0.35} />
+        <line x1={cx - rx} y1={cy} x2={cx + rx} y2={cy} stroke="#fff" strokeOpacity={0.35} />
+        <circle cx={px} cy={py} r={BALL_R_PX} fill="#fff" stroke="#0e0e10" strokeWidth={1.5} />
+        <text x={cx} y={12} textAnchor="middle" fontSize="10" fill="#57575a">先端</text>
+      </svg>
+      <p className="mt-1 text-xs leading-5 text-tt-gray70">
+        タップした位置にボールが当たります。先端寄りほど、手首の回転でラバーが速く動き、回転がかかりやすくなります。
+      </p>
+    </div>
+  );
+}
+
+const BALL_R_PX = 0.02 * 700;
